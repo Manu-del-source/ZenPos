@@ -1,5 +1,5 @@
 """
-WSGI config for kipchi_core project.
+WSGI config for zenpos_core project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'kipchi_core.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'zenpos_core.settings')
 
 application = get_wsgi_application()

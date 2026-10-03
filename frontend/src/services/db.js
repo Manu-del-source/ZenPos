@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 
-export const db = new Dexie('KipchiPOS_DB');
+export const db = new Dexie('ZenPOS_DB');
 
 db.version(1).stores({
   products: '++id, name, barcode, price, stockLevel',

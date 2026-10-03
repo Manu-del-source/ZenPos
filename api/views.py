@@ -12,9 +12,9 @@ from django.http import HttpResponse
 def landing_page(request):
     html = """
     <html>
-        <head><title>Kipchi-POS Back-Office</title></head>
+        <head><title>ZenPOS Back-Office</title></head>
         <body style="font-family: sans-serif; padding: 50px; text-align: center; background: #f4f7f6;">
-            <h1 style="color: #2c3e50;">🛒 Kipchi-POS Back-Office 🇰🇪</h1>
+            <h1 style="color: #2c3e50;">🛒 ZenPOS Back-Office 🇰🇪</h1>
             <p style="color: #7f8c8d;">The system is online and ready.</p>
             <div style="margin-top: 30px;">
                 <a href="/admin/" style="background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 10px;">Go to Admin Panel</a>

@@ -11,7 +11,7 @@ const products = [
 ];
 
 /**
- * Sample Kipchi checkout window used as marketing artwork.
+ * Sample ZenPOS checkout window used as marketing artwork.
  * `variant="compact"` (hero) is slightly rotated and floated; `variant="showcase"`
  * is the full-size copy on the dark band. Content is illustrative sample data.
  */
@@ -20,10 +20,10 @@ function PosPreview({ variant = 'showcase' }) {
     <div
       className={'pos-preview' + (variant === 'compact' ? ' pos-preview-compact' : '')}
       role="img"
-      aria-label="Sample Kipchi point of sale screen with product search, a two-item cart, KES total, and cash or M-Pesa payment options"
+      aria-label="Sample ZenPOS point of sale screen with product search, a two-item cart, KES total, and cash or M-Pesa payment options"
     >
       <div className="preview-topbar">
-        <div className="preview-brand"><span className="preview-brand-mark">K</span><b>Kipchi <span>POS</span></b></div>
+        <div className="preview-brand"><span className="preview-brand-mark">Z</span><b>Zen<span>POS</span></b></div>
         <div className="preview-location"><Building2 size={13} /> Main store <ChevronDown size={12} /></div>
         <div className="preview-avatar">JM</div>
       </div>

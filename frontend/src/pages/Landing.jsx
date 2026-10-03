@@ -29,7 +29,7 @@ const features = [
     icon: Building2,
     tone: 'slate',
     title: 'Branch-ready platform',
-    text: 'Kipchi includes branch records and staff access foundations. Branch workflows depend on your setup.',
+    text: 'ZenPOS includes branch records and staff access foundations. Branch workflows depend on your setup.',
     variant: 'full',
   },
 ];
@@ -93,14 +93,14 @@ function Hero() {
           </div>
         </div>
       </div>
-      <a className="hero-scroll" href="#features"><span>Explore Kipchi</span><ArrowDown size={14} /></a>
+      <a className="hero-scroll" href="#features"><span>Explore ZenPOS</span><ArrowDown size={14} /></a>
     </section>
   );
 }
 
 function CapabilityStrip() {
   return (
-    <div className="capability-strip" aria-label="Kipchi POS capabilities">
+    <div className="capability-strip" aria-label="ZenPOS capabilities">
       {capabilities.map(({ icon: Icon, label }) => (
         <span key={label}><Icon size={14} /> {label}</span>
       ))}
@@ -117,7 +117,7 @@ function Features() {
             <span className="eyebrow">One system for the daily details</span>
             <h2 className="section-title" id="features-heading">The essentials, all working together.</h2>
           </div>
-          <p className="section-lead">Kipchi brings the main parts of retail operations into one connected workspace.</p>
+          <p className="section-lead">ZenPOS brings the main parts of retail operations into one connected workspace.</p>
         </div>
         <div className="feature-grid">
           {features.map(({ icon: Icon, tone, title, text, variant, chip, bullets }) => (
@@ -156,7 +156,7 @@ function HowItWorks() {
             <h2 className="section-title" id="how-heading">From product search to paid.</h2>
             <p className="section-lead">Keep the routine clear for the people serving customers and managing the shop.</p>
           </div>
-          <Link className="text-link" to="/login">Sign in to Kipchi <ArrowRight size={15} /></Link>
+          <Link className="text-link" to="/login">Sign in to ZenPOS <ArrowRight size={15} /></Link>
         </div>
         <div className="steps-grid">
           {steps.map(({ icon: Icon, title, text }, index) => (
@@ -267,7 +267,7 @@ function Branches() {
           <span className="eyebrow">Built with growing teams in mind</span>
           <h2 className="section-title" id="branches-heading">A platform with branches in its foundations.</h2>
           <p className="section-lead">
-            Kipchi includes branch records and branch-scoped staff access. Branch-level sales and stock workflows are still being expanded across the product.
+            ZenPOS includes branch records and branch-scoped staff access. Branch-level sales and stock workflows are still being expanded across the product.
           </p>
         </div>
         <div className="branch-map" role="img" aria-label="An organization connected to three branch locations">
@@ -303,7 +303,7 @@ function FinalCta() {
     <div className="cta-wrap">
       <section className="final-cta" aria-labelledby="cta-heading">
         <div className="final-cta-inner">
-          <span className="eyebrow eyebrow--light">Kipchi POS</span>
+          <span className="eyebrow eyebrow--light">ZenPOS</span>
           <h2 id="cta-heading">Ready to bring the work together?</h2>
           <p>Bring sales, inventory, customers and business management into one retail workspace.</p>
           <div className="cta-actions">
@@ -318,7 +318,7 @@ function FinalCta() {
 
 function Landing() {
   return (
-    <div className="kipchi-site">
+    <div className="zenpos-site">
       <a className="skip-link" href="#main-content">Skip to content</a>
       <SiteHeader />
       <div id="main-content">

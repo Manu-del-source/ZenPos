@@ -23,7 +23,7 @@ function SiteFooter() {
         </div>
       </div>
       <div className="footer-bottom">
-        <span>© {new Date().getFullYear()} Kipchi POS</span>
+        <span>© {new Date().getFullYear()} ZenPOS</span>
         <span>Retail, made clearer.</span>
       </div>
     </footer>

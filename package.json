@@ -1,5 +1,5 @@
 {
-  "name": "kipchi-pos",
+  "name": "zenpos",
   "private": true,
   "version": "1.0.0",
   "description": "Root package for the realtime service (realtime.js). The backend and frontend services have their own package.json files.",

@@ -56,7 +56,7 @@ Rewrites (ordered most → least specific):
   `vercel dev` to run all services together with bindings injected.
 
 ### Notes
-- The Django prototype (`kipchi_core/`, `api/`, `manage.py`), the Textual
+- The Django prototype (`zenpos_core/`, `api/`, `manage.py`), the Textual
   terminal app (`main.py`, `screens.py`) and `mock-api.js` are not part of
   the Vercel deployment.
 - `realtime.js` runs socket.io; verify WebSocket support for your Vercel

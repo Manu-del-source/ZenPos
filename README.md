@@ -1,4 +1,4 @@
-# Kipchi-POS Supermarket System
+# ZenPOS Supermarket System
 
 A high-volume, multi-branch POS system designed for the Kenyan retail market.
 

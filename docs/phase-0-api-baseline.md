@@ -17,7 +17,7 @@ React (frontend/src/pages/*.jsx)
   -> pos.db                         (repo root)
 ```
 
-Legacy trees (`backend/server.js` + Express/Prisma, `api/` + `kipchi_core/` +
+Legacy trees (`backend/server.js` + Express/Prisma, `api/` + `zenpos_core/` +
 Django, `main.py`/`screens.py` TUI, `mock-api.js`, `realtime.js`) are **out of
 scope** and untouched.
 

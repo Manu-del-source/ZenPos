@@ -2,17 +2,17 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 /**
- * Kipchi POS logo lockup. `tone="dark"` renders for dark backgrounds.
+ * ZenPOS logo lockup. `tone="dark"` renders for dark backgrounds.
  */
-function Brand({ tone = 'light', to = '/', label = 'Kipchi POS home' }) {
+function Brand({ tone = 'light', to = '/', label = 'ZenPOS home' }) {
   return (
     <Link
-      className={'kipchi-brand' + (tone === 'dark' ? ' kipchi-brand--on-dark' : '')}
+      className={'zenpos-brand' + (tone === 'dark' ? ' zenpos-brand--on-dark' : '')}
       to={to}
       aria-label={label}
     >
-      <span className="kipchi-brand-mark" aria-hidden="true"><span>K</span></span>
-      <span className="kipchi-brand-name">kipchi<span>POS</span></span>
+      <span className="zenpos-brand-mark" aria-hidden="true"><span>Z</span></span>
+      <span className="zenpos-brand-name">zen<span>POS</span></span>
     </Link>
   );
 }
