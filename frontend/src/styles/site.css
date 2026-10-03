@@ -1,10 +1,10 @@
 /* ==========================================================================
-   Kipchi POS — site design system
+   ZenPOS — site design system
    Shared tokens + primitives for the public pages (landing, login).
-   Applied through .kipchi-site / .login-page so app screens stay untouched.
+   Applied through .zenpos-site / .login-page so app screens stay untouched.
    ========================================================================== */
 
-.kipchi-site,
+.zenpos-site,
 .login-page {
   --ink: #0b1a2c;
   --ink-2: #12263c;
@@ -40,25 +40,25 @@
   color: var(--text);
 }
 
-html:has(.kipchi-site),
+html:has(.zenpos-site),
 html:has(.login-page) {
   scroll-behavior: smooth;
 }
 
-.kipchi-site a,
+.zenpos-site a,
 .login-page a {
   text-decoration: none;
 }
-.kipchi-site button,
+.zenpos-site button,
 .login-page button {
   font-family: inherit;
 }
-.kipchi-site input,
+.zenpos-site input,
 .login-page input {
   font-family: inherit;
 }
-.kipchi-site a:focus-visible,
-.kipchi-site button:focus-visible,
+.zenpos-site a:focus-visible,
+.zenpos-site button:focus-visible,
 .login-page a:focus-visible,
 .login-page button:focus-visible,
 .login-page input:focus-visible {
@@ -85,13 +85,13 @@ html:has(.login-page) {
 }
 
 /* --------------------------------------------------------------- brand --- */
-.kipchi-brand {
+.zenpos-brand {
   display: inline-flex;
   align-items: center;
   gap: 11px;
   flex: 0 0 auto;
 }
-.kipchi-brand-mark {
+.zenpos-brand-mark {
   width: 38px;
   height: 38px;
   display: grid;
@@ -101,7 +101,7 @@ html:has(.login-page) {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 6px 16px rgb(47 107 255 / 35%);
   transform: rotate(-4deg);
 }
-.kipchi-brand-mark > span {
+.zenpos-brand-mark > span {
   color: #fff;
   font-size: 20px;
   font-weight: 800;
@@ -109,13 +109,13 @@ html:has(.login-page) {
   line-height: 1;
   transform: rotate(4deg);
 }
-.kipchi-brand-name {
+.zenpos-brand-name {
   color: var(--ink);
   font-size: 21px;
   font-weight: 800;
   letter-spacing: -0.05em;
 }
-.kipchi-brand-name > span {
+.zenpos-brand-name > span {
   margin-left: 6px;
   color: var(--accent);
   font-size: 10px;
@@ -123,10 +123,10 @@ html:has(.login-page) {
   letter-spacing: 0.14em;
   vertical-align: 2px;
 }
-.kipchi-brand--on-dark .kipchi-brand-name {
+.zenpos-brand--on-dark .zenpos-brand-name {
   color: #fff;
 }
-.kipchi-brand--on-dark .kipchi-brand-name > span {
+.zenpos-brand--on-dark .zenpos-brand-name > span {
   color: var(--sky);
 }
 

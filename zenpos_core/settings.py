@@ -4,7 +4,7 @@ from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-kipchi-pos-super-secret'
+SECRET_KEY = 'django-insecure-zenpos-super-secret'
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 
@@ -31,7 +31,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'kipchi_core.urls'
+ROOT_URLCONF = 'zenpos_core.urls'
 
 TEMPLATES = [
     {
@@ -49,7 +49,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'kipchi_core.wsgi.application'
+WSGI_APPLICATION = 'zenpos_core.wsgi.application'
 
 DATABASES = {
     'default': {

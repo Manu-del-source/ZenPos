@@ -48,7 +48,7 @@ const Login = () => {
 
   return (
     <div className="login-page">
-      <aside className="login-brand-panel" aria-label="About Kipchi POS">
+      <aside className="login-brand-panel" aria-label="About ZenPOS">
         <div className="login-brand-top">
           <Brand tone="dark" />
         </div>
@@ -79,14 +79,14 @@ const Login = () => {
         </div>
 
         <div className="login-brand-foot">
-          <span>© {new Date().getFullYear()} Kipchi POS</span>
+          <span>© {new Date().getFullYear()} ZenPOS</span>
           <Link to="/"><ArrowLeft size={14} /> Back to home</Link>
         </div>
       </aside>
 
       <main className="login-form-panel">
         <div className="login-form-top">
-          <span>New to Kipchi?</span>
+          <span>New to ZenPOS?</span>
           <Link to="/">Get started <ArrowUpRight size={14} /></Link>
         </div>
 
@@ -144,7 +144,7 @@ const Login = () => {
               Use the staff account provided by your administrator. Ask them if you need access.
             </div>
 
-            <Link className="login-back-link" to="/"><ArrowLeft size={14} /> Back to Kipchi POS home</Link>
+            <Link className="login-back-link" to="/"><ArrowLeft size={14} /> Back to ZenPOS home</Link>
           </div>
         </div>
       </main>

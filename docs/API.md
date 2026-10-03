@@ -1,4 +1,4 @@
-# Kipchi-POS API Documentation
+# ZenPOS API Documentation
 
 ## Auth
 - `POST /api/v1/auth/login`: Authenticate and get JWT.

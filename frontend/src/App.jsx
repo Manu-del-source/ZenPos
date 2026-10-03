@@ -29,7 +29,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
             <div className="bg-blue-600 p-2 rounded-lg">
               <span className="text-lg font-black italic">K</span>
             </div>
-            <div className="text-xl font-black tracking-tighter uppercase">KIPCHI <span className="text-blue-500">POS</span></div>
+            <div className="text-xl font-black tracking-tighter uppercase">ZEN<span className="text-blue-500">POS</span></div>
           </div>
           <div className="flex items-center space-x-2">
             <Link to="/pos" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition">POS</Link>

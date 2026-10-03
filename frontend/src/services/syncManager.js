@@ -3,7 +3,7 @@ import api from './api';
 import toast from 'react-hot-toast';
 
 // 1. Setup Local Database
-export const db = new Dexie('KipchiOfflineDB');
+export const db = new Dexie('ZenPOSOfflineDB');
 db.version(1).stores({
   offlineSales: '++id, sale_number, sync_status',
   cachedProducts: 'id, barcode, name'
