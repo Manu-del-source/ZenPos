@@ -3,7 +3,13 @@ const { v4: uuidv4 } = require('uuid');
 
 exports.getCustomers = async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM "Customer" ORDER BY name ASC');
+    const { search } = req.query;
+    const result = search
+      ? await db.query(
+          'SELECT * FROM "Customer" WHERE name ILIKE $1 OR phone ILIKE $1 ORDER BY name ASC',
+          [`%${search}%`]
+        )
+      : await db.query('SELECT * FROM "Customer" ORDER BY name ASC');
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ message: error.message });

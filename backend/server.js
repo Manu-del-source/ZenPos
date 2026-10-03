@@ -8,6 +8,10 @@ const db = require('./src/config/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Behind Vercel's proxy (or any reverse proxy) so express-rate-limit and
+// req.ip see the real client address.
+app.set('trust proxy', 1);
+
 // Rate limiting
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

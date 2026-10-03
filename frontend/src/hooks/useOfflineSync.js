@@ -18,7 +18,7 @@ const useOfflineSync = (token) => {
 
       for (const sale of offlineSales) {
         try {
-          await api.post('/sales', sale);
+          await api.post('/v1/sales', sale);
           // Update status in local DB to synced
           await db.salesQueue.update(sale.id, { status: 'synced' });
         } catch (error) {

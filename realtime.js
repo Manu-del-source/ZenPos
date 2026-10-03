@@ -49,7 +49,7 @@ app.post('/api/realtime/mpesa/stkpush', async (req, res) => {
   }
 });
 
-const PORT = 5001; // Separate port from Django
+const PORT = process.env.PORT || 5001; // Separate port from Django
 server.listen(PORT, () => {
   console.log(`🚀 Real-time & M-Pesa Service running on port ${PORT}`);
 });

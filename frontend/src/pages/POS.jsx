@@ -27,10 +27,10 @@ const POS = () => {
 
   const fetchProducts = async () => {
     try {
-      const { data } = await api.get(`/products/?search=${searchTerm}`);
+      const { data } = await api.get(`/v1/inventory/products?search=${searchTerm}`);
       setProducts(data);
       // Auto-add if exact SKU match and only one result
-      if (searchTerm && data.length === 1 && data[0].sku.toLowerCase() === searchTerm.toLowerCase()) {
+      if (searchTerm && data.length === 1 && data[0].sku?.toLowerCase() === searchTerm.toLowerCase()) {
         addToCart(data[0]);
         setSearchTerm('');
         toast.success(`Added ${data[0].name}`);
@@ -62,18 +62,17 @@ const POS = () => {
     setLoading(true);
     try {
       const saleData = {
-        sale_number: `CASH-${Date.now()}`,
-        total_amount: grandTotal,
-        tax_amount: tax.toFixed(2),
-        payment_method: 'CASH',
+        total: grandTotal,
+        tax: Number(tax.toFixed(2)),
+        paymentMethod: 'CASH',
         items: cart.map(item => ({
-          product: item.id,
+          productId: item.id,
           quantity: item.quantity,
-          unit_price: item.price,
-          subtotal: item.price * item.quantity
+          unitPrice: item.price,
+          subtotal: item.subtotal
         }))
       };
-      await api.post('/sales/', saleData);
+      await api.post('/v1/sales', saleData);
       const change = Number(cashAmount) - grandTotal;
       toast.success(`Sale Complete! Change: KES ${change.toLocaleString()}`, { duration: 5000 });
       clearCart();
@@ -112,8 +111,8 @@ const POS = () => {
               </div>
               <div>
                 <div className="price">KES {p.price.toLocaleString()}</div>
-                <div className={`stock-badge mt-2 ${p.stock > 10 ? 'stock-green' : p.stock > 0 ? 'stock-yellow' : 'stock-red'}`}>
-                  {p.stock > 0 ? `${p.stock} IN STOCK` : 'OUT OF STOCK'}
+                <div className={`stock-badge mt-2 ${p.stockLevel > 10 ? 'stock-green' : p.stockLevel > 0 ? 'stock-yellow' : 'stock-red'}`}>
+                  {p.stockLevel > 0 ? `${p.stockLevel} IN STOCK` : 'OUT OF STOCK'}
                 </div>
               </div>
             </div>

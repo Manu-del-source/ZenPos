@@ -12,10 +12,10 @@ const Dashboard = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/reports/dashboard', { params: { role: user.role } });
+      const { data } = await api.get('/v1/reports/dashboard');
       setStats(data);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to load dashboard stats');
+      toast.error(err.response?.data?.message || 'Failed to load dashboard stats');
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ const Dashboard = () => {
             <TrendingUp size={20} className="mr-2" />
             <span className="text-[10px] font-black uppercase tracking-widest">Revenue</span>
           </div>
-          <h2 className="text-2xl font-black text-white">KES {Number(stats?.revenue || 0).toLocaleString()}</h2>
+          <h2 className="text-2xl font-black text-white">KES {Number(stats?.revenueToday || 0).toLocaleString()}</h2>
         </div>
         
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
@@ -57,7 +57,7 @@ const Dashboard = () => {
             <BarChart3 size={20} className="mr-2" />
             <span className="text-[10px] font-black uppercase tracking-widest">Orders</span>
           </div>
-          <h2 className="text-2xl font-black text-white">{stats?.orders_count || 0}</h2>
+          <h2 className="text-2xl font-black text-white">{stats?.salesToday || 0}</h2>
         </div>
 
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl border-l-4 border-l-emerald-500">
@@ -65,7 +65,7 @@ const Dashboard = () => {
             <TrendingUp size={20} className="mr-2" />
             <span className="text-[10px] font-black uppercase tracking-widest">Net Profit</span>
           </div>
-          <h2 className="text-2xl font-black text-white">KES {Number(stats?.profit || 0).toLocaleString()}</h2>
+          <h2 className="text-2xl font-black text-white">KES {Number(stats?.profitToday || 0).toLocaleString()}</h2>
         </div>
 
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
@@ -73,7 +73,7 @@ const Dashboard = () => {
             <AlertTriangle size={20} className="mr-2" />
             <span className="text-[10px] font-black uppercase tracking-widest">Warnings</span>
           </div>
-          <h2 className="text-2xl font-black text-white">{stats?.low_stock?.length || 0}</h2>
+          <h2 className="text-2xl font-black text-white">{stats?.lowStockCount || 0}</h2>
         </div>
       </div>
 
@@ -84,18 +84,18 @@ const Dashboard = () => {
             <TrendingUp className="mr-2 text-blue-500" /> Top Selling Parts
           </h3>
           <div className="space-y-4">
-            {stats?.top_selling?.map((item, i) => (
+            {stats?.topSelling?.map((item, i) => (
               <div key={i} className="flex items-center justify-between p-4 bg-slate-800/40 rounded-xl border border-slate-800">
                 <div>
                   <div className="font-bold text-white text-sm uppercase">{item.name}</div>
-                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{item.total_qty} units sold</div>
+                  <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{item.totalSold} units sold</div>
                 </div>
                 <div className="text-blue-400 font-black">
-                  KES {Number(item.total_revenue).toLocaleString()}
+                  KES {Number(item.revenue).toLocaleString()}
                 </div>
               </div>
             ))}
-            {(!stats?.top_selling || stats.top_selling.length === 0) && (
+            {(!stats?.topSelling || stats.topSelling.length === 0) && (
                <div className="text-center py-10 text-slate-600 font-bold uppercase text-xs tracking-widest">No Sales Data Today</div>
             )}
           </div>
@@ -115,17 +115,17 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {stats?.low_stock?.map((item, i) => (
+                {stats?.lowStock?.map((item, i) => (
                   <tr key={i} className="border-t border-slate-800 hover:bg-slate-800/30 transition">
                     <td className="p-4 font-medium text-slate-200">{item.name}</td>
                     <td className="p-4 text-right">
                       <span className="bg-red-500/10 text-red-400 px-3 py-1 rounded-full text-xs font-black">
-                        {item.stock} left
+                        {item.stockLevel} left
                       </span>
                     </td>
                   </tr>
                 ))}
-                {(!stats?.low_stock || stats.low_stock.length === 0) && (
+                {(!stats?.lowStock || stats.lowStock.length === 0) && (
                   <tr>
                     <td colSpan="2" className="p-8 text-center text-slate-600 italic">No inventory warnings</td>
                   </tr>
@@ -141,7 +141,7 @@ const Dashboard = () => {
           <div className="space-y-4">
             <div className="flex items-center p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
               <div className="w-2 h-2 bg-blue-500 rounded-full mr-4 animate-pulse"></div>
-              <span className="text-sm text-slate-300">FastAPI Backend: <b className="text-blue-400">Connected</b></span>
+              <span className="text-sm text-slate-300">Express API: <b className="text-blue-400">Connected</b></span>
             </div>
             <div className="flex items-center p-4 bg-green-500/5 rounded-xl border border-green-500/10">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-4"></div>
@@ -149,7 +149,7 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center p-4 bg-slate-800/50 rounded-xl">
               <div className="w-2 h-2 bg-slate-600 rounded-full mr-4"></div>
-              <span className="text-sm text-slate-500">Database Engine: SQLite3 (Local)</span>
+              <span className="text-sm text-slate-500">Database Engine: PostgreSQL</span>
             </div>
           </div>
         </div>

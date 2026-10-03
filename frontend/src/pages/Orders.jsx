@@ -12,7 +12,7 @@ const Orders = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/sales/');
+      const res = await api.get('/v1/sales');
       setOrders(res.data);
     } catch (err) {
       toast.error('Failed to load transaction history');
@@ -23,8 +23,8 @@ const Orders = () => {
 
   const fetchOrderDetails = async (saleId) => {
     try {
-      const res = await api.get(`/sales/${saleId}`);
-      setOrderDetails(res.data);
+      const res = await api.get(`/v1/sales/${saleId}`);
+      setOrderDetails(res.data.items || []);
     } catch (err) {
       toast.error('Failed to load details');
     }
@@ -69,13 +69,13 @@ const Orders = () => {
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-slate-800/30 transition group">
                 <td className="p-5">
-                  <div className="font-mono text-blue-500 font-bold">#SALE-{order.id}</div>
+                  <div className="font-mono text-blue-500 font-bold">#{order.saleNumber || order.id}</div>
                 </td>
                 <td className="p-5 text-slate-300 text-sm">
-                  {order.timestamp}
+                  {new Date(order.createdAt).toLocaleString()}
                 </td>
                 <td className="p-5 text-slate-400 text-sm italic">
-                  {order.customer || 'Walk-in Customer'}
+                  {order.customerName || 'Walk-in Customer'}
                 </td>
                 <td className="p-5 text-right font-black text-white">
                   KES {Number(order.total).toLocaleString()}
@@ -117,9 +117,9 @@ const Orders = () => {
             </div>
 
             <div className="space-y-1 text-[10px] mb-6 uppercase font-bold">
-               <div className="flex justify-between"><span>RECEIPT NO:</span> <span>SALE-{selectedOrder.id}</span></div>
-               <div className="flex justify-between"><span>DATE:</span> <span>{selectedOrder.timestamp}</span></div>
-               <div className="flex justify-between"><span>CUSTOMER:</span> <span>{selectedOrder.customer || 'CASH SALE'}</span></div>
+               <div className="flex justify-between"><span>RECEIPT NO:</span> <span>{selectedOrder.saleNumber || selectedOrder.id}</span></div>
+               <div className="flex justify-between"><span>DATE:</span> <span>{new Date(selectedOrder.createdAt).toLocaleString()}</span></div>
+               <div className="flex justify-between"><span>CUSTOMER:</span> <span>{selectedOrder.customerName || 'CASH SALE'}</span></div>
             </div>
 
             <div className="border-b border-slate-200 mb-4"></div>
@@ -128,8 +128,8 @@ const Orders = () => {
                {orderDetails.map((item, i) => (
                  <div key={i} className="flex justify-between text-xs">
                    <div className="flex flex-col">
-                     <span className="font-bold">{item.name}</span>
-                     <span className="text-[10px] text-slate-500">{item.quantity} x {item.price_per_unit}</span>
+                     <span className="font-bold">{item.productName}</span>
+                     <span className="text-[10px] text-slate-500">{item.quantity} x {item.unitPrice}</span>
                    </div>
                    <span className="font-bold">KES {item.subtotal}</span>
                  </div>
