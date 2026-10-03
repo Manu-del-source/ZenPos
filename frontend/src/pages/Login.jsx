@@ -15,7 +15,7 @@ const Login = () => {
       const res = await api.post('/login', { username, password });
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      navigate('/');
+      navigate('/pos');
       window.location.reload();
     } catch (err) {
       setError(err.response?.data?.detail || 'Authentication failed');
@@ -29,8 +29,8 @@ const Login = () => {
           <div className="bg-blue-600 p-4 rounded-2xl mb-4 shadow-lg shadow-blue-500/20">
             <ShieldCheck size={40} className="text-white" />
           </div>
-          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">ROHI <span className="text-blue-500">Hardware & Moto</span></h2>
-          <p className="text-slate-500 font-bold text-xs uppercase tracking-[0.2em] mt-2 text-center">Secure Access Point</p>
+          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">KIPCHI <span className="text-blue-500">POS</span></h2>
+          <p className="text-slate-500 font-bold text-xs uppercase tracking-[0.2em] mt-2 text-center">Sign in to your workspace</p>
         </div>
 
         {error && (
@@ -74,7 +74,7 @@ const Login = () => {
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98]"
           >
-            Authenticate
+            Sign in
           </button>
         </form>
       </div>
