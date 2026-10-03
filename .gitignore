@@ -5,3 +5,4 @@ dist/
 *.log
 package-lock.json
 prisma/migrations/
+__pycache__/

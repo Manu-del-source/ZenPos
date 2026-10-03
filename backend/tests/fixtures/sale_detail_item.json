@@ -1,0 +1,7 @@
+{
+  "name": "str",
+  "sku": "str",
+  "quantity": "int",
+  "price_per_unit": "number",
+  "subtotal": "number"
+}

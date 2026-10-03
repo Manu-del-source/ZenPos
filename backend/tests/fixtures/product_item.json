@@ -1,0 +1,9 @@
+{
+  "id": "int",
+  "sku": "str",
+  "name": "str",
+  "category": "null|str",
+  "cost_price": "number",
+  "price": "number",
+  "stock": "int"
+}

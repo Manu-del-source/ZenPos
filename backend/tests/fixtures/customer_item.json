@@ -1,0 +1,6 @@
+{
+  "id": "int",
+  "name": "str",
+  "phone": "null|str",
+  "email": "null|str"
+}
