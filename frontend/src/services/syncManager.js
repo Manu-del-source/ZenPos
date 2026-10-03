@@ -21,7 +21,7 @@ export const syncOfflineSales = async () => {
     try {
       // Remove local ID before sending to Django
       const { id, sync_status, ...saleData } = sale;
-      await api.post('/sales/', saleData);
+      await api.post('/v1/sales', saleData);
       
       // Update local status
       await db.offlineSales.update(id, { sync_status: 'synced' });

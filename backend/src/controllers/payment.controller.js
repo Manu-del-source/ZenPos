@@ -1,3 +1,4 @@
+const axios = require('axios');
 const db = require('../config/db');
 const mpesaService = require('../services/mpesa.service');
 
@@ -87,9 +88,11 @@ exports.checkPaymentStatus = async (req, res) => {
           ['PAID', saleId]
         );
 
-        // Notify Real-time Service
+        // Notify Real-time Service (REALTIME_URL is injected by the Vercel
+        // service binding; read it at request time so it resolves at runtime)
         try {
-          await axios.post('http://localhost:5001/api/realtime/payment-notification', {
+          const realtimeBaseUrl = (process.env.REALTIME_URL || 'http://localhost:5001').replace(/\/$/, '');
+          await axios.post(`${realtimeBaseUrl}/api/realtime/payment-notification`, {
             saleId,
             checkoutRequestId,
             status: 'SUCCESS'

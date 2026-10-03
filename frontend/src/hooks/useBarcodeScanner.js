@@ -20,7 +20,7 @@ export const useBarcodeScanner = () => {
       if (e.key === 'Enter') {
         if (buffer.current.length > 3) {
           try {
-            const res = await api.get(`/products/search/?barcode=${buffer.current}`);
+            const res = await api.get(`/v1/inventory/products/${buffer.current}`);
             addToCart(res.data);
             toast.success(`Added ${res.data.name}`);
             buffer.current = '';

@@ -25,7 +25,7 @@ const Inventory = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/products/?search=${searchTerm}`);
+      const { data } = await api.get(`/v1/inventory/products?search=${searchTerm}`);
       setProducts(data);
     } catch (err) {
       toast.error('Failed to load products');
@@ -39,7 +39,7 @@ const Inventory = () => {
     if (!window.confirm("Delete this part from inventory permanently?")) return;
     
     try {
-      await api.delete(`/products/${id}`, { params: { role: user.role } });
+      await api.delete(`/v1/inventory/products/${id}`, { params: { role: user.role } });
       toast.success('Part deleted');
       fetchProducts();
     } catch (err) {

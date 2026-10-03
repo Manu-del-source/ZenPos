@@ -27,7 +27,7 @@ const POS = () => {
 
   const fetchProducts = async () => {
     try {
-      const { data } = await api.get(`/products/?search=${searchTerm}`);
+      const { data } = await api.get(`/v1/inventory/products?search=${searchTerm}`);
       setProducts(data);
       // Auto-add if exact SKU match and only one result
       if (searchTerm && data.length === 1 && data[0].sku.toLowerCase() === searchTerm.toLowerCase()) {
@@ -73,7 +73,7 @@ const POS = () => {
           subtotal: item.price * item.quantity
         }))
       };
-      await api.post('/sales/', saleData);
+      await api.post('/v1/sales', saleData);
       const change = Number(cashAmount) - grandTotal;
       toast.success(`Sale Complete! Change: KES ${change.toLocaleString()}`, { duration: 5000 });
       clearCart();

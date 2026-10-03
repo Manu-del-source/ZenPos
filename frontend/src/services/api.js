@@ -1,12 +1,11 @@
 import axios from 'axios';
 
-// Detect the current host's IP and use port 5000 for the FastAPI backend
-const getBaseURL = () => {
-  const { hostname } = window.location;
-  // If we are on localhost, backend is at localhost:5000
-  // If we are on a mobile device, backend is at [mobile-ip]:5000
-  return `http://${hostname}:5000/api`;
-};
+// The API is served from the same origin under /api:
+// - In production, Vercel rewrites /api/* to the backend service
+//   and /api/realtime/* to the realtime service.
+// - In local dev, the Vite dev server proxies /api to http://localhost:5000
+//   (see vite.config.js).
+const getBaseURL = () => '/api';
 
 const api = axios.create({
   baseURL: getBaseURL(),
