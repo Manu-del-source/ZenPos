@@ -1,0 +1,7 @@
+{
+  "revenue": "number",
+  "orders_count": "int",
+  "profit": "number",
+  "top_selling": "list",
+  "low_stock": "list"
+}

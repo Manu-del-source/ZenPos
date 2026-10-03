@@ -1,0 +1,7 @@
+{
+  "token": "str",
+  "user": {
+    "username": "str",
+    "role": "str"
+  }
+}

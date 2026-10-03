@@ -1,0 +1,6 @@
+{
+  "id": "int",
+  "timestamp": "str",
+  "total": "number",
+  "customer": "null|str"
+}

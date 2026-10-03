@@ -1,7 +1,31 @@
 import React, { useState } from 'react';
 import api from '../services/api';
-import { useNavigate } from 'react-router-dom';
-import { Lock, User, ShieldCheck } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft, ArrowUpRight, Check, CircleDollarSign, Lock, ShieldCheck,
+  Smartphone, User, Warehouse,
+} from 'lucide-react';
+import Brand from '../components/site/Brand';
+import '../styles/site.css';
+import '../styles/login.css';
+
+const benefits = [
+  {
+    icon: CircleDollarSign,
+    title: 'Fast point of sale',
+    text: 'Products, cart and totals in one clear checkout.',
+  },
+  {
+    icon: Warehouse,
+    title: 'Stock-aware selling',
+    text: 'Catalogue and stock levels connected to sales.',
+  },
+  {
+    icon: Smartphone,
+    title: 'Cash or M-Pesa',
+    text: 'Start an M-Pesa STK push or take cash at the counter.',
+  },
+];
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -23,61 +47,107 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <div className="bg-slate-900 p-10 rounded-3xl border border-slate-800 shadow-2xl w-full max-w-md">
-        <div className="flex flex-col items-center mb-10">
-          <div className="bg-blue-600 p-4 rounded-2xl mb-4 shadow-lg shadow-blue-500/20">
-            <ShieldCheck size={40} className="text-white" />
-          </div>
-          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">KIPCHI <span className="text-blue-500">POS</span></h2>
-          <p className="text-slate-500 font-bold text-xs uppercase tracking-[0.2em] mt-2 text-center">Sign in to your workspace</p>
+    <div className="login-page">
+      <aside className="login-brand-panel" aria-label="About Kipchi POS">
+        <div className="login-brand-top">
+          <Brand tone="dark" />
         </div>
 
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 mb-6 rounded-xl text-center text-sm font-bold">
-            {error}
-          </div>
-        )}
+        <div className="login-brand-body">
+          <span className="eyebrow eyebrow--light">Retail, brought together</span>
+          <h1>Everything you need to run your <em>retail business.</em></h1>
+          <p>
+            Bring sales, inventory, payments, customers and business management together in one simple system.
+          </p>
+          <ul className="login-benefits">
+            {benefits.map(({ icon: Icon, title, text }) => (
+              <li key={title}>
+                <Icon size={19} strokeWidth={1.9} />
+                <span><b>{title}</b><small>{text}</small></span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-slate-400 text-xs font-black uppercase tracking-widest mb-2 ml-1">Username</label>
-            <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input
-                type="text"
-                className="w-full bg-slate-950 border border-slate-800 text-white pl-12 pr-4 py-4 rounded-xl focus:border-blue-500 outline-none transition-all"
-                placeholder="Enter admin ID"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
+        <div className="login-float-note login-float-note--a">
+          <span className="float-note-icon"><Check size={16} /></span>
+          <span><b>Stock-aware checkout</b><small>Items and totals, together</small></span>
+        </div>
+        <div className="login-float-note login-float-note--b">
+          <span className="float-note-icon"><ShieldCheck size={16} /></span>
+          <span><b>Role-aware workspace</b><small>Tools for your staff account</small></span>
+        </div>
+
+        <div className="login-brand-foot">
+          <span>© {new Date().getFullYear()} Kipchi POS</span>
+          <Link to="/"><ArrowLeft size={14} /> Back to home</Link>
+        </div>
+      </aside>
+
+      <main className="login-form-panel">
+        <div className="login-form-top">
+          <span>New to Kipchi?</span>
+          <Link to="/">Get started <ArrowUpRight size={14} /></Link>
+        </div>
+
+        <div className="login-form-wrap">
+          <div className="login-form-card">
+            <div className="login-mobile-brand"><Brand /></div>
+            <h2>Welcome back</h2>
+            <p>Sign in to your workspace to reach the retail tools available to your role.</p>
+
+            {error && (
+              <div className="login-error" role="alert">
+                <ShieldCheck size={17} />
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="login-form">
+              <div className="login-field">
+                <label htmlFor="login-username">Username</label>
+                <div className="login-input-wrap">
+                  <User size={17} />
+                  <input
+                    id="login-username"
+                    type="text"
+                    placeholder="Enter your username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                    autoComplete="username"
+                  />
+                </div>
+              </div>
+
+              <div className="login-field">
+                <label htmlFor="login-password">Password</label>
+                <div className="login-input-wrap">
+                  <Lock size={17} />
+                  <input
+                    id="login-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="login-submit">Sign in</button>
+            </form>
+
+            <div className="login-hint">
+              <ShieldCheck size={16} />
+              Use the staff account provided by your administrator. Ask them if you need access.
             </div>
-          </div>
 
-          <div>
-            <label className="block text-slate-400 text-xs font-black uppercase tracking-widest mb-2 ml-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input
-                type="password"
-                className="w-full bg-slate-950 border border-slate-800 text-white pl-12 pr-4 py-4 rounded-xl focus:border-blue-500 outline-none transition-all"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            <Link className="login-back-link" to="/"><ArrowLeft size={14} /> Back to Kipchi POS home</Link>
           </div>
-
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98]"
-          >
-            Sign in
-          </button>
-        </form>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };
