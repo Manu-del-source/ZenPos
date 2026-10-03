@@ -1,0 +1,20 @@
+{
+  "name": "kipchi-pos",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Root package for the realtime service (realtime.js). The backend and frontend services have their own package.json files.",
+  "main": "realtime.js",
+  "scripts": {
+    "start": "node realtime.js",
+    "dev": "node realtime.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.20.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^14.0.0"
+  }
+}

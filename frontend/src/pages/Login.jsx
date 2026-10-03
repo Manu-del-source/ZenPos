@@ -42,7 +42,7 @@ const Login = () => {
       navigate('/pos');
       window.location.reload();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Authentication failed');
+      setError(err.response?.data?.message || 'Authentication failed');
     }
   };
 

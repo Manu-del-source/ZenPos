@@ -11,7 +11,7 @@ const Inventory = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user.role === 'ADMIN';
 
   const [formData, setFormData] = useState({
     name: '',
@@ -43,7 +43,7 @@ const Inventory = () => {
       toast.success('Part deleted');
       fetchProducts();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Delete failed');
+      toast.error(err.response?.data?.message || 'Delete failed');
     }
   };
 
@@ -58,13 +58,13 @@ const Inventory = () => {
         name: product.name,
         sku: product.sku,
         price: product.price,
-        cost_price: product.cost_price,
-        stock: product.stock,
-        category_id: product.category_id || ''
+        costPrice: product.costPrice,
+        stockLevel: product.stockLevel,
+        category: product.category || ''
       });
     } else {
       setEditingProduct(null);
-      setFormData({ name: '', sku: '', price: '', cost_price: '', stock: '', category_id: '' });
+      setFormData({ name: '', sku: '', price: '', costPrice: '', stockLevel: '', category: '' });
     }
     setShowModal(true);
   };
@@ -128,11 +128,11 @@ const Inventory = () => {
                 </td>
                 <td className="p-5 text-right">
                   <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                    p.stock <= 10 
+                    p.stockLevel <= 10 
                       ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
                       : 'bg-green-500/10 text-green-500 border border-green-500/20'
                   }`}>
-                    {p.stock} units
+                    {p.stockLevel} units
                   </span>
                 </td>
                 <td className="p-5 text-center">
@@ -189,8 +189,8 @@ const Inventory = () => {
                   <input 
                     type="number"
                     className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                    value={formData.stockLevel}
+                    onChange={(e) => setFormData({...formData, stockLevel: e.target.value})}
                   />
                 </div>
               </div>
@@ -209,8 +209,8 @@ const Inventory = () => {
                   <input 
                     type="number"
                     className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500"
-                    value={formData.cost_price}
-                    onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
+                    value={formData.costPrice}
+                    onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
                   />
                 </div>
               </div>

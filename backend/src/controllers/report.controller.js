@@ -22,10 +22,41 @@ exports.getDashboardStats = async (req, res) => {
       [branchId]
     );
 
+    // 4. Net Profit (Today): sum of (unitPrice - costPrice) * quantity sold
+    const profitToday = await db.query(
+      `SELECT COALESCE(SUM((si."unitPrice" - p."costPrice") * si.quantity), 0) as profit
+       FROM "SaleItem" si
+       JOIN "Sale" s ON si."saleId" = s.id
+       JOIN "Product" p ON si."productId" = p.id
+       WHERE s."branchId" = $1 AND s."createdAt" >= CURRENT_DATE`,
+      [branchId]
+    );
+
+    // 5. Top Selling Products (all time)
+    const topSelling = await db.query(
+      `SELECT p.name, SUM(si.quantity) as "totalSold", SUM(si.subtotal) as revenue
+       FROM "SaleItem" si
+       JOIN "Product" p ON si."productId" = p.id
+       JOIN "Sale" s ON si."saleId" = s.id
+       WHERE s."branchId" = $1
+       GROUP BY p.id, p.name
+       ORDER BY "totalSold" DESC LIMIT 5`,
+      [branchId]
+    );
+
+    // 6. Low Stock Items
+    const lowStock = await db.query(
+      'SELECT id, name, "stockLevel", "lowStockThreshold" FROM "Product" WHERE "branchId" = $1 AND "stockLevel" <= "lowStockThreshold" ORDER BY "stockLevel" ASC LIMIT 10',
+      [branchId]
+    );
+
     res.json({
       revenueToday: revenueToday.rows[0].revenue || 0,
       salesToday: salesToday.rows[0].count,
-      lowStockCount: lowStockCount.rows[0].count
+      lowStockCount: lowStockCount.rows[0].count,
+      profitToday: profitToday.rows[0].profit || 0,
+      topSelling: topSelling.rows,
+      lowStock: lowStock.rows
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

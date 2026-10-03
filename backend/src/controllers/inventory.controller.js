@@ -4,10 +4,16 @@ const { v4: uuidv4 } = require('uuid');
 exports.getProducts = async (req, res) => {
   try {
     const { branchId } = req.user;
-    const result = await db.query(
-      'SELECT * FROM "Product" WHERE "branchId" = $1 ORDER BY name ASC',
-      [branchId]
-    );
+    const { search } = req.query;
+    const result = search
+      ? await db.query(
+          'SELECT * FROM "Product" WHERE "branchId" = $1 AND (name ILIKE $2 OR barcode ILIKE $2 OR COALESCE(sku, \'\') ILIKE $2) ORDER BY name ASC',
+          [branchId, `%${search}%`]
+        )
+      : await db.query(
+          'SELECT * FROM "Product" WHERE "branchId" = $1 ORDER BY name ASC',
+          [branchId]
+        );
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ message: error.message });
