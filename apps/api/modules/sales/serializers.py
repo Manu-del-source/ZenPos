@@ -145,18 +145,10 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         read_only_fields = ("total_amount", "tax_amount", "discount_amount")
 
     def validate_payment_method(self, value):
-        """Only cash can be completed atomically with sale creation.
-
-        M-Pesa is a two-step provider flow: the sale must exist before an STK
-        request can reference it, and only the verified callback may complete
-        the payment. Treating an MPESA sale as cash here would create a false
-        completed payment and prevent the payment API from initiating the real
-        collection.
-        """
-        if value != Sale.PaymentMethod.CASH:
+        """Accept cash and M-Pesa; M-Pesa is settled by the payment endpoint."""
+        if value not in {Sale.PaymentMethod.CASH, Sale.PaymentMethod.MPESA}:
             raise serializers.ValidationError(
-                "M-Pesa payments must be initiated through the payments endpoint "
-                "after the sale is created."
+                "Only CASH and MPESA are currently supported at the POS."
             )
         return value
 
@@ -223,27 +215,25 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             tax_amount=tax_total,
         )
 
-        # The money received, recorded in the same transaction as the sale it
-        # pays for. This is the one place sales reaches into the payments
-        # domain: ``payments`` already points back at ``Sale`` for its foreign
-        # key, so the edge exists in both directions until phase 6 rebuilds
-        # ``Sale`` and moves payment creation into the new sales engine.
-        payment = complete_cash_payment(
-            sale=sale, amount=computed_total, received_by=sale.cashier
-        )
-        record_audit(
-            action="payment.completed",
-            entity_type="payment",
-            entity_id=payment.pk,
-            actor=sale.cashier,
-            request=self.context.get("request"),
-            after={
-                "sale": str(sale.pk),
-                "method": payment.method,
-                "amount": str(payment.amount),
-                "status": payment.status,
-            },
-        )
+        # Cash is completed here because the customer has already handed it over.
+        # M-Pesa remains unsettled until the provider callback verifies the payment.
+        if sale.payment_method == Sale.PaymentMethod.CASH:
+            payment = complete_cash_payment(
+                sale=sale, amount=computed_total, received_by=sale.cashier
+            )
+            record_audit(
+                action="payment.completed",
+                entity_type="payment",
+                entity_id=payment.pk,
+                actor=sale.cashier,
+                request=self.context.get("request"),
+                after={
+                    "sale": str(sale.pk),
+                    "method": payment.method,
+                    "amount": str(payment.amount),
+                    "status": payment.status,
+                },
+            )
 
         # ``quantity`` is supplied per item; the line dict carries it only so
         # ``compute_line_money`` stays a pure, individually testable function.
