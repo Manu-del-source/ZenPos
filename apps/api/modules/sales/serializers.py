@@ -144,6 +144,22 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         # discounts bolted onto the sale header cannot be explained per line.
         read_only_fields = ("total_amount", "tax_amount", "discount_amount")
 
+    def validate_payment_method(self, value):
+        """Only cash can be completed atomically with sale creation.
+
+        M-Pesa is a two-step provider flow: the sale must exist before an STK
+        request can reference it, and only the verified callback may complete
+        the payment. Treating an MPESA sale as cash here would create a false
+        completed payment and prevent the payment API from initiating the real
+        collection.
+        """
+        if value != Sale.PaymentMethod.CASH:
+            raise serializers.ValidationError(
+                "M-Pesa payments must be initiated through the payments endpoint "
+                "after the sale is created."
+            )
+        return value
+
     def validate_items(self, value):
         if not value:
             raise serializers.ValidationError("A sale must contain at least one item.")
