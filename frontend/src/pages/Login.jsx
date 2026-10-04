@@ -35,10 +35,20 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError('');
+
     try {
-      const res = await api.post('/login', { username, password });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      // Django SimpleJWT expects /auth/login/ and returns access/refresh.
+      const { data } = await api.post('/auth/login/', { username, password });
+
+      localStorage.setItem('token', data.access);
+      localStorage.setItem('refreshToken', data.refresh);
+
+      // Load the authoritative user/role/branch data from Django rather than
+      // trusting a stale user object from the old Express API.
+      const me = await api.get('/auth/me/');
+      localStorage.setItem('user', JSON.stringify(me.data));
+
       navigate('/pos');
       window.location.reload();
     } catch (err) {
