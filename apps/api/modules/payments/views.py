@@ -47,6 +47,21 @@ class PaymentViewSet(
             return InitiatePaymentSerializer
         return PaymentSerializer
 
+    def create(self, request, *args, **kwargs):
+        """Return the created payment using the public payment representation.
+
+        The write serializer intentionally accepts only sale/method/phone. The
+        POS needs the persisted payment id immediately so it can poll status,
+        therefore the response is serialized with the read-only PaymentSerializer.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        payment = serializer.instance
+        response_serializer = PaymentSerializer(payment, context={"request": request})
+        headers = self.get_success_headers(response_serializer.data)
+        return Response(response_serializer.data, status=201, headers=headers)
+
     def perform_create(self, serializer):
         """Create the payment, then start the provider exchange.
 
