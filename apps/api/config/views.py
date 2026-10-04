@@ -1,4 +1,5 @@
-from django.http import HttpResponse
+from django.db import connection
+from django.http import HttpResponse, JsonResponse
 
 
 def landing_page(request):
@@ -19,3 +20,14 @@ def landing_page(request):
         </html>
         """
     )
+
+
+def health_check(request):
+    """Render health probe: verifies the Django process and database are reachable."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception:
+        return JsonResponse({"status": "unhealthy", "database": "unavailable"}, status=503)
+    return JsonResponse({"status": "ok", "database": "ok"})
