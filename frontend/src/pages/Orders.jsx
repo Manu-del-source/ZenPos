@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, FileText, RefreshCw, X } from 'lucide-react';
+import { Eye, FileText, Printer, RefreshCw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -24,6 +24,21 @@ export default function Orders() {
   };
 
   useEffect(() => { fetchOrders(); }, []);
+
+  const printReceipt = async (saleId) => {
+    try {
+      const { data } = await api.get(`/sales/${saleId}/receipt/?paper=80mm`, { responseType: 'text' });
+      const printWindow = window.open('', '_blank', 'width=480,height=760');
+      if (!printWindow) return toast.error('Allow pop-ups to print receipts.');
+      printWindow.document.open();
+      printWindow.document.write(data);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.onload = () => printWindow.print();
+    } catch {
+      toast.error('Could not prepare the receipt.');
+    }
+  };
 
   const openSale = async (sale) => {
     setSelected({ ...sale, items: [] });
@@ -125,6 +140,9 @@ export default function Orders() {
               )}
 
               <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+                <button className="btn-secondary" onClick={() => printReceipt(selected.id)} disabled={detailsLoading}>
+                  <Printer size={16} /> Print receipt
+                </button>
                 <span className="text-sm font-medium text-slate-400">Total</span>
                 <span className="text-xl font-bold text-white">{money(selected.total_amount)}</span>
               </div>
