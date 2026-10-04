@@ -26,6 +26,8 @@ class SoftDeleteQuerySet(models.QuerySet):
 class AllObjectsManager(models.Manager):
     """Unfiltered manager for querying active and soft-deleted records."""
 
+    use_in_migrations = True
+
 
 class SoftDeleteManager(models.Manager.from_queryset(SoftDeleteQuerySet)):
     """Default manager: hides soft-deleted rows.
