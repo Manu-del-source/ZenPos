@@ -49,8 +49,10 @@ export default function POS() {
   const visibleProducts = useMemo(() => products.filter((product) => product.is_active !== false), [products]);
 
   const addProduct = (product) => {
-    if (product.track_inventory && Number(product.stock_level) <= 0) {
-      toast.error('This product is out of stock.');
+    const existing = cart.find((item) => item.id === product.id);
+    const currentQty = existing?.quantity || 0;
+    if (product.track_inventory && currentQty >= Number(product.stock_level || 0)) {
+      toast.error(product.stock_level > 0 ? `Only ${product.stock_level} available.` : 'This product is out of stock.');
       return;
     }
     addToCart(product);
