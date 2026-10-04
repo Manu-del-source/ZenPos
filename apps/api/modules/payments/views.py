@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.exceptions import NotFound, ValidationError
@@ -47,6 +48,22 @@ class PaymentViewSet(
         if self.action == "create":
             return InitiatePaymentSerializer
         return PaymentSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        payment = self.get_object()
+        # A stale STK request must not hold inventory forever when a provider
+        # callback is lost. Polling the payment naturally performs the cleanup.
+        if (
+            payment.method == Payment.Method.MPESA
+            and payment.status == Payment.Status.PENDING
+            and payment.created_at <= timezone.now() - timezone.timedelta(minutes=10)
+        ):
+            payment.status = Payment.Status.FAILED
+            payment.save(update_fields=["status", "updated_at"])
+            release_mpesa_stock_reservation(sale=payment.sale, request=request)
+            payment.refresh_from_db()
+        return Response(PaymentSerializer(payment, context={"request": request}).data)
+
 
     def create(self, request, *args, **kwargs):
         """Return the created payment using the public payment representation.
