@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from .managers import SoftDeleteManager
+from .managers import AllObjectsManager, SoftDeleteManager
 
 
 class BaseModel(models.Model):
@@ -33,8 +33,8 @@ class SoftDeleteModel(BaseModel):
 
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
-    objects = SoftDeleteManager()  # noqa: DJ012
-    all_objects = models.Manager()
+    objects = SoftDeleteManager()
+    all_objects = AllObjectsManager()
 
     class Meta:
         abstract = True
