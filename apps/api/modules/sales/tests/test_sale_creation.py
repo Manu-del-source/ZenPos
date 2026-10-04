@@ -109,7 +109,9 @@ class TestSaleCreation:
         product.refresh_from_db()
         assert product.stock_level == 49
 
-    def test_non_stocked_product_does_not_consume_inventory(self, authenticated_client, make_product):
+    def test_non_stocked_product_does_not_consume_inventory(
+        self, authenticated_client, make_product
+    ):
         service = make_product(
             name="Delivery service",
             price="500.00",
