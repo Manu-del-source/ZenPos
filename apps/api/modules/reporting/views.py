@@ -84,7 +84,9 @@ class AnalyticsViewSet(viewsets.ViewSet):
         return Response(
             {
                 "low_stock_count": products.filter(
-                    stock_level__lte=F("low_stock_threshold")
+                    track_inventory=True,
+                    stock_level__lte=F("low_stock_threshold"),
+                    is_active=True,
                 ).count(),
                 "total_products": products.count(),
             }
