@@ -96,6 +96,20 @@ class TestSaleCreation:
         # A caller must not be able to attribute a sale to somebody else.
         assert Sale.objects.get().cashier_id == cashier.id
 
+    def test_mpesa_sale_is_rejected_until_payment_is_initiated(self, authenticated_client, product):
+        response = authenticated_client.post(
+            SALES_URL,
+            sale_payload(product, sale_number="SALE-MPESA", quantity=1)
+            | {"payment_method": "MPESA"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "payments endpoint" in str(response.data)
+        assert Sale.objects.count() == 0
+        product.refresh_from_db()
+        assert product.stock_level == 50
+
     def test_empty_item_list_is_rejected(self, authenticated_client):
         payload = {
             "sale_number": "SALE-EMPTY",
