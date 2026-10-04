@@ -8,18 +8,21 @@ import Orders from './pages/Orders';
 import Customers from './pages/Customers';
 import Landing from './pages/Landing';
 import useOfflineSync from './hooks/useOfflineSync';
+import { Toaster } from 'react-hot-toast';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  if (!token) return <Navigate to="/login" />;
+  if (!token) return <Navigate to="/login" replace />;
   return children;
 };
 
-import { Toaster } from 'react-hot-toast';
-
 const AppLayout = ({ token, user, handleLogout }) => {
   const { pathname } = useLocation();
-  const showAppNav = token && pathname !== '/' && pathname !== '/login';
+  const roles = Array.isArray(user?.roles) ? user.roles : [];
+  const isAdmin = user?.is_superuser === true || roles.some(
+    (role) => String(role).toLowerCase() === 'admin'
+  );
+  const showAppNav = Boolean(token) && pathname !== '/' && pathname !== '/login';
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -35,7 +38,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
             <Link to="/pos" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition">POS</Link>
             <Link to="/inventory" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition">Inventory</Link>
             <Link to="/orders" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition">Sales</Link>
-            {user.role?.toLowerCase() === 'admin' && (
+            {isAdmin && (
               <Link to="/dashboard" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition text-blue-400">Reports</Link>
             )}
             <button onClick={handleLogout} className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-lg font-bold transition">
@@ -61,11 +64,18 @@ const AppLayout = ({ token, user, handleLogout }) => {
 
 function App() {
   const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  let user = {};
+  try {
+    user = JSON.parse(localStorage.getItem('user') || '{}');
+  } catch {
+    localStorage.removeItem('user');
+  }
+
   useOfflineSync(token);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     window.location.href = '/login';
   };
@@ -77,6 +87,5 @@ function App() {
     </Router>
   );
 }
-
 
 export default App;
