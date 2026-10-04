@@ -238,7 +238,11 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
                     type=StockAdjustment.AdjustmentType.ADJUST,
                     notes=(
                         f"Sale {sale.sale_number}"
-                        + (" - M-Pesa pending reservation" if sale.payment_method == Sale.PaymentMethod.MPESA else "")
+                        + (
+                            " - M-Pesa pending reservation"
+                            if sale.payment_method == Sale.PaymentMethod.MPESA
+                            else ""
+                        )
                     ),
                 )
                 record_audit(
