@@ -13,7 +13,7 @@ import Customers from './pages/Customers';
 import Landing from './pages/Landing';
 import SettingsPage from './pages/Settings';
 import useOfflineSync from './hooks/useOfflineSync';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -124,7 +124,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => window.dispatchEvent(new CustomEvent('zenpos:notification'))} aria-label="Notifications" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-900 hover:text-slate-200"><Bell size={19} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-blue-500" /></button>
+            <button onClick={() => toast('You are all caught up.')} aria-label="Notifications" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-900 hover:text-slate-200"><Bell size={19} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-blue-500" /></button>
             <div className="hidden items-center gap-2 border-l border-slate-800 pl-3 sm:flex"><Store size={17} className="text-slate-500" /><span className="text-xs font-semibold text-slate-400">Main Store</span></div>
           </div>
         </header>
