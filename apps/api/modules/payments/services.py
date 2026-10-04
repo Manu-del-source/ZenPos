@@ -164,6 +164,7 @@ def initiate_payment(*, payment, phone: str, provider: PaymentProvider) -> Payme
                     "error": str(exc)[:255],
                 },
             )
+            release_mpesa_stock_reservation(sale=payment.sale)
             raise
 
         attempt.checkout_request_id = initiation.checkout_request_id
@@ -265,6 +266,10 @@ def handle_mpesa_callback(*, provider: PaymentProvider, payload, request=None) -
         else:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=["status", "updated_at"])
+            release_mpesa_stock_reservation(
+                sale=payment.sale,
+                request=request,
+            )
 
         WebhookEvent.objects.filter(
             provider=provider.provider_name, external_id=callback.external_id
