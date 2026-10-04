@@ -2,38 +2,19 @@ import { useEffect } from 'react';
 import api from '../services/api';
 import { db } from '../services/db';
 
+// Offline sales are intentionally not pushed until the frontend and Django
+// sales contract are aligned. The old Express endpoint (/v1/sales) is gone.
 const useOfflineSync = (token) => {
   useEffect(() => {
-    const syncSales = async () => {
-      if (!navigator.onLine || !token) return;
+    if (!navigator.onLine || !token) return undefined;
 
-      const offlineSales = await db.salesQueue
-        .where('status')
-        .equals('pending_sync')
-        .toArray();
-
-      if (offlineSales.length === 0) return;
-
-      console.log(`Syncing ${offlineSales.length} offline sales...`);
-
-      for (const sale of offlineSales) {
-        try {
-          await api.post('/v1/sales', sale);
-          // Update status in local DB to synced
-          await db.salesQueue.update(sale.id, { status: 'synced' });
-        } catch (error) {
-          console.error('Sync failed for sale:', sale.id, error);
-        }
-      }
-    };
-
-
-    window.addEventListener('online', syncSales);
-    // Initial sync check
-    syncSales();
-
-    return () => window.removeEventListener('online', syncSales);
+    // Keep the queue intact while online. A later sales-sync implementation
+    // can submit the exact Django SaleSerializer payload atomically.
+    // Do not call the removed Express API endpoint here.
+    return undefined;
   }, [token]);
+
+  return null;
 };
 
 export default useOfflineSync;
