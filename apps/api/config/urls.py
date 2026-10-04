@@ -21,6 +21,7 @@ api_v2_patterns = [
 
 urlpatterns = [
     path("", views.landing_page, name="landing"),
+    path("healthz/", views.health_check, name="healthz"),
     path("admin/", admin.site.urls),
     path("api/v2/", include(api_v2_patterns)),
     # Provider callbacks live outside /api/v2/: they are anonymous, verified
