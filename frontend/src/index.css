@@ -2,11 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom POS Tweaks */
-input::placeholder {
-  color: #94a3b8;
+:root {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  color-scheme: dark;
+  background: #020617;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
+html, body, #root { min-height: 100%; margin: 0; }
+
 body {
-  @apply antialiased text-slate-800;
+  @apply antialiased bg-slate-950 text-slate-100;
+}
+
+button, input, select, textarea { font: inherit; }
+
+input::placeholder, textarea::placeholder { color: #64748b; }
+
+* { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+
+@layer components {
+  .page-shell { @apply mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8; }
+  .page-title { @apply text-2xl font-black tracking-tight text-white sm:text-3xl; }
+  .page-subtitle { @apply mt-1 text-sm text-slate-500; }
+  .panel { @apply rounded-2xl border border-slate-800 bg-slate-900/80 shadow-xl shadow-black/10; }
+  .panel-header { @apply flex items-center justify-between border-b border-slate-800 px-5 py-4; }
+  .input { @apply w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10; }
+  .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm font-bold text-slate-300 transition hover:bg-slate-800 hover:text-white; }
 }
