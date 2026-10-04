@@ -1,156 +1,137 @@
-import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import React, { useEffect, useState } from 'react';
+import { Eye, FileText, RefreshCw, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { History, Search, Eye, X } from 'lucide-react';
+import api from '../services/api';
 
-const Orders = () => {
+const money = (value) => `KES ${Number(value || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [orderDetails, setOrderDetails] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/sales/');
-      setOrders(res.data);
+      const { data } = await api.get('/sales/');
+      setOrders(Array.isArray(data) ? data : (data.results || []));
     } catch (err) {
-      toast.error('Failed to load transaction history');
+      toast.error(err.response?.data?.detail || 'Failed to load sales.');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchOrderDetails = async (saleId) => {
+  useEffect(() => { fetchOrders(); }, []);
+
+  const openSale = async (sale) => {
+    setSelected({ ...sale, items: [] });
+    setDetailsLoading(true);
     try {
-      const res = await api.get(`/sales/${saleId}`);
-      setOrderDetails(res.data.items || []);
+      const { data } = await api.get(`/sales/${sale.id}/`);
+      setSelected(data);
     } catch (err) {
-      toast.error('Failed to load details');
+      toast.error('Could not load sale details.');
+    } finally {
+      setDetailsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const handleViewDetails = (order) => {
-    setSelectedOrder(order);
-    fetchOrderDetails(order.id);
-  };
-
   return (
-    <div className="p-8 max-w-7xl mx-auto bg-slate-950 min-h-screen text-white">
-      <div className="flex justify-between items-center mb-8">
+    <div className="page-shell">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight uppercase italic">SALES <span className="text-blue-500">HISTORY</span></h1>
-          <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Hardware & Motorcycle Spare Parts</p>
+          <div className="eyebrow">Transactions</div>
+          <h1 className="page-title">Sales</h1>
+          <p className="page-subtitle">Review completed sales, payment methods and line items.</p>
         </div>
-        <button 
-          onClick={fetchOrders}
-          className="bg-slate-800 text-slate-300 px-6 py-2 rounded-xl font-bold hover:bg-slate-700 transition flex items-center border border-slate-700"
-        >
-          REFRESH
+        <button className="btn-secondary" onClick={fetchOrders} disabled={loading}>
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
       </div>
 
-      <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
-        <table className="w-full text-left">
-          <thead className="bg-slate-800/50">
-            <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-              <th className="p-5">Transaction ID</th>
-              <th className="p-5">Timestamp</th>
-              <th className="p-5">Customer</th>
-              <th className="p-5 text-right">Total Amount</th>
-              <th className="p-5 text-center">Details</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {orders.map((order) => (
-              <tr key={order.id} className="hover:bg-slate-800/30 transition group">
-                <td className="p-5">
-                  <div className="font-mono text-blue-500 font-bold">#{order.saleNumber || order.id}</div>
-                </td>
-                <td className="p-5 text-slate-300 text-sm">
-                  {new Date(order.createdAt).toLocaleString()}
-                </td>
-                <td className="p-5 text-slate-400 text-sm italic">
-                  {order.customerName || 'Walk-in Customer'}
-                </td>
-                <td className="p-5 text-right font-black text-white">
-                  KES {Number(order.total).toLocaleString()}
-                </td>
-                <td className="p-5 text-center">
-                   <button 
-                    onClick={() => handleViewDetails(order)}
-                    className="p-2 bg-slate-800 hover:bg-blue-600 rounded-lg text-slate-400 hover:text-white transition"
-                   >
-                     <Eye size={18} />
-                   </button>
-                </td>
-              </tr>
+      <div className="panel mt-6 overflow-hidden">
+        <div className="hidden grid-cols-[1.2fr_1fr_1fr_.8fr_auto] gap-4 border-b border-slate-800 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 md:grid">
+          <span>Sale</span><span>Date</span><span>Customer</span><span>Payment</span><span>Total</span>
+        </div>
+
+        {loading ? (
+          <div className="p-10 text-center text-slate-500">Loading sales…</div>
+        ) : orders.length === 0 ? (
+          <div className="p-12 text-center">
+            <FileText className="mx-auto mb-3 text-slate-600" size={34} />
+            <p className="font-semibold text-slate-300">No sales recorded</p>
+            <p className="mt-1 text-sm text-slate-500">Completed transactions will appear here.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-800/70">
+            {orders.map((sale) => (
+              <button
+                key={sale.id}
+                className="grid w-full grid-cols-1 gap-2 px-5 py-4 text-left transition hover:bg-slate-900/60 md:grid-cols-[1.2fr_1fr_1fr_.8fr_auto] md:items-center md:gap-4"
+                onClick={() => openSale(sale)}
+              >
+                <div>
+                  <p className="font-semibold text-white">{sale.sale_number}</p>
+                  <p className="text-xs text-slate-500">{sale.cashier_name || 'Cashier'}</p>
+                </div>
+                <span className="text-sm text-slate-400">{new Date(sale.created_at).toLocaleString()}</span>
+                <span className="text-sm text-slate-400">{sale.customer_name || 'Walk-in customer'}</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{sale.payment_method}</span>
+                <span className="font-semibold text-white">{money(sale.total_amount)}</span>
+              </button>
             ))}
-          </tbody>
-        </table>
-        {orders.length === 0 && !loading && (
-          <div className="p-20 text-center flex flex-col items-center">
-            <History size={64} className="text-slate-800 mb-4" />
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">No transactions archived</p>
           </div>
         )}
       </div>
 
-      {/* Modern Receipt Modal */}
-      {selectedOrder && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-          <div className="bg-white text-slate-900 rounded-2xl p-8 w-full max-w-md shadow-2xl relative font-mono">
-            <button 
-              onClick={() => setSelectedOrder(null)}
-              className="absolute -top-12 right-0 text-white hover:text-red-500 transition"
-            >
-              <X size={32} />
-            </button>
-            
-            <div className="text-center border-b-2 border-dashed border-slate-300 pb-4 mb-4">
-              <h3 className="text-xl font-black uppercase tracking-tighter">HARDWARE & MOTO</h3>
-              <p className="text-xs text-slate-500">Official Sales Receipt</p>
+      {selected && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="panel max-h-[90vh] w-full max-w-lg overflow-y-auto">
+            <div className="panel-header sticky top-0 bg-slate-950/95 backdrop-blur">
+              <div>
+                <p className="eyebrow">Sale receipt</p>
+                <h2 className="panel-title">{selected.sale_number}</h2>
+              </div>
+              <button className="btn-secondary !px-3" onClick={() => setSelected(null)}><X size={17} /></button>
             </div>
+            <div className="space-y-4 p-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                  <p className="text-xs text-slate-500">Customer</p>
+                  <p className="mt-1 font-medium text-slate-200">{selected.customer_name || 'Walk-in customer'}</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                  <p className="text-xs text-slate-500">Payment</p>
+                  <p className="mt-1 font-medium text-slate-200">{selected.payment_method}</p>
+                </div>
+              </div>
 
-            <div className="space-y-1 text-[10px] mb-6 uppercase font-bold">
-               <div className="flex justify-between"><span>RECEIPT NO:</span> <span>{selectedOrder.saleNumber || selectedOrder.id}</span></div>
-               <div className="flex justify-between"><span>DATE:</span> <span>{new Date(selectedOrder.createdAt).toLocaleString()}</span></div>
-               <div className="flex justify-between"><span>CUSTOMER:</span> <span>{selectedOrder.customerName || 'CASH SALE'}</span></div>
-            </div>
+              {detailsLoading ? (
+                <div className="py-8 text-center text-slate-500">Loading items…</div>
+              ) : (
+                <div className="divide-y divide-slate-800 rounded-xl border border-slate-800">
+                  {(selected.items || []).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-4 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-200">{item.product_name}</p>
+                        <p className="text-xs text-slate-500">{item.quantity} × {money(item.unit_price)}</p>
+                      </div>
+                      <p className="font-semibold text-white">{money(item.line_total)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-            <div className="border-b border-slate-200 mb-4"></div>
-
-            <div className="space-y-3 mb-8">
-               {orderDetails.map((item, i) => (
-                 <div key={i} className="flex justify-between text-xs">
-                   <div className="flex flex-col">
-                     <span className="font-bold">{item.productName}</span>
-                     <span className="text-[10px] text-slate-500">{item.quantity} x {item.unitPrice}</span>
-                   </div>
-                   <span className="font-bold">KES {item.subtotal}</span>
-                 </div>
-               ))}
-            </div>
-
-            <div className="border-t-2 border-dashed border-slate-300 pt-4 mt-auto">
-               <div className="flex justify-between text-lg font-black italic">
-                 <span>TOTAL:</span>
-                 <span className="text-blue-600 underline">KES {Number(selectedOrder.total).toLocaleString()}</span>
-               </div>
-            </div>
-
-            <div className="text-center mt-8 text-[10px] text-slate-400 uppercase font-black tracking-widest">
-              *** Thank you for your business ***
+              <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+                <span className="text-sm font-medium text-slate-400">Total</span>
+                <span className="text-xl font-bold text-white">{money(selected.total_amount)}</span>
+              </div>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-export default Orders;
+}
