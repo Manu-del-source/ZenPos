@@ -9,20 +9,23 @@ const money = (value) => `KES ${Number(value || 0).toLocaleString()}`;
 const Dashboard = () => {
   const [trend, setTrend] = useState([]);
   const [lowStock, setLowStock] = useState([]);
+  const [lowStockCount, setLowStockCount] = useState(0);
   const [stockValue, setStockValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [trendRes, stockRes, lowStockRes] = await Promise.all([
+      const [trendRes, stockRes, lowStockRes, statusRes] = await Promise.all([
         api.get('/analytics/daily_sales_trend/'),
         api.get('/analytics/stock_value/'),
         api.get('/analytics/low_stock/'),
+        api.get('/analytics/inventory_status/'),
       ]);
       setTrend(Array.isArray(trendRes.data) ? trendRes.data : []);
       setStockValue(stockRes.data?.total || 0);
       setLowStock(Array.isArray(lowStockRes.data) ? lowStockRes.data : []);
+      setLowStockCount(Number(statusRes.data?.low_stock_count || 0));
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Unable to load dashboard data');
     } finally {
@@ -56,7 +59,7 @@ const Dashboard = () => {
           { label: 'Today’s revenue', value: money(todayRevenue), icon: TrendingUp, accent: 'text-blue-400' },
           { label: 'Sales today', value: todaySales, icon: ShoppingCart, accent: 'text-emerald-400' },
           { label: 'Inventory value', value: money(stockValue), icon: Package, accent: 'text-violet-400' },
-          { label: 'Low stock', value: lowStock.length, icon: AlertTriangle, accent: lowStock.length ? 'text-amber-400' : 'text-slate-400' },
+          { label: 'Low stock', value: lowStockCount, icon: AlertTriangle, accent: lowStock.length ? 'text-amber-400' : 'text-slate-400' },
         ].map(({ label, value, icon: Icon, accent }) => (
           <div key={label} className="panel p-5">
             <div className="mb-5 flex items-center justify-between">
