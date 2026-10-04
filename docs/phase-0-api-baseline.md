@@ -5,6 +5,11 @@ before any security/auth/PostgreSQL/inventory/payment work. Nothing in this
 document describes desired behavior — it describes **what the system does
 today**, quirks and defects included.
 
+This is a historical Phase 0 snapshot. Authentication, authorization, password
+storage, CORS, error handling, and M-Pesa configuration entries below describe
+the pre-Phase 1 behavior; the current security controls are documented in
+[`fastapi-phase-1.md`](security/fastapi-phase-1.md).
+
 **Active chain under test:**
 
 ```
@@ -45,8 +50,7 @@ Configuration lives in `pytest.ini` (`testpaths = backend/tests`). The suite:
 * **never makes external HTTP** — `backend.mpesa_api.requests.get/post` are
   blocked for every test, and M-Pesa tests replace the provider client with a
   stub (`FakeMpesaClient`);
-* works around one known production defect **in the harness only** (see
-  DEF-04 below) by executing the production DDL in a safe statement order.
+* uses a schema fixture that executes production DDL in dependency order.
 
 No CI secrets, no Postgres, no Docker, no network beyond `pip install`.
 
@@ -98,8 +102,8 @@ contract until a later phase changes it deliberately.
 
 ## Auth as it actually works today (characterized)
 
-* Login succeeds for seeded users `admin/admin123` (role `admin`) and
-  `cashier/cashier123` (role `cashier`), hashed with **unsalted SHA-256**
+* Login succeeded for the seeded administrator and cashier accounts, whose
+  passwords were hashed with **unsalted SHA-256**
   (DEF-08). User records seed on first `init_db()`.
 * Every successful login returns the same literal `"mock-jwt-token"` (DEF-01).
   The frontend stores it and sends `Authorization: Bearer mock-jwt-token`;
@@ -158,7 +162,7 @@ contract until a later phase changes it deliberately.
 | DEF-01 | Login returns literal `"mock-jwt-token"` for every user | `backend/api.py` login(); pinned by tests | Phase 1 |
 | DEF-02 | No authentication anywhere; `Authorization` header never checked | every endpoint test runs credential-free | Phase 1 |
 | DEF-03 | Authorization = spoofable `?role=` query param | `test_role_behavior.py` | Phase 2 |
-| DEF-04 | `database.init_db()` runs `CREATE INDEX ON sales/sale_items` **before** the tables exist -> fresh-DB crash (`sqlite3.OperationalError: no such table`) | worked around in `helpers.create_fresh_test_schema` (harness only) | Phase 3 |
+| DEF-04 | `database.init_db()` previously ran sales indexes before their tables | fixed in Phase 1 without changing the SQLite schema | Resolved |
 | DEF-05 | `database.get_top_selling_products()` missing `return rows` -> `None` -> `dict(None)` -> `TypeError` -> **dashboard 500 for everyone** | `test_dashboard_reports.py` | Phase 1 (hotfix) |
 | DEF-06 | No M-Pesa callback endpoint / persistence / status / sale linkage | `test_mpesa_boundary.py` absences | Phase 7 |
 | DEF-07 | M-Pesa `saleId` silently ignored | `test_stkpush_sale_id_is_ignored_no_sale_linkage` | Phase 7 |

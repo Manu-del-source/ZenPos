@@ -14,7 +14,7 @@ const Customers = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/v1/customers', { params: { search: searchTerm } });
+      const res = await api.get('/customers/', { params: { search: searchTerm } });
       setCustomers(res.data);
     } catch (err) {
       toast.error('Failed to load customer directory');

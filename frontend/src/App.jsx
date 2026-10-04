@@ -35,7 +35,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
             <Link to="/pos" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition">POS</Link>
             <Link to="/inventory" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition">Inventory</Link>
             <Link to="/orders" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition">Sales</Link>
-            {user.role === 'ADMIN' && (
+            {user.role?.toLowerCase() === 'admin' && (
               <Link to="/dashboard" className="hover:bg-slate-800 px-4 py-2 rounded-lg font-medium transition text-blue-400">Reports</Link>
             )}
             <button onClick={handleLogout} className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-lg font-bold transition">

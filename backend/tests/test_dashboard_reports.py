@@ -1,7 +1,7 @@
 """
 Phase 0 — CHARACTERIZATION of current dashboard/reports behavior (STEP 8).
 
-Consumed by frontend: Dashboard.jsx (GET /api/reports/dashboard?role=admin),
+Consumed by frontend: Dashboard.jsx (GET /api/reports/dashboard),
 reading exactly: .revenue, .orders_count, .profit, .top_selling[].{name,
 total_qty, total_revenue}, .low_stock[].{name, stock}. These keys MATCH what
 backend/api.py builds — the DTOs are aligned; the endpoint is simply broken.
@@ -51,33 +51,30 @@ def test_dashboard_currently_fails_with_500_for_admin(client):
     text body 'Internal Server Error' (text/plain) — NOT a JSON envelope.
     """
     _make_a_sale(client)
-    resp = client.get("/api/reports/dashboard", params={"role": "admin"})
+    resp = client.get("/api/reports/dashboard")
     assert resp.status_code == 500
-    assert resp.headers["content-type"].startswith("text/plain")
-    assert resp.text == "Internal Server Error"
+    assert resp.json() == {"detail": "Internal server error"}
 
 
 def test_dashboard_500_happens_even_with_no_data(client):
     """The crash is independent of data state (bug is in the report helper)."""
-    resp = client.get("/api/reports/dashboard", params={"role": "admin"})
+    resp = client.get("/api/reports/dashboard")
     assert resp.status_code == 500
 
 
-def test_dashboard_denied_without_admin_role_param(client):
-    """KNOWN BEHAVIOR: role defaults to 'cashier' -> 403 BEFORE the crash."""
-    resp = client.get("/api/reports/dashboard")
+def test_dashboard_denied_for_authenticated_cashier(cashier_client):
+    resp = cashier_client.get("/api/reports/dashboard")
     assert resp.status_code == 403
     assert resp.json() == {"detail": "Permission denied. Admin only."}
 
 
-def test_dashboard_role_param_check_is_case_insensitive(client):
-    """role=ADMIN passes the gate (then hits the 500 — see defect above)."""
+def test_dashboard_role_query_does_not_affect_authenticated_admin(client):
     resp = client.get("/api/reports/dashboard", params={"role": "ADMIN"})
     assert resp.status_code == 500
 
 
-def test_dashboard_role_cashier_is_denied(client):
-    resp = client.get("/api/reports/dashboard", params={"role": "cashier"})
+def test_dashboard_query_cannot_grant_cashier_admin_access(cashier_client):
+    resp = cashier_client.get("/api/reports/dashboard", params={"role": "admin"})
     assert resp.status_code == 403
 
 
@@ -85,7 +82,7 @@ def test_dashboard_role_cashier_is_denied(client):
 # Desired behavior pinned as xfail until the defect is fixed (later phase)
 # ---------------------------------------------------------------------------
 @pytest.mark.xfail(
-    reason="KNOWN DEFECT (Phase 1/6): database.get_top_selling_products() "
+    reason="KNOWN REPORTING DEFECT (Phase 6): database.get_top_selling_products() "
     "missing `return rows` -> dict(None) iteration -> TypeError -> 500. Fix "
     "deliberately in a later phase; this marker then flips to xpass and the "
     "desired contract below becomes the new golden master.",
@@ -95,7 +92,7 @@ def test_dashboard_should_succeed_with_contract(client):
     """Pins the contract the code WOULD return (keys verified against both
     backend/api.py and frontend Dashboard.jsx — the DTOs already agree)."""
     _make_a_sale(client)
-    resp = client.get("/api/reports/dashboard", params={"role": "admin"})
+    resp = client.get("/api/reports/dashboard")
     assert resp.status_code == 200
     body = resp.json()
     assert_contract(body, "dashboard_response.json")
@@ -109,26 +106,30 @@ def test_dashboard_should_succeed_with_contract(client):
 
 
 @pytest.mark.xfail(
-    reason="KNOWN DEFECT (Phase 1/6): top_selling/low_stock never reach the "
+    reason="KNOWN REPORTING DEFECT (Phase 6): top_selling/low_stock never reach the "
     "client because of the crash; after the fix rows must carry name/"
     "total_qty/total_revenue (Dashboard.jsx reads exactly these).",
     strict=False,
 )
 def test_dashboard_top_selling_rows_match_frontend_reads(client):
     _make_a_sale(client)
-    body = client.get("/api/reports/dashboard", params={"role": "admin"}).json()
+    resp = client.get("/api/reports/dashboard")
+    assert resp.status_code == 200
+    body = resp.json()
     for item in body.get("top_selling", []):
         assert set(item.keys()) >= {"name", "total_qty", "total_revenue"}
 
 
 @pytest.mark.xfail(
-    reason="KNOWN DEFECT (Phase 1/6): low_stock rows (threshold=10) never "
+    reason="KNOWN REPORTING DEFECT (Phase 6): low_stock rows (threshold=10) never "
     "reach the client because of the crash.",
     strict=False,
 )
 def test_dashboard_low_stock_rows_match_frontend_reads(client):
     create_product(client, sku="LOW-1", name="Bolts", stock=3)
-    body = client.get("/api/reports/dashboard", params={"role": "admin"}).json()
+    resp = client.get("/api/reports/dashboard")
+    assert resp.status_code == 200
+    body = resp.json()
     for item in body.get("low_stock", []):
         assert set(item.keys()) >= {"name", "stock"}
 

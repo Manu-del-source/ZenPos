@@ -13,6 +13,7 @@ router.get('/products/:barcode', auth, inventoryController.getProductByBarcode);
 
 router.post('/products', 
   auth, 
+  checkRole(['ADMIN']),
   [
     body('name').notEmpty().trim().escape(),
     body('barcode').isAlphanumeric().withMessage('Barcode must be alphanumeric'),
@@ -27,6 +28,7 @@ router.post('/products',
 
 router.patch('/products/:id', 
   auth, 
+  checkRole(['ADMIN']),
   [
     body('name').optional().trim().escape(),
     body('price').optional().isDecimal({ min: 0 }),

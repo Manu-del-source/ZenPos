@@ -19,8 +19,8 @@ def test_404_shape_for_unknown_api_subresource(client):
     assert resp.json() == {"detail": "Not Found"}
 
 
-def test_403_shape_permission_denied(client):
-    resp = client.delete("/api/products/1")  # no role param
+def test_403_shape_permission_denied(cashier_client):
+    resp = cashier_client.delete("/api/products/1")
     assert resp.status_code == 403
     assert resp.json() == {"detail": "Permission denied. Admin only."}
 
@@ -52,10 +52,10 @@ def test_422_shape_detail_is_a_list_of_error_objects(client):
     assert set(first.keys()) == {"type", "loc", "msg", "input"}
 
 
-def test_error_envelope_never_has_extra_keys(client):
+def test_error_envelope_never_has_extra_keys(client, cashier_client):
     cases = [
         client.get("/api/definitely-not-a-route"),
-        client.delete("/api/products/1"),
+        cashier_client.delete("/api/products/1"),
         client.post("/api/products/", json={}),
     ]
     for resp in cases:
@@ -63,18 +63,11 @@ def test_error_envelope_never_has_extra_keys(client):
         assert set(body.keys()) == {"detail"}
 
 
-def test_500_unhandled_error_is_plain_text_not_json(client):
-    """Golden master: UNHANDLED production exceptions are NOT JSON.
-
-    Starlette's error middleware answers 500 with the plain text body
-    'Internal Server Error' (text/plain). Known example: the dashboard crash.
-    Consumers must handle this non-JSON surface until a later phase adds
-    consistent error handling.
-    """
-    resp = client.get("/api/reports/dashboard", params={"role": "admin"})
+def test_500_unhandled_error_is_safe_json(client):
+    """Phase 1 intentionally replaces the plain-text error surface."""
+    resp = client.get("/api/reports/dashboard")
     assert resp.status_code == 500
-    assert resp.headers["content-type"].startswith("text/plain")
-    assert resp.text == "Internal Server Error"
+    assert resp.json() == {"detail": "Internal server error"}
 
 
 def test_method_not_allowed_shape_is_the_detail_envelope(client):

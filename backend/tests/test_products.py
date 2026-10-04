@@ -2,7 +2,7 @@
 Phase 0 — CHARACTERIZATION of current product endpoints (STEP 5).
 
 Consumed by frontend: Inventory.jsx and POS.jsx (GET /api/products/?search=,
-DELETE /api/products/{id}?role=). Creation/update endpoints exist on the
+DELETE /api/products/{id}). Creation/update endpoints exist on the
 backend but the web UI currently stubs its forms (see baseline doc).
 Field naming is pinned EXACTLY as implemented (snake_case).
 """
@@ -149,19 +149,25 @@ def test_product_update_nonexistent_id_should_be_404(client):
 
 
 # ---------------------------------------------------------------------------
-# Delete (role enforced ONLY via client-supplied ?role= query param)
+# Delete (role comes from the authenticated database identity)
 # ---------------------------------------------------------------------------
-def test_product_delete_without_role_param_is_denied(client):
+def test_cashier_cannot_delete_product_regardless_of_role_query(cashier_client, client):
     product = create_product(client, sku="DEL-1")
-    resp = client.delete(f"/api/products/{product['id']}")
+    resp = cashier_client.delete(f"/api/products/{product['id']}", params={"role": "admin"})
     assert resp.status_code == 403
-    assert resp.json() == {"detail": "Permission denied. Admin only."}
     assert any(p["sku"] == "DEL-1" for p in client.get("/api/products/").json())
+
+
+def test_authenticated_admin_can_delete_without_role_param(client):
+    product = create_product(client, sku="DEL-1B")
+    resp = client.delete(f"/api/products/{product['id']}")
+    assert resp.status_code == 200
+    assert not any(p["sku"] == "DEL-1B" for p in client.get("/api/products/").json())
 
 
 def test_product_delete_with_role_admin_succeeds(client):
     product = create_product(client, sku="DEL-2")
-    resp = client.delete(f"/api/products/{product['id']}", params={"role": "admin"})
+    resp = client.delete(f"/api/products/{product['id']}", params={"role": "cashier"})
     assert resp.status_code == 200
     assert resp.json() == {"status": "success"}
     assert not any(p["sku"] == "DEL-2" for p in client.get("/api/products/").json())
@@ -177,7 +183,7 @@ def test_product_delete_role_check_is_case_insensitive(client):
 def test_product_delete_role_cashier_is_denied(client):
     product = create_product(client, sku="DEL-4")
     resp = client.delete(f"/api/products/{product['id']}", params={"role": "cashier"})
-    assert resp.status_code == 403
+    assert resp.status_code == 200
 
 
 def test_product_delete_nonexistent_id_currently_returns_success(client):
@@ -216,13 +222,12 @@ def test_barcode_lookup_should_exist(client):
 # ---------------------------------------------------------------------------
 # Missing authentication on product routes (characterized for Phase 1/2)
 # ---------------------------------------------------------------------------
-def test_product_endpoints_currently_require_no_credentials(client):
-    """KNOWN BEHAVIOR (defect): no Authorization header is needed anywhere."""
-    assert client.get("/api/products/").status_code == 200
+def test_product_endpoints_require_authentication(anonymous_client):
+    assert anonymous_client.get("/api/products/").status_code == 401
     assert (
-        client.post(
+        anonymous_client.post(
             "/api/products/",
             json={"sku": "OPEN-1", "name": "Open", "cost_price": 1, "price": 2, "stock": 1},
         ).status_code
-        == 200
+        == 401
     )

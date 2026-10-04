@@ -1,9 +1,11 @@
 import sqlite3
 import os
-import hashlib
 from datetime import datetime
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "pos.db")
+_password_hasher = PasswordHasher()
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -12,7 +14,7 @@ def get_connection():
     return conn
 
 def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    return _password_hasher.hash(password)
 
 def init_db():
     conn = get_connection()
@@ -40,8 +42,6 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
         CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
-        CREATE INDEX IF NOT EXISTS idx_sales_timestamp ON sales(timestamp);
-        CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
         CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -64,6 +64,8 @@ def init_db():
             FOREIGN KEY (sale_id) REFERENCES sales(id),
             FOREIGN KEY (product_id) REFERENCES products(id)
         );
+        CREATE INDEX IF NOT EXISTS idx_sales_timestamp ON sales(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -78,16 +80,6 @@ def init_db():
         cats = [("Hardware",), ("Building Materials",), ("Motorcycle Parts",),
                 ("Tools",), ("Electrical",), ("Plumbing",)]
         cursor.executemany("INSERT INTO categories (name) VALUES (?)", cats)
-    # Seed an admin user if not exists
-    user_exist = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if user_exist == 0:
-        admin_pass = hash_password("admin123")
-        cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-                       ("admin", admin_pass, "admin"))
-        cashier_pass = hash_password("cashier123")
-        cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-                       ("cashier", cashier_pass, "cashier"))
-    
     # Migration: Add cost_price if it doesn't exist
     try:
         cursor.execute("SELECT cost_price FROM products LIMIT 1")
@@ -100,11 +92,50 @@ def init_db():
 # ---------- User functions ----------
 def check_user(username, password):
     conn = get_connection()
-    row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    conn.close()
-    if row and row["password_hash"] == hash_password(password):
+    try:
+        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        if row is None or not verify_password(row["password_hash"], password):
+            return None
         return dict(row)
-    return None
+    finally:
+        conn.close()
+
+
+def _is_legacy_sha256(encoded):
+    return len(encoded) == 64 and all(char in "0123456789abcdefABCDEF" for char in encoded)
+
+
+def verify_password(encoded, password):
+    # SHA-256 rows are deliberately rejected: the old seeded credentials were
+    # public, and the legacy schema cannot distinguish them from real accounts.
+    if _is_legacy_sha256(encoded):
+        return False
+    try:
+        return _password_hasher.verify(encoded, password)
+    except (VerifyMismatchError, VerificationError, InvalidHashError, TypeError):
+        return False
+
+
+def get_user_by_id(user_id):
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT id, username, role FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_user_by_username(username):
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT id, username, role FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 def get_all_users():
     conn = get_connection()
@@ -114,10 +145,25 @@ def get_all_users():
 
 def add_user(username, password, role):
     conn = get_connection()
-    conn.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-                 (username, hash_password(password), role))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                     (username, hash_password(password), role))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def reset_user_password(username, password):
+    conn = get_connection()
+    try:
+        result = conn.execute(
+            "UPDATE users SET password_hash = ? WHERE username = ?",
+            (hash_password(password), username),
+        )
+        conn.commit()
+        return result.rowcount == 1
+    finally:
+        conn.close()
 
 def delete_user(user_id):
     conn = get_connection()

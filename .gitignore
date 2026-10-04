@@ -1,5 +1,12 @@
 node_modules/
+.venv/
+.venv*/
 .env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
 dist/
 .DS_Store
 *.log

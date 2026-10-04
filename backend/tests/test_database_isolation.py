@@ -21,7 +21,10 @@ def test_production_database_unchanged_after_write_traffic(client):
     """
     before = prod_db_fingerprint()
 
-    client.post("/api/login", json={"username": "admin", "password": "admin123"})
+    client.post(
+        "/api/login",
+        json={"username": "admin", "password": "phase1-admin-test-password"},
+    )
     client.post(
         "/api/products/",
         json={"sku": "ISO-1", "name": "Iso", "cost_price": 1, "price": 2, "stock": 5},

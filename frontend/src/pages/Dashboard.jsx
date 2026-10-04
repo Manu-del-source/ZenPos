@@ -12,10 +12,10 @@ const Dashboard = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/v1/reports/dashboard');
+      const { data } = await api.get('/reports/dashboard');
       setStats(data);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to load dashboard stats');
+      toast.error(err.response?.data?.detail || 'Failed to load dashboard stats');
     } finally {
       setLoading(false);
     }

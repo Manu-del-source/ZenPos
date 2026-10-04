@@ -11,7 +11,7 @@ const Inventory = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAdmin = user.role === 'ADMIN';
+  const isAdmin = user.role?.toLowerCase() === 'admin';
 
   const [formData, setFormData] = useState({
     name: '',
@@ -25,7 +25,7 @@ const Inventory = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/v1/inventory/products?search=${searchTerm}`);
+      const { data } = await api.get('/products/', { params: { search: searchTerm } });
       setProducts(data);
     } catch (err) {
       toast.error('Failed to load products');
@@ -39,7 +39,7 @@ const Inventory = () => {
     if (!window.confirm("Delete this part from inventory permanently?")) return;
     
     try {
-      await api.delete(`/v1/inventory/products/${id}`, { params: { role: user.role } });
+      await api.delete(`/products/${id}`);
       toast.success('Part deleted');
       fetchProducts();
     } catch (err) {

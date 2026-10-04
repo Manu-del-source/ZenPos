@@ -3,6 +3,11 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
+  const cashierPassword = process.env.BOOTSTRAP_CASHIER_PASSWORD;
+  if (!cashierPassword || cashierPassword.length < 12) {
+    throw new Error('BOOTSTRAP_CASHIER_PASSWORD must be configured with at least 12 characters');
+  }
+
   const branch = await prisma.branch.upsert({
     where: { code: 'BR-001' },
     update: {},
@@ -13,7 +18,7 @@ async function main() {
     },
   });
 
-  const passwordHash = await bcrypt.hash('cashier123', 10);
+  const passwordHash = await bcrypt.hash(cashierPassword, 10);
   await prisma.user.upsert({
     where: { username: 'cashier1' },
     update: {},

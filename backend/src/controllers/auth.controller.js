@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 
 exports.register = async (req, res) => {
   try {
-    const { username, password, name, role, branchId } = req.body;
+    const { username, password, name, branchId } = req.body;
 
     const existingUser = await db.query('SELECT * FROM "User" WHERE username = $1', [username]);
     if (existingUser.rows.length > 0) {
@@ -17,7 +17,7 @@ exports.register = async (req, res) => {
 
     const result = await db.query(
       'INSERT INTO "User" (id, username, "passwordHash", name, role, "branchId", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING id',
-      [id, username, passwordHash, name, role || 'CASHIER', branchId]
+      [id, username, passwordHash, name, 'CASHIER', branchId]
     );
 
     res.status(201).json({ message: 'User created successfully', userId: result.rows[0].id });

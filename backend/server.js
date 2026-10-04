@@ -7,6 +7,13 @@ const rateLimit = require('express-rate-limit');
 const db = require('./src/config/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
+const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,https://kipchi-pos.vercel.app')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+if (corsOrigins.includes('*')) {
+  throw new Error('CORS_ORIGINS must be an explicit origin allowlist');
+}
 
 // Behind Vercel's proxy (or any reverse proxy) so express-rate-limit and
 // req.ip see the real client address.
@@ -36,7 +43,7 @@ app.use(helmet());
 app.use(generalLimiter);
 app.use('/api/v1/auth/login', authLimiter);
 app.use('/api/v1/payments/mpesa/stkpush', paymentLimiter);
-app.use(cors());
+app.use(cors({ origin: corsOrigins }));
 app.use(express.json());
 app.use(morgan('dev'));
 

@@ -12,7 +12,7 @@ const Orders = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/v1/sales');
+      const res = await api.get('/sales/');
       setOrders(res.data);
     } catch (err) {
       toast.error('Failed to load transaction history');
@@ -23,7 +23,7 @@ const Orders = () => {
 
   const fetchOrderDetails = async (saleId) => {
     try {
-      const res = await api.get(`/v1/sales/${saleId}`);
+      const res = await api.get(`/sales/${saleId}`);
       setOrderDetails(res.data.items || []);
     } catch (err) {
       toast.error('Failed to load details');

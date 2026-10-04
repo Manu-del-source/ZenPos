@@ -1,8 +1,8 @@
 """
 Shared helpers for the Phase 0 characterization suite.
 
-Production code is imported UNCHANGED; this module only reads it and provides
-test-side utilities (golden-contract checks, data builders, fingerprints).
+The historical endpoint contracts are retained where behavior is unchanged;
+intentional Phase 1 auth/security changes are asserted by updated tests.
 """
 import hashlib
 import inspect
@@ -26,8 +26,7 @@ PROD_DB_PATH = Path(database.__file__).resolve().parent / "pos.db"
 
 
 # --------------------------------------------------------------------------
-# Schema bootstrap using ONLY production DDL (works around the known
-# init_db() ordering defect in the harness — see conftest docstring).
+# Schema bootstrap using ONLY production DDL, ordered by object dependencies.
 # --------------------------------------------------------------------------
 def extract_production_ddl() -> str:
     source = inspect.getsource(database.init_db)

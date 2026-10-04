@@ -8,6 +8,10 @@ const pool = new Pool({
 });
 
 async function seed() {
+  const cashierPassword = process.env.BOOTSTRAP_CASHIER_PASSWORD;
+  if (!cashierPassword || cashierPassword.length < 12) {
+    throw new Error('BOOTSTRAP_CASHIER_PASSWORD must be configured with at least 12 characters');
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -27,7 +31,7 @@ async function seed() {
     // 2. Create Cashier User
     const userId = uuidv4();
     const username = 'cashier1';
-    const passwordHash = await bcrypt.hash('cashier123', 10);
+    const passwordHash = await bcrypt.hash(cashierPassword, 10);
     await client.query(
       'INSERT INTO "User" (id, username, "passwordHash", name, role, "branchId", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, NOW()) ON CONFLICT (username) DO NOTHING',
       [userId, username, passwordHash, 'John Doe', 'CASHIER', actualBranchId]
@@ -50,7 +54,6 @@ async function seed() {
     await client.query('COMMIT');
     console.log('✅ Manual Seed Successful!');
     console.log('Username: cashier1');
-    console.log('Password: cashier123');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Seed Failed:', err);

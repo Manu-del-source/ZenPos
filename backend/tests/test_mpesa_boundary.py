@@ -57,6 +57,10 @@ class FakeMpesaClient:
 def fake_mpesa(monkeypatch):
     fake = FakeMpesaClient()
     monkeypatch.setattr("backend.api.mpesa_client", fake)
+    monkeypatch.setattr(
+        "backend.api.MPESA_CONFIG",
+        {"consumer_key": "test-key", "consumer_secret": "test-secret", "shortcode": "000000", "passkey": "test-passkey"},
+    )
     return fake
 
 
@@ -77,7 +81,7 @@ def test_stkpush_current_success_contract(client, fake_mpesa):
     assert body["mpesa_response"] == fake_mpesa.response
 
 
-def test_stkpush_forwards_phone_and_amount_with_placeholder_callback(
+def test_stkpush_forwards_phone_amount_and_configured_callback(
     client, fake_mpesa
 ):
     resp = client.post("/api/realtime/mpesa/stkpush", json=_pos_stkpush_payload())
@@ -86,8 +90,7 @@ def test_stkpush_forwards_phone_and_amount_with_placeholder_callback(
     call = fake_mpesa.calls[0]
     assert call["phone"] == "254712345678"
     assert call["amount"] == 1500
-    # KNOWN DEFECT: hardcoded placeholder callback URL in backend/api.py.
-    assert call["callback_url"] == "https://your-domain.com/mpesa-callback"
+    assert call["callback_url"] == "https://example.test/mpesa-callback"
 
 
 def test_stkpush_sale_id_is_ignored_no_sale_linkage(client, fake_mpesa):
@@ -106,22 +109,10 @@ def test_stkpush_sale_id_is_ignored_no_sale_linkage(client, fake_mpesa):
 # ---------------------------------------------------------------------------
 # Validation / error handling gaps (pinned current behavior)
 # ---------------------------------------------------------------------------
-def test_stkpush_empty_body_currently_still_calls_provider(client, fake_mpesa):
-    """KNOWN DEFECT pinned: raw dict body, no validation whatsoever."""
+def test_stkpush_empty_body_is_rejected_without_calling_provider(client, fake_mpesa):
     resp = client.post("/api/realtime/mpesa/stkpush", json={})
-    assert resp.status_code == 200
-    assert fake_mpesa.calls[0]["phone"] is None
-    assert fake_mpesa.calls[0]["amount"] is None
-
-
-@pytest.mark.xfail(
-    reason="KNOWN DEFECT (Phase 7): stkpush must validate phone/amount and "
-    "return 422/400 for missing fields.",
-    strict=False,
-)
-def test_stkpush_empty_body_should_be_rejected(client, fake_mpesa):
-    resp = client.post("/api/realtime/mpesa/stkpush", json={})
-    assert resp.status_code in (400, 422)
+    assert resp.status_code == 422
+    assert fake_mpesa.calls == []
 
 
 def test_stkpush_provider_error_payload_currently_returned_as_success(
@@ -144,14 +135,11 @@ def test_stkpush_provider_error_should_be_a_failure(client, fake_mpesa):
     assert resp.status_code >= 400
 
 
-def test_stkpush_provider_exception_becomes_unhandled_500(client, fake_mpesa):
-    """Current behavior: provider crashes surface as an unhandled plain-text
-    500 ('Internal Server Error'), not a JSON envelope."""
+def test_stkpush_provider_exception_is_safely_mapped_to_502(client, fake_mpesa):
     fake_mpesa.raise_error = RuntimeError("simulated provider outage")
     resp = client.post("/api/realtime/mpesa/stkpush", json=_pos_stkpush_payload())
-    assert resp.status_code == 500
-    assert resp.headers["content-type"].startswith("text/plain")
-    assert resp.text == "Internal Server Error"
+    assert resp.status_code == 502
+    assert resp.json() == {"detail": "M-Pesa request failed"}
 
 
 # ---------------------------------------------------------------------------

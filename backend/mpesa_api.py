@@ -3,6 +3,7 @@ from requests.auth import HTTPBasicAuth
 from datetime import datetime
 import base64
 import json
+import os
 
 class MpesaGateWay:
     def __init__(self, consumer_key, consumer_secret, shortcode, passkey):
@@ -10,7 +11,14 @@ class MpesaGateWay:
         self.consumer_secret = consumer_secret
         self.shortcode = shortcode
         self.passkey = passkey
-        self.base_url = "https://sandbox.safaricom.co.ke" # Change to api.safaricom.co.ke for production
+        environment = os.getenv("MPESA_ENV", "sandbox").strip().lower()
+        if environment not in {"sandbox", "production"}:
+            raise ValueError("MPESA_ENV must be sandbox or production")
+        self.base_url = (
+            "https://sandbox.safaricom.co.ke"
+            if environment == "sandbox"
+            else "https://api.safaricom.co.ke"
+        )
 
     def get_token(self):
         url = f"{self.base_url}/oauth/v1/generate?grant_type=client_credentials"

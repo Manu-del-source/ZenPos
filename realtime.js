@@ -2,16 +2,41 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const mpesaService = require('./backend/src/services/mpesa.service'); // Reuse existing logic
 
 const app = express();
-app.use(cors());
+const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,https://kipchi-pos.vercel.app')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+if (corsOrigins.includes('*')) {
+  throw new Error('CORS_ORIGINS must be an explicit origin allowlist');
+}
+app.use(cors({ origin: corsOrigins, methods: ['GET', 'POST', 'OPTIONS'] }));
 app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: { origin: corsOrigins, methods: ['GET', 'POST'] }
 });
+
+function requireSignedBearerToken(req, res, next) {
+  const authorization = req.headers.authorization || '';
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const secret = process.env.JWT_SECRET_KEY;
+  if (!match || !secret || Buffer.byteLength(secret, 'utf8') < 32) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+  try {
+    const claims = jwt.verify(match[1], secret, { algorithms: ['HS256'] });
+    if (!claims.sub) return res.status(401).json({ message: 'Invalid or expired token' });
+    req.authenticatedUserId = claims.sub;
+    return next();
+  } catch (_error) {
+    return res.status(401).json({ message: 'Invalid or expired token' });
+  }
+}
 
 // Real-time Event Handling
 io.on('connection', (socket) => {
@@ -38,14 +63,17 @@ app.post('/api/realtime/payment-notification', (req, res) => {
   res.json({ message: 'Notification received' });
 });
 
-app.post('/api/realtime/mpesa/stkpush', async (req, res) => {
+app.post('/api/realtime/mpesa/stkpush', requireSignedBearerToken, async (req, res) => {
   try {
     const { phoneNumber, amount, saleId } = req.body;
-    console.log(`📱 Triggering M-Pesa STK Push for ${phoneNumber} - ${amount} KES`);
+    if (!/^(?:\+?254|0)(?:7|1)\d{8}$/.test(String(phoneNumber || '')) ||
+        !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !saleId) {
+      return res.status(422).json({ message: 'Invalid payment request' });
+    }
     const response = await mpesaService.stkPush(phoneNumber, amount, saleId);
     res.json(response);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (_error) {
+    res.status(502).json({ message: 'Payment request failed' });
   }
 });
 

@@ -136,26 +136,16 @@ def test_create_sale_walkin_has_null_customer(client):
     assert row["customer"] is None
 
 
-def test_create_sale_with_unknown_customer_currently_returns_500(client):
-    """KNOWN DEFECT pinned: FK violation surfaces as an unhandled 500.
-
-    Golden master of the unhandled-error surface: status 500 with the plain
-    text body 'Internal Server Error' (text/plain) — NOT a JSON envelope.
-    """
+def test_create_sale_with_unknown_customer_returns_safe_error(client):
+    """Phase 1 intentionally maps the raw SQLite failure to a safe response."""
     product = create_product(client, sku="S-7", price=10, stock=5)
     payload = _pos_cash_sale_payload(product["id"], 1, 10)
     payload["customer"] = 999999
     resp = client.post("/api/sales/", json=payload)
-    assert resp.status_code == 500
-    assert resp.headers["content-type"].startswith("text/plain")
-    assert resp.text == "Internal Server Error"
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "Unable to create sale"}
 
 
-@pytest.mark.xfail(
-    reason="KNOWN DEFECT (Phase 6): unknown customer id should be rejected "
-    "with 4xx, not an unhandled 500.",
-    strict=False,
-)
 def test_unknown_customer_should_be_client_error(client):
     product = create_product(client, sku="S-7X", price=10, stock=5)
     payload = _pos_cash_sale_payload(product["id"], 1, 10)
