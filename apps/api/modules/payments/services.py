@@ -19,6 +19,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from modules.core.audit import record_audit
+from modules.inventory.models import StockAdjustment
 
 from .base import PaymentCallbackError, PaymentGatewayError, PaymentProvider
 from .models import Payment, PaymentAttempt, WebhookEvent
@@ -27,6 +28,33 @@ from .models import Payment, PaymentAttempt, WebhookEvent
 #: till cannot bill the customer twice. Ported from the legacy Node service,
 #: where ADR-0001 calls out that this check was worth keeping.
 PENDING_STK_WINDOW = timezone.timedelta(minutes=5)
+
+
+def release_mpesa_stock_reservation(*, sale, actor=None, request=None) -> int:
+    """Release stock reserved for an M-Pesa sale exactly once."""
+    release_note = f"Release M-Pesa reservation for sale {sale.sale_number}"
+    if StockAdjustment.objects.filter(notes=release_note).exists():
+        return 0
+    released = 0
+    adjustments = StockAdjustment.objects.filter(
+        notes__startswith=f"Sale {sale.sale_number}", quantity__lt=0
+    ).select_related("product")
+    for adjustment in adjustments:
+        product = adjustment.product
+        product.stock_level += -adjustment.quantity
+        product.save(update_fields=["stock_level", "updated_at"])
+        StockAdjustment.objects.create(
+            product=product, user=actor, quantity=-adjustment.quantity,
+            type=StockAdjustment.AdjustmentType.RETURN, notes=release_note,
+        )
+        released += -adjustment.quantity
+    if released:
+        record_audit(
+            action="stock.reservation_released", entity_type="sale", entity_id=sale.pk,
+            actor=actor, request=request,
+            after={"sale": sale.sale_number, "quantity": released},
+        )
+    return released
 
 
 def get_payment_provider():
