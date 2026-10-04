@@ -8,7 +8,7 @@ from modules.core.audit import record_audit
 
 from .base import PaymentCallbackError, PaymentGatewayError
 from .models import Payment
-from .serializers import PaymentSerializer
+from .serializers import InitiatePaymentSerializer, PaymentSerializer
 from .services import (
     assert_no_pending_stk,
     get_payment_provider,
@@ -41,6 +41,11 @@ class PaymentViewSet(
     required_permissions_by_action = {
         "create": ("sales.create",),
     }
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return InitiatePaymentSerializer
+        return PaymentSerializer
 
     def perform_create(self, serializer):
         """Create the payment, then start the provider exchange.
