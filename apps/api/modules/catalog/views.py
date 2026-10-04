@@ -75,6 +75,13 @@ class ProductViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
             if match:
                 return Response(ProductSerializer(match.product).data)
 
+        # USB scanners often send the product SKU rather than a row in the
+        # optional ProductBarcode table. Treat an exact SKU as a barcode hit too.
+        if barcode:
+            product = self.get_queryset().filter(sku=barcode, is_active=True).first()
+            if product:
+                return Response(ProductSerializer(product).data)
+
         return Response(
             {"detail": "Product not found."},
             status=status.HTTP_404_NOT_FOUND,
