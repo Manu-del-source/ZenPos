@@ -36,5 +36,7 @@ class SoftDeleteManager(models.Manager.from_queryset(SoftDeleteQuerySet)):
     is invisible to normal queries, which is the safe default for a POS.
     """
 
+    use_in_migrations = True
+
     def get_queryset(self):
         return super().get_queryset().filter(deleted_at__isnull=True)
