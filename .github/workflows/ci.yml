@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+
+# Only the API is verified. apps/web is a reference implementation that is
+# rebuilt in phase 6/10; adding it here now would mean a knowingly-red pipeline.
+# Its job is added with the rebuild.
+
+jobs:
+  api:
+    name: API — lint, checks, tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: kipchi_pos
+          POSTGRES_USER: kipchi
+          POSTGRES_PASSWORD: kipchi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kipchi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Test-only configuration. These are throwaway values, not secrets.
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: ci-only-key-never-used-outside-ci
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+      POSTGRES_DB: kipchi_pos
+      POSTGRES_USER: kipchi
+      POSTGRES_PASSWORD: kipchi
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: apps/api/requirements/dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements/dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      # Non-blocking until the codebase has had one `ruff format .` pass.
+      - name: Format check
+        continue-on-error: true
+        run: ruff format --check .
+
+      - name: Django system checks
+        run: python manage.py check
+
+      # Fails if a model change was made without its migration. This is what
+      # keeps hand-written migrations honest.
+      - name: Detect missing migrations
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Tests
+        run: pytest -q

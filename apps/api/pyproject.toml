@@ -1,0 +1,57 @@
+[project]
+name = "kipchi-pos-api"
+version = "0.1.0"
+description = "Kipchi POS - multi-branch retail platform API"
+requires-python = ">=3.12"
+
+# ---------------------------------------------------------------------------
+# Linting and formatting
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+# Migrations are machine-generated; reformatting them makes future diffs
+# unreadable and buys nothing.
+extend-exclude = ["**/migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "DJ",  # flake8-django
+]
+ignore = [
+    # Existing catalog fields (sku, category) use null=True on CharField. Phase 3
+    # replaces them with real category/brand tables, so leave them alone for now
+    # rather than forcing a blank-vs-null migration in this phase.
+    "DJ001",
+]
+
+[tool.ruff.lint.isort]
+# Without this, `config.*` and `modules.*` are treated as third-party and get
+# merged into the Django import block, which would reorder every module's
+# imports and make review noise.
+known-first-party = ["config", "modules"]
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["."]
+testpaths = ["modules"]
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers --strict-config"
+
+[tool.coverage.run]
+source = ["modules"]
+omit = ["**/migrations/*", "**/apps.py"]
+
+[tool.coverage.report]
+show_missing = true

@@ -1,0 +1,105 @@
+{# Reprint of a recorded sale. Every figure on this page was computed by the #}
+{# server and stored — the receipt renders history, not a request. #}
+{# A branch line is omitted until Sale carries a branch (phase 6 rebuild). #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Receipt {{ context.sale_number }}</title>
+    <style>
+        body {
+            font-family: "Courier New", monospace;
+            color: #111;
+            margin: 0;
+            padding: 16px;
+            background: #f4f4f4;
+        }
+        .receipt {
+            background: #fff;
+            margin: 0 auto;
+            padding: 16px 20px;
+            border: 1px solid #ccc;
+            {% if paper == "80mm" %}
+            width: 80mm;
+            {% else %}
+            width: 160mm;
+            {% endif %}
+        }
+        h1 { font-size: 15px; text-align: center; margin: 0 0 2px; }
+        .muted { color: #555; font-size: 11px; text-align: center; margin: 0; }
+        .meta { font-size: 11px; margin: 10px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { padding: 2px 0; text-align: left; }
+        .money { text-align: right; white-space: nowrap; }
+        thead th { border-bottom: 1px solid #111; }
+        .totals td { padding: 1px 0; }
+        .grand { font-weight: bold; border-top: 1px solid #111; font-size: 14px; }
+        .payments { margin-top: 8px; font-size: 12px; }
+        .footer { text-align: center; font-size: 11px; margin-top: 12px; }
+        @media print {
+            body { background: none; padding: 0; }
+            .receipt { border: none; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <h1>{{ context.organization_name }}</h1>
+        <p class="muted">{{ context.sale_number }}</p>
+
+        <div class="meta">
+            <div>{{ context.created_at|date:"Y-m-d H:i" }}</div>
+            <div>Cashier: {{ context.cashier_name }}</div>
+            {% if context.customer_name %}<div>Customer: {{ context.customer_name }}</div>{% endif %}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th class="money">Qty</th>
+                    <th class="money">Price</th>
+                    <th class="money">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in context.items %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td class="money">{{ item.quantity }}</td>
+                    <td class="money">{{ item.unit_price }}</td>
+                    <td class="money">{{ item.line_total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <table class="totals">
+            <tbody>
+                <tr><td>Subtotal</td><td class="money">{{ context.subtotal }}</td></tr>
+                {% for group in context.tax_groups %}
+                <tr>
+                    <td>
+                        {% if group.rate %}{{ group.name }} ({{ group.rate }}%){% else %}{{ group.name }}{% endif %}
+                    </td>
+                    <td class="money">net {{ group.net }} / tax {{ group.tax }}</td>
+                </tr>
+                {% endfor %}
+                <tr><td>Tax</td><td class="money">{{ context.tax_amount }}</td></tr>
+                <tr class="grand"><td>TOTAL</td><td class="money">{{ context.currency }} {{ context.total_amount }}</td></tr>
+            </tbody>
+        </table>
+
+        <div class="payments">
+            {% for payment in context.payments %}
+            <div>
+                {{ payment.method }} ({{ payment.status }}): {{ payment.amount }}
+                {% if payment.provider_reference %}&mdash; Ref {{ payment.provider_reference }}{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <p class="footer">Thank you for shopping with us!</p>
+    </div>
+</body>
+</html>
