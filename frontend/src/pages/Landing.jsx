@@ -1,9 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowDown, ArrowRight, ArrowUpRight, BarChart3, Boxes, Building2, Check,
-  CircleDollarSign, ClipboardList, PackageCheck, ReceiptText, ShieldCheck,
-  ShoppingBag, Smartphone, Users, Warehouse,
+  ArrowRight, ArrowUpRight, BarChart3, Boxes, Check, ChevronRight,
+  ClipboardList, CreditCard, Package, ReceiptText, Smartphone, Users,
 } from 'lucide-react';
 import SiteHeader from '../components/site/SiteHeader';
 import SiteFooter from '../components/site/SiteFooter';
@@ -13,160 +12,108 @@ import '../styles/landing.css';
 
 const features = [
   {
-    icon: ShoppingBag,
-    tone: 'blue',
-    title: 'Fast point of sale',
-    text: 'Find products, build a cart and complete a sale from one clear checkout.',
-    variant: 'wide',
-    chip: 'Built for the counter',
-    bullets: ['Search or scan', 'Cart and totals', 'Cash or M-Pesa'],
+    icon: CreditCard,
+    number: '01',
+    title: 'Sell without friction',
+    text: 'A focused checkout for busy counters. Search products, manage the cart and take payment without unnecessary screens.',
   },
-  { icon: Warehouse, tone: 'green', title: 'Inventory visibility', text: 'Search your catalogue and keep stock levels connected to recorded sales.' },
-  { icon: Smartphone, tone: 'mint', title: 'M-Pesa payments', text: 'Start an M-Pesa STK push from checkout alongside cash payments.' },
-  { icon: BarChart3, tone: 'violet', title: 'Sales and reports', text: 'Review sales history and see business activity in a reporting view.' },
-  { icon: Users, tone: 'amber', title: 'Customer records', text: 'Keep customer contact details available alongside day-to-day retail work.' },
   {
-    icon: Building2,
-    tone: 'slate',
-    title: 'Branch-ready platform',
-    text: 'ZenPOS includes branch records and staff access foundations. Branch workflows depend on your setup.',
-    variant: 'full',
+    icon: Boxes,
+    number: '02',
+    title: 'Know what is in stock',
+    text: 'Keep your catalogue and stock movements connected to every recorded sale so the team works from the same numbers.',
+  },
+  {
+    icon: BarChart3,
+    number: '03',
+    title: 'See the business clearly',
+    text: 'Sales history, customers and reporting give owners a practical view of what happened in the shop.',
   },
 ];
 
-const steps = [
-  { icon: ShieldCheck, title: 'Sign in to your workspace', text: 'Use your staff account to open the retail tools available to your role.' },
-  { icon: Boxes, title: 'Find products and stock', text: 'Search the catalogue by name, SKU or barcode.' },
-  { icon: ShoppingBag, title: 'Build the sale', text: 'Add items, check the total and choose cash or M-Pesa.' },
-  { icon: ClipboardList, title: 'Review activity', text: 'Return to sales history and reporting to follow what has been recorded.' },
-];
-
-const capabilities = [
-  { icon: ShoppingBag, label: 'Point of sale' },
-  { icon: Warehouse, label: 'Inventory' },
-  { icon: Smartphone, label: 'M-Pesa payments' },
-  { icon: ReceiptText, label: 'Sales history' },
-  { icon: Users, label: 'Customer records' },
-  { icon: Building2, label: 'Branch records' },
-];
-
-const managementLinks = [
-  { icon: Warehouse, title: 'Inventory', text: 'Catalogue and stock visibility' },
-  { icon: Users, title: 'Customers', text: 'Contact records and lookup' },
-  { icon: ClipboardList, title: 'Sales and reports', text: 'Recorded transactions and activity' },
-  { icon: ShieldCheck, title: 'Staff access', text: 'Role-aware access in the platform' },
+const workflow = [
+  { icon: Package, title: 'Catalogue', text: 'Products, prices and stock in one place.' },
+  { icon: ReceiptText, title: 'Checkout', text: 'Build the order and confirm the total.' },
+  { icon: Smartphone, title: 'Payment', text: 'Cash today, M-Pesa when you need it.' },
+  { icon: ClipboardList, title: 'Records', text: 'Every completed sale stays in the system.' },
 ];
 
 function Hero() {
   return (
-    <section className="hero-section" aria-labelledby="hero-heading">
-      <div className="hero-inner">
-        <div className="hero-copy">
-          <div className="hero-kicker">
-            <span className="hero-kicker-icon"><CircleDollarSign size={13} /></span>
-            Retail, brought together
-          </div>
-          <h1 id="hero-heading">
-            Everything you need to run your <em>retail business.</em>
-          </h1>
-          <p className="hero-description">
-            Bring sales, inventory, payments, customers and business management together in one simple system.
+    <section className="lp-hero">
+      <div className="lp-hero-inner">
+        <div className="lp-hero-copy">
+          <p className="lp-overline">POINT OF SALE · INVENTORY · PAYMENTS</p>
+          <h1>Run the shop.<br /><span>Not the paperwork.</span></h1>
+          <p className="lp-hero-text">
+            ZenPOS is a straightforward retail system for businesses that need sales,
+            stock and payments to stay in sync.
           </p>
-          <div className="hero-actions">
-            <Link className="btn btn--primary" to="/login">Get started <ArrowRight size={17} /></Link>
-            <Link className="btn btn--ghost-light" to="/login">Sign in</Link>
+          <div className="lp-hero-actions">
+            <Link className="lp-button lp-button--dark" to="/login">
+              Open ZenPOS <ArrowRight size={16} />
+            </Link>
+            <a className="lp-text-button" href="#features">
+              See how it works <ChevronRight size={15} />
+            </a>
           </div>
-          <div className="hero-proof">
-            <span><Check size={13} /></span>
-            A clearer view of the work happening across your shop
+          <div className="lp-local-note">
+            <span className="lp-check"><Check size={12} /></span>
+            Designed around everyday retail in Kenya
           </div>
         </div>
-        <div className="hero-product-wrap">
+
+        <div className="lp-hero-product">
+          <div className="lp-browser-bar">
+            <span className="lp-browser-dots"><i /><i /><i /></span>
+            <span>ZenPOS · Point of Sale</span>
+            <span className="lp-browser-live">LIVE</span>
+          </div>
           <PosPreview variant="compact" />
-          <div className="hero-float-note hero-float-note--a">
-            <span className="float-note-icon"><PackageCheck size={16} /></span>
-            <span><b>Stock-aware checkout</b><small>Items and totals, together</small></span>
-          </div>
-          <div className="hero-float-note hero-float-note--b">
-            <span className="float-note-icon"><Smartphone size={16} /></span>
-            <span><b>Cash or M-Pesa</b><small>Choose at the counter</small></span>
-          </div>
         </div>
       </div>
-      <a className="hero-scroll" href="#features"><span>Explore ZenPOS</span><ArrowDown size={14} /></a>
     </section>
   );
 }
 
-function CapabilityStrip() {
+function Intro() {
   return (
-    <div className="capability-strip" aria-label="ZenPOS capabilities">
-      {capabilities.map(({ icon: Icon, label }) => (
-        <span key={label}><Icon size={14} /> {label}</span>
-      ))}
-    </div>
+    <section className="lp-intro">
+      <div className="lp-container lp-intro-grid">
+        <p className="lp-intro-label">A retail workspace, kept simple.</p>
+        <div>
+          <h2>Everything at the counter should be easy to find.</h2>
+          <p>
+            ZenPOS brings the work that usually gets scattered across notebooks,
+            spreadsheets and separate payment steps into one calm workspace.
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
 function Features() {
   return (
-    <section className="feature-section" id="features" aria-labelledby="features-heading">
-      <div className="feature-section-inner">
-        <div className="section-heading-row">
+    <section className="lp-section lp-features" id="features">
+      <div className="lp-container">
+        <div className="lp-section-head">
           <div>
-            <span className="eyebrow">One system for the daily details</span>
-            <h2 className="section-title" id="features-heading">The essentials, all working together.</h2>
+            <p className="lp-overline">THE CORE</p>
+            <h2>Built around the work that matters.</h2>
           </div>
-          <p className="section-lead">ZenPOS brings the main parts of retail operations into one connected workspace.</p>
+          <p>Less dashboard theatre. More useful tools for the person actually running the counter.</p>
         </div>
-        <div className="feature-grid">
-          {features.map(({ icon: Icon, tone, title, text, variant, chip, bullets }) => (
-            <article
-              className={
-                'feature-card' +
-                (variant === 'wide' ? ' feature-card--wide' : '') +
-                (variant === 'full' ? ' feature-card--full' : '')
-              }
-              key={title}
-            >
-              {chip && <span className="feature-card-chip"><Check size={12} /> {chip}</span>}
-              <span className={'feature-icon ' + tone}><Icon size={20} strokeWidth={1.8} /></span>
-              <h3>{title}</h3>
-              <p>{text}</p>
-              {bullets && (
-                <div className="feature-card-pills">
-                  {bullets.map((bullet) => <span key={bullet}><Check size={11} /> {bullet}</span>)}
-                </div>
-              )}
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function HowItWorks() {
-  return (
-    <section className="how-section" id="how-it-works" aria-labelledby="how-heading">
-      <div className="how-inner">
-        <div className="how-head">
-          <div>
-            <span className="eyebrow">A straightforward daily flow</span>
-            <h2 className="section-title" id="how-heading">From product search to paid.</h2>
-            <p className="section-lead">Keep the routine clear for the people serving customers and managing the shop.</p>
-          </div>
-          <Link className="text-link" to="/login">Sign in to ZenPOS <ArrowRight size={15} /></Link>
-        </div>
-        <div className="steps-grid">
-          {steps.map(({ icon: Icon, title, text }, index) => (
-            <article className="step-card" key={title}>
-              <div className="step-top">
-                <span className="step-index">0{index + 1}</span>
-                <span className="step-icon"><Icon size={17} /></span>
+        <div className="lp-feature-grid">
+          {features.map(({ icon: Icon, number, title, text }) => (
+            <article className="lp-feature" key={title}>
+              <div className="lp-feature-top">
+                <span>{number}</span>
+                <Icon size={20} />
               </div>
               <h3>{title}</h3>
               <p>{text}</p>
+              <span className="lp-feature-line" />
             </article>
           ))}
         </div>
@@ -175,22 +122,27 @@ function HowItWorks() {
   );
 }
 
-function Showcase() {
+function Workflow() {
   return (
-    <section className="showcase-section" aria-labelledby="showcase-heading">
-      <div className="showcase-inner">
-        <div className="showcase-copy">
-          <span className="eyebrow eyebrow--light">A checkout that feels familiar</span>
-          <h2 id="showcase-heading">The whole sale,<br />in one view.</h2>
-          <p>Pick products, keep an eye on the cart, confirm the total and choose a payment method without losing your place.</p>
-          <ul className="showcase-checks">
-            <li><Check size={13} /> Search by product name or SKU</li>
-            <li><Check size={13} /> See quantities and totals as you build the cart</li>
-            <li><Check size={13} /> Choose cash or start an M-Pesa payment</li>
-          </ul>
-          <Link className="btn btn--light" to="/login">Open the sales desk <ArrowRight size={16} /></Link>
+    <section className="lp-workflow" id="how-it-works">
+      <div className="lp-container">
+        <div className="lp-workflow-head">
+          <div>
+            <p className="lp-overline">ONE DAILY FLOW</p>
+            <h2>From shelf to sale.</h2>
+          </div>
+          <p>Keep the routine familiar for staff while keeping the records useful for the owner.</p>
         </div>
-        <div className="showcase-visual"><PosPreview /></div>
+        <div className="lp-workflow-grid">
+          {workflow.map(({ icon: Icon, title, text }, index) => (
+            <div className="lp-workflow-item" key={title}>
+              <div className="lp-workflow-number">0{index + 1}</div>
+              <Icon size={19} />
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -198,99 +150,41 @@ function Showcase() {
 
 function Management() {
   return (
-    <section className="management-section" id="business-management" aria-labelledby="management-heading">
-      <div className="management-inner">
-        <div className="management-copy">
-          <span className="eyebrow">More than checkout</span>
-          <h2 className="section-title" id="management-heading">Keep the business in view.</h2>
-          <p className="section-lead">
-            Move between the records your team uses to serve customers, manage stock and understand sales activity.
+    <section className="lp-management" id="business-management">
+      <div className="lp-container lp-management-grid">
+        <div className="lp-management-copy">
+          <p className="lp-overline">BEYOND THE TILL</p>
+          <h2>The owner sees what the cashier sees.</h2>
+          <p>
+            Sales, stock and customer records live in the same workspace. That means
+            fewer handovers, fewer guesses and a clearer picture at the end of the day.
           </p>
-          <div className="management-links">
-            {managementLinks.map(({ icon: Icon, title, text }) => (
-              <div key={title}>
-                <span className="management-link-icon"><Icon size={16} /></span>
-                <span><b>{title}</b><small>{text}</small></span>
-              </div>
-            ))}
+          <div className="lp-list">
+            <div><Check size={15} /><span>Sales history with recorded transaction details</span></div>
+            <div><Check size={15} /><span>Inventory visibility linked to sales</span></div>
+            <div><Check size={15} /><span>Customer records for repeat business</span></div>
           </div>
+          <Link className="lp-inline-link" to="/login">Go to the workspace <ArrowUpRight size={15} /></Link>
         </div>
-        <div className="management-visual" role="img" aria-label="Illustration of a retail management dashboard">
-          <div className="management-window">
-            <div className="management-window-top">
-              <span className="window-dots"><i /><i /><i /></span>
-              <span>Business overview</span>
-              <span className="sample-tag">SAMPLE VIEW</span>
-            </div>
-            <div className="management-window-body">
-              <div className="management-sidebar">
-                <span className="sidebar-logo">K</span>
-                <i className="sidebar-selected"><BarChart3 size={14} /></i>
-                <i><ShoppingBag size={14} /></i>
-                <i><PackageCheck size={14} /></i>
-                <i><Users size={14} /></i>
-              </div>
-              <div className="management-content">
-                <div className="management-title">
-                  <span><small>YOUR WORKSPACE</small><b>Business overview</b></span>
-                  <span className="period-chip">Recent activity</span>
-                </div>
-                <div className="overview-cards">
-                  <div><span>Sales activity</span><b>Reports</b><small>Open sales reports</small></div>
-                  <div><span>Transactions</span><b>Sales history</b><small>View recorded sales</small></div>
-                  <div><span>Stock</span><b>Catalogue</b><small>View inventory</small></div>
-                </div>
-                <div className="activity-panel">
-                  <div className="activity-heading"><b>Recent sales</b><span>Sample records</span></div>
-                  <div className="activity-line"><span className="activity-dot blue-dot" /><span>Sale · Walk-in customer</span><b>KES 2,400</b></div>
-                  <div className="activity-line"><span className="activity-dot green-dot" /><span>Sale · Customer record</span><b>KES 1,850</b></div>
-                  <div className="activity-line"><span className="activity-dot yellow-dot" /><span>Sale · Walk-in customer</span><b>KES 760</b></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="management-caption">
-            <span><span className="caption-dot" /> Sample workspace preview</span>
-            <span>Sales · stock · customers</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
-function Branches() {
-  return (
-    <section className="branches-section" aria-labelledby="branches-heading">
-      <div className="branches-inner">
-        <div className="branches-head">
-          <span className="eyebrow">Built with growing teams in mind</span>
-          <h2 className="section-title" id="branches-heading">A platform with branches in its foundations.</h2>
-          <p className="section-lead">
-            ZenPOS includes branch records and branch-scoped staff access. Branch-level sales and stock workflows are still being expanded across the product.
-          </p>
-        </div>
-        <div className="branch-map" role="img" aria-label="An organization connected to three branch locations">
-          <div className="branch-root">
-            <span><Building2 size={19} /></span>
-            <div><b>Your business</b><small>Organization workspace</small></div>
+        <div className="lp-management-card">
+          <div className="lp-management-card-head">
+            <div>
+              <span>ZENPOS WORKSPACE</span>
+              <strong>Today at a glance</strong>
+            </div>
+            <span className="lp-date">LIVE DATA</span>
           </div>
-          <div className="branch-locations">
-            <div className="branch-card">
-              <span className="branch-store"><Warehouse size={17} /></span>
-              <span><b>Branch A</b><small>Location record</small></span>
-              <span className="branch-status">Example</span>
-            </div>
-            <div className="branch-card">
-              <span className="branch-store"><Warehouse size={17} /></span>
-              <span><b>Branch B</b><small>Location record</small></span>
-              <span className="branch-status">Example</span>
-            </div>
-            <div className="branch-card branch-add">
-              <span className="branch-store"><Building2 size={17} /></span>
-              <span><b>More locations</b><small>Managed by authorized staff</small></span>
-              <ArrowUpRight size={15} />
-            </div>
+          <div className="lp-metrics">
+            <div><span>Sales</span><strong>Recorded</strong><small>Every completed order</small></div>
+            <div><span>Inventory</span><strong>Connected</strong><small>Stock-aware checkout</small></div>
+            <div><span>Customers</span><strong>Organised</strong><small>One customer record</small></div>
+          </div>
+          <div className="lp-activity">
+            <div className="lp-activity-head"><strong>Recent activity</strong><span>Sales desk</span></div>
+            <div><span className="lp-activity-dot" />Sale recorded <b>CASH</b></div>
+            <div><span className="lp-activity-dot lp-activity-dot--green" />Payment workflow <b>M-PESA</b></div>
+            <div><span className="lp-activity-dot lp-activity-dot--muted" />Stock updated <b>INVENTORY</b></div>
           </div>
         </div>
       </div>
@@ -300,37 +194,34 @@ function Branches() {
 
 function FinalCta() {
   return (
-    <div className="cta-wrap">
-      <section className="final-cta" aria-labelledby="cta-heading">
-        <div className="final-cta-inner">
-          <span className="eyebrow eyebrow--light">ZenPOS</span>
-          <h2 id="cta-heading">Ready to bring the work together?</h2>
-          <p>Bring sales, inventory, customers and business management into one retail workspace.</p>
-          <div className="cta-actions">
-            <Link className="btn btn--light" to="/login">Get started <ArrowRight size={16} /></Link>
-            <Link className="cta-signin" to="/login">Sign in to your account <ArrowUpRight size={15} /></Link>
-          </div>
+    <section className="lp-final">
+      <div className="lp-container lp-final-inner">
+        <div>
+          <p className="lp-overline">ZENPOS</p>
+          <h2>Make the next sale<br />the easy part.</h2>
         </div>
-      </section>
-    </div>
+        <div className="lp-final-side">
+          <p>Start with the tools your shop needs today. Add more as the business grows.</p>
+          <Link className="lp-button lp-button--light" to="/login">Open ZenPOS <ArrowRight size={16} /></Link>
+        </div>
+      </div>
+    </section>
   );
 }
 
 function Landing() {
   return (
-    <div className="zenpos-site">
+    <div className="zenpos-site lp-site">
       <a className="skip-link" href="#main-content">Skip to content</a>
       <SiteHeader />
-      <div id="main-content">
+      <main id="main-content">
         <Hero />
-        <CapabilityStrip />
+        <Intro />
         <Features />
-        <HowItWorks />
-        <Showcase />
+        <Workflow />
         <Management />
-        <Branches />
         <FinalCta />
-      </div>
+      </main>
       <SiteFooter />
     </div>
   );
