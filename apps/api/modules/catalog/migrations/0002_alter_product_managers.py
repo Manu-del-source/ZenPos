@@ -9,6 +9,8 @@ class Migration(migrations.Migration):
         ("catalog", "0001_initial"),
     ]
 
+    # Keep migration state aligned with Product's live custom managers.
+    # Both managers opt into migration serialization in core.managers.
     operations = [
         migrations.AlterModelManagers(
             name="product",
