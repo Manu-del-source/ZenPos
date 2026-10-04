@@ -1,4 +1,5 @@
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+import uuid
 
 from django.db import transaction
 from rest_framework import serializers
@@ -24,21 +25,7 @@ def _money(value: Decimal) -> Decimal:
 
 
 def compute_line_money(product: Product, quantity: int) -> dict:
-    """Resolve one sale line's money from the catalogue.
-
-    This is the single place a line's monetary truth is produced. The client
-    supplies only the product and the quantity; the price comes from the
-    product, the cost is captured for historical margin, and the tax comes from
-    the product's tax band:
-
-    - inclusive price: the customer pays ``price * quantity`` exactly, and the
-      tax is carved back out of it;
-    - exclusive price: the tax is added on top;
-    - no tax band: tax is zero.
-
-    Every value is quantized per line, so the sale total is the exact sum of
-    its lines with no aggregate rounding drift.
-    """
+    """Resolve one sale line's money from the catalogue."""
     gross = _money(product.price * quantity)
     tax_rate = product.tax_rate
 
@@ -73,8 +60,6 @@ def compute_line_money(product: Product, quantity: int) -> dict:
 
 
 class SaleItemSerializer(OrganizationScopedSerializerMixin, serializers.ModelSerializer):
-    # Nested serializers inherit the request context, so this check runs for each
-    # line: a cashier must not be able to sell another organization's product.
     organization_bound_fields = ("product",)
 
     product_name = serializers.ReadOnlyField(source="product.name")
@@ -95,9 +80,6 @@ class SaleItemSerializer(OrganizationScopedSerializerMixin, serializers.ModelSer
             "tax_rate_name",
             "tax_rate_percent",
         )
-        # Every monetary field is computed by the server from the product and
-        # its tax configuration (``compute_line_money``). A client-sent value
-        # for any of them is ignored rather than stored.
         read_only_fields = (
             "unit_price",
             "unit_cost",
@@ -108,7 +90,6 @@ class SaleItemSerializer(OrganizationScopedSerializerMixin, serializers.ModelSer
         )
 
     def get_line_total(self, obj) -> Decimal:
-        """What the customer pays for the line: net plus tax."""
         return obj.subtotal + obj.tax_amount
 
 
@@ -116,8 +97,6 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
     organization_bound_fields = ("customer",)
 
     items = SaleItemSerializer(many=True)
-    # Read-only and nested: the payment rows are the source of truth for how a
-    # sale was settled, and become the record split payments read in phase 6.
     payments = PaymentSerializer(many=True, read_only=True)
     cashier_name = serializers.ReadOnlyField(source="cashier.username")
     customer_name = serializers.ReadOnlyField(source="customer.name")
@@ -139,13 +118,14 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             "items",
             "created_at",
         )
-        # The totals are computed from the items; the discount stays zero until
-        # phase 6 decides how line-level discounts are priced. Line-level
-        # discounts bolted onto the sale header cannot be explained per line.
-        read_only_fields = ("total_amount", "tax_amount", "discount_amount")
+        read_only_fields = (
+            "sale_number",
+            "total_amount",
+            "tax_amount",
+            "discount_amount",
+        )
 
     def validate_payment_method(self, value):
-        """Accept cash and M-Pesa; M-Pesa is settled by the payment endpoint."""
         if value not in {Sale.PaymentMethod.CASH, Sale.PaymentMethod.MPESA}:
             raise serializers.ValidationError(
                 "Only CASH and MPESA are currently supported at the POS."
@@ -157,21 +137,12 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             raise serializers.ValidationError("A sale must contain at least one item.")
         for item in value:
             if item["quantity"] < 1:
-                # A non-positive quantity would produce a negative-or-zero
-                # total and *increase* stock — the opposite of a sale.
                 raise serializers.ValidationError(
                     {"quantity": "Quantity must be at least 1."}
                 )
         return value
 
     def _check_client_total_hint(self, computed_total: Decimal) -> None:
-        """Treat a client-sent total as a mismatch hint, never as truth.
-
-        A differing total is usually a buggy or desynchronised client, so it is
-        rejected with the computed value in the message. A garbage value is
-        rejected too: DRF no longer validates this field for us once it is
-        read-only, so it is parsed here.
-        """
         client_total = self.initial_data.get("total_amount")
         if client_total is None:
             return
@@ -186,37 +157,37 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
                 {
                     "total_amount": (
                         f"Client total does not match the server-computed total "
-                        f"of {computed_total}. Totals are calculated from the "
-                        f"line items."
+                        f"of {computed_total}. Totals are calculated from the line items."
                     )
                 }
             )
 
     @transaction.atomic
     def create(self, validated_data):
-        """Persist a sale and its stock effects as one unit of work.
-
-        Any failure rolls the whole thing back, so a sale can never exist
-        without its stock deduction, or vice versa. Money is computed before
-        anything is written, so a rejected total leaves no rows behind.
-        """
         items_data = validated_data.pop("items")
 
-        lines = [compute_line_money(item["product"], item["quantity"]) for item in items_data]
+        lines = [
+            compute_line_money(item["product"], item["quantity"])
+            for item in items_data
+        ]
         subtotal = sum(line["subtotal"] for line in lines)
         tax_total = sum(line["tax_amount"] for line in lines)
         computed_total = subtotal + tax_total
 
         self._check_client_total_hint(computed_total)
 
+        # Sale numbers are generated by the server so every POS client,
+        # including older deployed frontends, can create a sale safely.
+        validated_data.pop("sale_number", None)
+        sale_number = f"SALE-{timezone_now_stamp()}-{uuid.uuid4().hex[:8].upper()}"
+
         sale = Sale.objects.create(
             **validated_data,
+            sale_number=sale_number,
             total_amount=computed_total,
             tax_amount=tax_total,
         )
 
-        # Cash is completed here because the customer has already handed it over.
-        # M-Pesa remains unsettled until the provider callback verifies the payment.
         if sale.payment_method == Sale.PaymentMethod.CASH:
             payment = complete_cash_payment(
                 sale=sale, amount=computed_total, received_by=sale.cashier
@@ -235,13 +206,10 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
                 },
             )
 
-        # ``quantity`` is supplied per item; the line dict carries it only so
-        # ``compute_line_money`` stays a pure, individually testable function.
         for line in lines:
             line.pop("quantity")
 
         for item_data, line in zip(items_data, lines, strict=True):
-            # Lock the row: two cashiers must not oversell the last unit.
             product = Product.objects.select_for_update().get(pk=item_data["product"].pk)
             quantity = item_data["quantity"]
 
@@ -287,3 +255,8 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         )
 
         return sale
+
+
+def timezone_now_stamp():
+    from django.utils import timezone
+    return timezone.now().strftime("%Y%m%d%H%M%S")
