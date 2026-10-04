@@ -48,8 +48,8 @@ const POS = () => {
 
   const handleMpesa = async () => {
     if (!cart.length) return;
-    const normalizedPhone = phone.replace(/\\s+/g, '');
-    if (!/^0(1|7)\\d{8}$/.test(normalizedPhone)) {
+    const normalizedPhone = phone.replace(/\s+/g, '');
+    if (!/^0(1|7)\d{8}$/.test(normalizedPhone)) {
       return toast.error('Enter a valid Kenyan M-Pesa number, e.g. 0712345678.');
     }
 
@@ -158,7 +158,14 @@ const POS = () => {
             </div>
           )}
           {products.map((p) => (
-            <div key={p.id} className="product-card" onClick={() => addToCart(p)}>
+            <div
+              key={p.id}
+              className={`product-card ${p.stock_level <= 0 && p.track_inventory ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              onClick={() => {
+                if (p.stock_level > 0 || !p.track_inventory) addToCart(p);
+                else toast.error('This product is out of stock.');
+              }}
+            >
               <div>
                 <div className="sku">{p.sku}</div>
                 <div className="name uppercase tracking-tight">{p.name}</div>
