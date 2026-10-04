@@ -23,6 +23,13 @@ export default function POS() {
   const cash = Number(cashReceived || 0);
   const change = Math.max(0, cash - total);
 
+  const createSaleNumber = () => {
+    const suffix = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()
+      : Math.random().toString(36).slice(2, 10).toUpperCase();
+    return `SALE-${Date.now()}-${suffix}`;
+  };
+
   const loadProducts = async (term = '') => {
     setLoadingProducts(true);
     try {
@@ -71,6 +78,7 @@ export default function POS() {
     setCheckoutLoading(true);
     try {
       await api.post('/sales/', {
+        sale_number: createSaleNumber(),
         payment_method: 'CASH',
         items: cart.map((item) => ({ product: item.id, quantity: item.quantity })),
       });
@@ -98,6 +106,7 @@ export default function POS() {
     setCheckoutLoading(true);
     try {
       const { data: sale } = await api.post('/sales/', {
+        sale_number: createSaleNumber(),
         payment_method: 'MPESA',
         items: cart.map((item) => ({ product: item.id, quantity: item.quantity })),
       });
