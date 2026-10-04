@@ -1,169 +1,173 @@
-import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pencil, Plus, Search, UserRound, Users, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Users, UserPlus, Pencil, Search, Phone } from 'lucide-react';
+import api from '../services/api';
 
-const Customers = () => {
+const emptyForm = { name: '', phone: '' };
+
+export default function Customers() {
   const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
-  const [formData, setFormData] = useState({ name: '', phone: '', email: '' });
+  const [form, setForm] = useState(emptyForm);
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/customers/', { params: { search: searchTerm } });
-      setCustomers(res.data);
+      const { data } = await api.get('/customers/');
+      const rows = Array.isArray(data) ? data : (data.results || []);
+      setCustomers(rows);
     } catch (err) {
-      toast.error('Failed to load customer directory');
+      toast.error(err.response?.data?.detail || 'Failed to load customers.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchCustomers();
-  }, [searchTerm]);
+  useEffect(() => { fetchCustomers(); }, []);
 
-  const handleOpenModal = (customer = null) => {
-    if (customer) {
-      setEditingCustomer(customer);
-      setFormData({ name: customer.name, phone: customer.phone || '', email: customer.email || '' });
-    } else {
-      setEditingCustomer(null);
-      setFormData({ name: '', phone: '', email: '' });
-    }
-    setShowModal(true);
+  const filteredCustomers = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter((customer) =>
+      customer.name?.toLowerCase().includes(q) ||
+      customer.phone?.toLowerCase().includes(q)
+    );
+  }, [customers, searchTerm]);
+
+  const openCreate = () => {
+    setEditingCustomer(null);
+    setForm(emptyForm);
+    setModalOpen(true);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const openEdit = (customer) => {
+    setEditingCustomer(customer);
+    setForm({ name: customer.name || '', phone: customer.phone || '' });
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (!saving) setModalOpen(false);
+  };
+
+  const saveCustomer = async (event) => {
+    event.preventDefault();
+    const name = form.name.trim();
+    const phone = form.phone.trim();
+
+    if (!name || !phone) {
+      toast.error('Name and phone number are required.');
+      return;
+    }
+
+    setSaving(true);
     try {
-      // In this version, we'll implement simple add/edit via the database
-      toast.error("Cloud edit restricted - use Terminal UI for bulk updates");
-      setShowModal(false);
+      if (editingCustomer) {
+        await api.patch(`/customers/${editingCustomer.id}/`, { name, phone });
+        toast.success('Customer updated.');
+      } else {
+        await api.post('/customers/', { name, phone });
+        toast.success('Customer added.');
+      }
+      setModalOpen(false);
+      await fetchCustomers();
     } catch (err) {
-      toast.error('Operation failed');
+      const data = err.response?.data;
+      const detail = data?.detail || Object.values(data || {}).flat().find((value) => typeof value === 'string');
+      toast.error(detail || 'Could not save customer.');
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto bg-slate-950 min-h-screen text-white">
-      <div className="flex justify-between items-center mb-8">
+    <div className="page-shell">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight uppercase italic">CLIENT <span className="text-blue-500">DATABASE</span></h1>
-          <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Customer Loyalty & Contact Records</p>
+          <div className="eyebrow">Customer management</div>
+          <h1 className="page-title">Customers</h1>
+          <p className="page-subtitle">Keep customer contacts ready for faster checkout and repeat business.</p>
         </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black uppercase tracking-tighter hover:bg-blue-700 transition shadow-lg shadow-blue-600/20 flex items-center"
-        >
-          <UserPlus size={20} className="mr-2" /> REGISTER CLIENT
+        <button className="btn-primary" onClick={openCreate}>
+          <Plus size={17} /> Add customer
         </button>
       </div>
 
-      <div className="mb-6 relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
-        <input 
-          className="w-full bg-slate-900 border border-slate-800 p-4 pl-12 rounded-2xl text-white outline-none focus:border-blue-500 transition-all"
-          placeholder="Search by name or phone number..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+      <div className="panel mt-6">
+        <div className="panel-header">
+          <div>
+            <h2 className="panel-title">Customer directory</h2>
+            <p className="panel-subtitle">{customers.length} customer{customers.length === 1 ? '' : 's'} registered</p>
+          </div>
+          <div className="relative w-full sm:w-80">
+            <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              className="input pl-10"
+              placeholder="Search name or phone"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
 
-      <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
-        <table className="w-full text-left">
-          <thead className="bg-slate-800/50">
-            <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-              <th className="p-5">Client Name</th>
-              <th className="p-5">Contact Details</th>
-              <th className="p-5 text-center">Manage</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {customers.map((c) => (
-              <tr key={c.id} className="hover:bg-slate-800/30 transition group">
-                <td className="p-5">
-                  <div className="font-bold text-white group-hover:text-blue-400 transition-colors">{c.name}</div>
-                  <div className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-wider">ID: #CUST-{c.id}</div>
-                </td>
-                <td className="p-5">
-                  <div className="flex flex-col space-y-1">
-                    <span className="text-sm text-slate-300 flex items-center"><Phone size={12} className="mr-2 text-blue-500" /> {c.phone || 'N/A'}</span>
-                    <span className="text-[11px] text-slate-500">{c.email || 'No email provided'}</span>
-                  </div>
-                </td>
-                <td className="p-5 text-center">
-                   <button onClick={() => handleOpenModal(c)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition">
-                     <Pencil size={16} />
-                   </button>
-                </td>
-              </tr>
+        {loading ? (
+          <div className="p-10 text-center text-slate-500">Loading customers…</div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="p-12 text-center">
+            <Users className="mx-auto mb-3 text-slate-600" size={34} />
+            <p className="font-semibold text-slate-300">{searchTerm ? 'No matching customers' : 'No customers yet'}</p>
+            <p className="mt-1 text-sm text-slate-500">{searchTerm ? 'Try another name or phone number.' : 'Add your first customer to get started.'}</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-800/70">
+            {filteredCustomers.map((customer) => (
+              <div key={customer.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-900/60">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-700 bg-slate-900 text-slate-300">
+                  <UserRound size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-white">{customer.name}</p>
+                  <p className="mt-0.5 text-sm text-slate-500">{customer.phone}</p>
+                </div>
+                <div className="hidden text-right sm:block">
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Loyalty</p>
+                  <p className="font-semibold text-slate-200">{customer.loyalty_points ?? 0} pts</p>
+                </div>
+                <button className="btn-secondary !px-3" onClick={() => openEdit(customer)} aria-label={`Edit ${customer.name}`}>
+                  <Pencil size={15} />
+                </button>
+              </div>
             ))}
-          </tbody>
-        </table>
-        {customers.length === 0 && !loading && (
-          <div className="p-20 text-center flex flex-col items-center">
-            <Users size={64} className="text-slate-800 mb-4" />
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">No clients registered</p>
           </div>
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl">
-            <h3 className="text-2xl font-black mb-8 text-white tracking-tighter uppercase italic">
-              {editingCustomer ? 'Update Client Info' : 'New Client Registration'}
-            </h3>
-            <form onSubmit={handleSubmit} className="space-y-6">
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="panel w-full max-w-md shadow-2xl">
+            <div className="panel-header">
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Full Name</label>
-                <input 
-                  className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  required
-                />
+                <h2 className="panel-title">{editingCustomer ? 'Edit customer' : 'Add customer'}</h2>
+                <p className="panel-subtitle">Name and phone are required by the current API.</p>
               </div>
-              <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Phone Number (M-Pesa)</label>
-                  <input 
-                    className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500"
-                    placeholder="e.g. 0712345678"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Email Address</label>
-                  <input 
-                    type="email"
-                    className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  />
-                </div>
-              </div>
-              
-              <div className="flex space-x-3 pt-6">
-                <button 
-                  type="button" 
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 bg-slate-800 text-slate-400 py-4 rounded-2xl font-bold uppercase tracking-widest hover:bg-slate-700 transition"
-                >
-                  Discard
-                </button>
-                <button 
-                  type="submit" 
-                  className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition"
-                >
-                  Save Record
-                </button>
+              <button className="btn-secondary !px-3" onClick={closeModal}><X size={17} /></button>
+            </div>
+            <form onSubmit={saveCustomer} className="space-y-4 p-5">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-300">Full name</span>
+                <input className="input" autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-300">Phone number</span>
+                <input className="input" placeholder="0712345678" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </label>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" className="btn-secondary" onClick={closeModal}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : editingCustomer ? 'Save changes' : 'Add customer'}</button>
               </div>
             </form>
           </div>
@@ -171,6 +175,4 @@ const Customers = () => {
       )}
     </div>
   );
-};
-
-export default Customers;
+}
