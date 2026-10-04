@@ -1,5 +1,5 @@
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 import uuid
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.db import transaction
 from rest_framework import serializers
