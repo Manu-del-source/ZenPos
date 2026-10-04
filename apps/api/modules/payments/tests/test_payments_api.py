@@ -132,6 +132,8 @@ class TestPaymentInitiation:
         assert attempt.status == Payment.Status.FAILED
         assert "refused" in attempt.error
         assert attempt.response_payload["errorCode"] == "500.001.1001"
+        product.refresh_from_db()
+        assert product.stock_level == 50
 
     def test_cash_payment_through_this_endpoint_is_completed(
         self, authenticated_client, product, cashier, stub_provider
@@ -350,6 +352,8 @@ class TestMpesaCallback:
         assert response.status_code == 200
         payment.refresh_from_db()
         assert payment.status == Payment.Status.FAILED
+        product.refresh_from_db()
+        assert product.stock_level == 50
 
     def test_a_wrong_secret_is_a_404(self, stub_provider):
         response = APIClient().post(
