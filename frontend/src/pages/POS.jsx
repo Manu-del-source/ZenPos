@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Barcode, CheckCircle2, CreditCard, Minus, Package, Plus, Search, Smartphone, Trash2, Wallet } from 'lucide-react';
+import { Barcode, CheckCircle2, CreditCard, Minus, Package, Plus, Search, Smartphone, Trash2, UserRound, Wallet, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { usePOSStore } from '../store/posStore';
@@ -17,6 +17,8 @@ export default function POS() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [phone, setPhone] = useState('');
   const [cashReceived, setCashReceived] = useState('');
+  const [customers, setCustomers] = useState([]);
+  const [customerId, setCustomerId] = useState('');
   const searchRef = useRef(null);
 
   const total = getTotal();
@@ -51,7 +53,43 @@ export default function POS() {
 
   useEffect(() => {
     searchRef.current?.focus();
+    api.get('/customers/', { params: { page_size: 100 } })
+      .then(({ data }) => setCustomers(Array.isArray(data) ? data : (data.results || [])))
+      .catch(() => {});
   }, []);
+
+  const scanBarcode = async () => {
+    const barcode = searchTerm.trim();
+    if (!barcode) return;
+    try {
+      const { data } = await api.get('/products/search/', { params: { barcode } });
+      if (data?.id) {
+        addProduct(data);
+        setSearchTerm('');
+        searchRef.current?.focus();
+      }
+    } catch {
+      toast.error('No product found for that barcode.');
+    }
+  };
+
+  const printReceipt = async (saleId) => {
+    try {
+      const { data } = await api.get(`/sales/${saleId}/receipt/?paper=80mm`, { responseType: 'text' });
+      const printWindow = window.open('', '_blank', 'width=480,height=760');
+      if (!printWindow) {
+        toast.error('Allow pop-ups to print the receipt.');
+        return;
+      }
+      printWindow.document.open();
+      printWindow.document.write(data);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.onload = () => printWindow.print();
+    } catch {
+      toast.error('Could not prepare the receipt.');
+    }
+  };
 
   const visibleProducts = useMemo(() => products.filter((product) => product.is_active !== false), [products]);
 
@@ -77,12 +115,14 @@ export default function POS() {
     if (!cart.length || cash < total) return;
     setCheckoutLoading(true);
     try {
-      await api.post('/sales/', {
+      const { data: sale } = await api.post('/sales/', {
         sale_number: createSaleNumber(),
         payment_method: 'CASH',
+        customer: customerId || null,
         items: cart.map((item) => ({ product: item.id, quantity: item.quantity })),
       });
       toast.success(`Cash sale completed. Change: KES ${money(change)}`);
+      await printReceipt(sale.id);
       clearCart();
       setCashReceived('');
       await loadProducts(searchTerm);
@@ -108,6 +148,7 @@ export default function POS() {
       const { data: sale } = await api.post('/sales/', {
         sale_number: createSaleNumber(),
         payment_method: 'MPESA',
+        customer: customerId || null,
         items: cart.map((item) => ({ product: item.id, quantity: item.quantity })),
       });
 
@@ -127,6 +168,7 @@ export default function POS() {
 
         if (current.status === 'COMPLETED') {
           toast.success('M-Pesa payment confirmed.');
+          await printReceipt(sale.id);
           clearCart();
           setPhone('');
           await loadProducts(searchTerm);
@@ -134,7 +176,7 @@ export default function POS() {
         }
 
         if (current.status === 'FAILED') {
-          toast.error('M-Pesa payment failed or was cancelled. The sale remains recorded for reconciliation.');
+          toast.error('M-Pesa payment failed or was cancelled. The reserved stock has been released.');
           return;
         }
       }
@@ -171,11 +213,19 @@ export default function POS() {
               <input
                 ref={searchRef}
                 className="input pl-11 pr-11"
-                placeholder="Search product name or SKU…"
+                placeholder="Search product name or scan barcode…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    scanBarcode();
+                  }
+                }}
               />
-              <Barcode size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600" />
+              <button type="button" onClick={scanBarcode} aria-label="Scan barcode" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-white">
+                <Barcode size={18} />
+              </button>
             </div>
           </div>
 
@@ -269,6 +319,17 @@ export default function POS() {
             </div>
 
             <div className="space-y-3">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-400">Customer</span>
+                <div className="relative">
+                  <UserRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <select className="input pl-10" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+                    <option value="">Walk-in customer</option>
+                    {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name} — {customer.phone}</option>)}
+                  </select>
+                </div>
+              </label>
+
               <label className="block">
                 <span className="mb-1.5 block text-xs font-semibold text-slate-400">M-Pesa phone</span>
                 <div className="relative">
