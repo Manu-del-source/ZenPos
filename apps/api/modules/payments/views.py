@@ -14,6 +14,7 @@ from .services import (
     get_payment_provider,
     handle_mpesa_callback,
     initiate_payment,
+    release_mpesa_stock_reservation,
 )
 
 
@@ -83,10 +84,11 @@ class PaymentViewSet(
                     phone=serializer.validated_data["phone"],
                     provider=get_payment_provider(),
                 )
-            except PaymentGatewayError as exc:
-                # A refused push leaves the payment and its attempt row on
-                # disk, marked FAILED: a refused charge is history, not a
-                # secret. The cashier gets the refusal to show at the till.
+            except (PaymentGatewayError, ValueError) as exc:
+                # Provider configuration failures must also release the stock
+                # reservation; otherwise a failed STK request could leave a
+                # sale permanently consuming inventory.
+                release_mpesa_stock_reservation(sale=serializer.validated_data["sale"])
                 raise ValidationError({"detail": str(exc)}) from exc
             action = "payment.initiated"
         else:
