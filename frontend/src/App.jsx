@@ -88,7 +88,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
                 <BarChart3 size={19} className="text-slate-500" /><span>Reports</span>
               </NavLink>
               <NavLink to="/settings" onClick={() => setMobileOpen(false)} className={({ isActive }) => `flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${isActive ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-white'}`}>
-                <Settings size={19} className={({}) => ''} /><span>Settings</span>
+                <Settings size={19} className="text-slate-500" /><span>Settings</span>
               </NavLink>
             </>
           )}
