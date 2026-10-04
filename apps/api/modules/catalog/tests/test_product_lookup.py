@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 
 from modules.catalog.models import Category, PriceHistory, Product, ProductBarcode
+from modules.core.managers import SoftDeleteManager
 
 PRODUCTS_URL = "/api/v2/products/"
 
@@ -49,6 +50,18 @@ class TestProductLookup:
         response = api_client.get(PRODUCTS_URL)
 
         assert response.status_code in (401, 403)
+
+
+@pytest.mark.django_db
+def test_soft_delete_managers_keep_archived_products_retrievable(product):
+    """The default manager hides archived products; the explicit one exposes them."""
+    assert isinstance(Product.objects, SoftDeleteManager)
+    assert Product._default_manager.name == "objects"
+
+    product.soft_delete()
+
+    assert not Product.objects.filter(pk=product.pk).exists()
+    assert Product.all_objects.filter(pk=product.pk).exists()
 
 
 @pytest.mark.django_db
