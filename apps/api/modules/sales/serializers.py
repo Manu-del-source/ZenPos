@@ -213,31 +213,42 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             product = Product.objects.select_for_update().get(pk=item_data["product"].pk)
             quantity = item_data["quantity"]
 
-            if product.stock_level < quantity:
-                raise serializers.ValidationError(
-                    f"Insufficient stock for {product.name}. Available: {product.stock_level}."
-                )
+            # Non-stocked products (services, fees, etc.) never participate in
+            # inventory validation or stock movements.
+            if product.track_inventory:
+                if product.stock_level < quantity:
+                    raise serializers.ValidationError(
+                        f"Insufficient stock for {product.name}. Available: {product.stock_level}."
+                    )
 
             SaleItem.objects.create(sale=sale, **item_data, **line)
 
-            product.stock_level -= quantity
-            product.save(update_fields=["stock_level", "updated_at"])
+            if product.track_inventory:
+                # For M-Pesa this is a reservation: the stock is held while the
+                # customer completes the STK prompt and is released automatically
+                # if the provider reports failure. Cash sales are immediately
+                # completed, so the same movement is the final deduction.
+                product.stock_level -= quantity
+                product.save(update_fields=["stock_level", "updated_at"])
 
-            StockAdjustment.objects.create(
-                product=product,
-                user=sale.cashier,
-                quantity=-quantity,
-                type=StockAdjustment.AdjustmentType.ADJUST,
-                notes=f"Sale {sale.sale_number}",
-            )
-            record_audit(
-                action="stock.adjusted",
-                entity_type="product",
-                entity_id=product.pk,
-                actor=sale.cashier,
-                request=self.context.get("request"),
-                after={"stock_level": product.stock_level},
-            )
+                StockAdjustment.objects.create(
+                    product=product,
+                    user=sale.cashier,
+                    quantity=-quantity,
+                    type=StockAdjustment.AdjustmentType.ADJUST,
+                    notes=(
+                        f"Sale {sale.sale_number}"
+                        + (" - M-Pesa pending reservation" if sale.payment_method == Sale.PaymentMethod.MPESA else "")
+                    ),
+                )
+                record_audit(
+                    action="stock.adjusted",
+                    entity_type="product",
+                    entity_id=product.pk,
+                    actor=sale.cashier,
+                    request=self.context.get("request"),
+                    after={"stock_level": product.stock_level},
+                )
 
         record_audit(
             action="sale.created",
