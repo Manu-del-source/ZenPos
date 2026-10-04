@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Production and local builds use the Django REST API under /api/v2.
 // Vercel rewrites /api/v2/* to the Render Django service.
-const getBaseURL = () => '/api/v2';
+const getBaseURL = () => 'https://zenpos-ef02.onrender.com/api/v2';
 
 const api = axios.create({
   baseURL: getBaseURL(),
