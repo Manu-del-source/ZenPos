@@ -47,7 +47,51 @@ const POS = () => {
   };
 
   const handleMpesa = async () => {
-    toast.error('M-Pesa checkout is not connected to the Django payments flow yet.');
+    if (!cart.length) return;
+    const normalizedPhone = phone.replace(/\\s+/g, '');
+    if (!/^0(1|7)\\d{8}$/.test(normalizedPhone)) {
+      return toast.error('Enter a valid Kenyan M-Pesa number, e.g. 0712345678.');
+    }
+
+    setLoading(true);
+    try {
+      const { data: sale } = await api.post('/sales/', {
+        payment_method: 'MPESA',
+        items: cart.map((item) => ({ product: item.id, quantity: item.quantity })),
+      });
+
+      const { data: payment } = await api.post('/payments/', {
+        sale: sale.id,
+        method: 'MPESA',
+        phone: normalizedPhone,
+      });
+
+      toast.success('STK Push sent. Ask the customer to enter their M-Pesa PIN.', { duration: 5000 });
+
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const { data: current } = await api.get('/payments/' + payment.id + '/');
+
+        if (current.status === 'COMPLETED') {
+          toast.success('M-Pesa payment confirmed. Sale complete.', { duration: 5000 });
+          clearCart();
+          setPhone('');
+          return;
+        }
+        if (current.status === 'FAILED') {
+          toast.error('M-Pesa payment failed or was cancelled.');
+          return;
+        }
+      }
+
+      toast.error('Payment is still pending. Check Sales later for its status.');
+    } catch (err) {
+      const data = err.response?.data;
+      const detail = data?.detail || (data && Object.values(data).flat().find(v => typeof v === 'string'));
+      toast.error(detail || 'M-Pesa checkout failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const completeCashSale = async () => {
@@ -106,6 +150,13 @@ const POS = () => {
         </div>
 
         <div className="product-grid">
+          {products.length === 0 && (
+            <div className="col-span-full flex flex-col items-center justify-center min-h-[300px] text-slate-500">
+              <Package size={64} className="mb-4 opacity-30" />
+              <p className="font-black uppercase tracking-widest">No products in catalogue</p>
+              <p className="text-xs mt-2">Open Inventory to add your first product.</p>
+            </div>
+          )}
           {products.map((p) => (
             <div key={p.id} className="product-card" onClick={() => addToCart(p)}>
               <div>
