@@ -65,6 +65,20 @@ class AnalyticsViewSet(viewsets.ViewSet):
         )
 
     @action(detail=False, methods=["get"])
+    def low_stock(self, request):
+        """Return the organization's current low-stock products without pagination."""
+        rows = list(
+            self._products.filter(
+                track_inventory=True,
+                stock_level__lte=F("low_stock_threshold"),
+                is_active=True,
+            )
+            .values("id", "name", "sku", "stock_level", "low_stock_threshold")
+            .order_by("stock_level", "name")[:50]
+        )
+        return Response(rows)
+
+    @action(detail=False, methods=["get"])
     def inventory_status(self, request):
         products = self._products
         return Response(
