@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "install-anti-slop": {
+      "source": "dmmulroy/anti-slop",
+      "sourceType": "github",
+      "skillPath": "skills/install-anti-slop/SKILL.md",
+      "upstreamCommit": "c44ef22ca116d0ba62a3ff663a0bd13a3f3fa40b",
+      "reverseHash": "6c2f0ba02619030412ddad059284e56968f5d8ae76b31287c82af030ab699b7d"
+    }
+  }
+}
