@@ -8,23 +8,24 @@ function SiteFooter() {
       <div className="footer-main">
         <div className="footer-brand-column">
           <Brand tone="dark" />
-          <p>Retail operations, brought together in one straightforward workspace.</p>
+          <p>Retail operations, in one place.</p>
         </div>
         <div className="footer-link-column">
           <b>Product</b>
+          <a href="#product">Product</a>
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
-          <a href="#business-management">Business management</a>
         </div>
         <div className="footer-link-column">
-          <b>Workspace</b>
+          <b>ZenPOS</b>
+          <a href="#contact">Contact</a>
           <Link to="/login">Sign in</Link>
-          <Link to="/login">Get started</Link>
+          <Link to="/login">Open ZenPOS</Link>
         </div>
       </div>
       <div className="footer-bottom">
         <span>© {new Date().getFullYear()} ZenPOS</span>
-        <span>Retail, made clearer.</span>
+        <span>Retail operations, in one place.</span>
       </div>
     </footer>
   );

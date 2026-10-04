@@ -4,9 +4,9 @@ import { ArrowUpRight, Menu, X } from 'lucide-react';
 import Brand from './Brand';
 
 const NAV_LINKS = [
+  { href: '#product', label: 'Product' },
   { href: '#features', label: 'Features' },
   { href: '#how-it-works', label: 'How it works' },
-  { href: '#business-management', label: 'Business management' },
 ];
 
 function SiteHeader() {
@@ -40,7 +40,7 @@ function SiteHeader() {
           <div className="site-nav-actions">
             <Link className="nav-signin" to="/login" onClick={closeMenu}>Sign in</Link>
             <Link className="btn btn--small btn--primary" to="/login" onClick={closeMenu}>
-              Get started <ArrowUpRight size={15} />
+              Open ZenPOS <ArrowUpRight size={15} />
             </Link>
           </div>
         </nav>
