@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -8,22 +8,21 @@ const money = (value) => `KES ${Number(value || 0).toLocaleString()}`;
 
 const Dashboard = () => {
   const [trend, setTrend] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [lowStock, setLowStock] = useState([]);
   const [stockValue, setStockValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [trendRes, stockRes, productsRes] = await Promise.all([
+      const [trendRes, stockRes, lowStockRes] = await Promise.all([
         api.get('/analytics/daily_sales_trend/'),
         api.get('/analytics/stock_value/'),
-        api.get('/products/', { params: { page_size: 100 } }),
+        api.get('/analytics/low_stock/'),
       ]);
       setTrend(Array.isArray(trendRes.data) ? trendRes.data : []);
       setStockValue(stockRes.data?.total || 0);
-      const rows = Array.isArray(productsRes.data) ? productsRes.data : (productsRes.data?.results || []);
-      setProducts(rows);
+      setLowStock(Array.isArray(lowStockRes.data) ? lowStockRes.data : []);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Unable to load dashboard data');
     } finally {
@@ -37,11 +36,6 @@ const Dashboard = () => {
   const todayRow = trend.find((row) => String(row.date).slice(0, 10) === today);
   const todayRevenue = Number(todayRow?.revenue || 0);
   const todaySales = Number(todayRow?.count || 0);
-  const lowStock = useMemo(
-    () => products.filter((p) => p.track_inventory !== false && Number(p.stock_level || 0) <= Number(p.low_stock_threshold || 0)),
-    [products]
-  );
-
   const maxRevenue = Math.max(...trend.slice(-7).map((x) => Number(x.revenue || 0)), 1);
 
   return (
