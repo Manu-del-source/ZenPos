@@ -87,15 +87,15 @@ const Inventory = () => {
   return (
     <div className="p-8 max-w-7xl mx-auto bg-slate-950 min-h-screen text-white">
       <div className="flex justify-between items-center mb-8">
-        <div><h1 className="text-3xl font-black tracking-tight uppercase italic">STOCK <span className="text-blue-500">CONTROL</span></h1>
-          <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Hardware & Motorcycle Spare Parts</p></div>
-        <button onClick={() => handleOpenModal()} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black uppercase tracking-tighter hover:bg-blue-700 transition shadow-lg shadow-blue-600/20 flex items-center">
-          <Plus size={20} className="mr-2" /> NEW ITEM
+        <div><h1 className="text-3xl font-black tracking-tight">Inventory</h1>
+          <p className="text-slate-500 text-sm">Manage products, pricing and stock levels.</p></div>
+        <button onClick={() => handleOpenModal()} className="btn-primary flex items-center">
+          <Plus size={18} className="mr-2" /> Add product
         </button>
       </div>
       <div className="mb-6 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
         <input className="w-full bg-slate-900 border border-slate-800 p-4 pl-12 rounded-2xl text-white outline-none focus:border-blue-500 transition-all"
-          placeholder="Filter by SKU or Part Name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+          placeholder="Search product name or SKU..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
 
       <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
         <table className="w-full text-left"><thead className="bg-slate-800/50"><tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
@@ -126,6 +126,10 @@ const Inventory = () => {
               value={formData[key]} onChange={(e) => setFormData({...formData, [key]: e.target.value})} /></div>)}
           <div className="flex space-x-3 pt-4"><button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-slate-800 text-slate-400 py-4 rounded-2xl font-bold uppercase">Discard</button>
             <button type="submit" className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase">Save Item</button></div>
+          <label className="flex items-center gap-3 text-sm text-slate-300">
+            <input type="checkbox" checked={formData.track_inventory} onChange={(e) => setFormData({ ...formData, track_inventory: e.target.checked })} />
+            Track inventory for this product
+          </label>
         </form>
       </div></div>}
     </div>
