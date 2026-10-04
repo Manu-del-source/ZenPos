@@ -87,9 +87,9 @@ const AppLayout = ({ token, user, handleLogout }) => {
               <NavLink to="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-400 hover:bg-slate-900 hover:text-white">
                 <BarChart3 size={19} className="text-slate-500" /><span>Reports</span>
               </NavLink>
-              <button onClick={() => { window.location.href = '/settings'; }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-400 hover:bg-slate-900 hover:text-white">
-                <Settings size={19} className="text-slate-500" /><span>Settings</span>
-              </button>
+              <NavLink to="/settings" onClick={() => setMobileOpen(false)} className={({ isActive }) => `flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold ${isActive ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-white'}`}>
+                <Settings size={19} className={({}) => ''} /><span>Settings</span>
+              </NavLink>
             </>
           )}
         </nav>
@@ -119,7 +119,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
           <div className="flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 lg:hidden"><Menu size={21} /></button>
             <div>
-              <div className="text-sm font-bold text-white">{current?.label || 'ZenPOS'}</div>
+              <div className="text-sm font-bold text-white">{current?.label || (pathname === '/settings' ? 'Settings' : 'ZenPOS')}</div>
               <div className="hidden text-[10px] uppercase tracking-wider text-slate-600 sm:block">{organization}</div>
             </div>
           </div>
