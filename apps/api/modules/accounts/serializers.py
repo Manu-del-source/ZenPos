@@ -35,7 +35,15 @@ class RoleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Role
-        fields = ("id", "name", "description", "is_system", "organization", "permissions", "permission_codes")
+        fields = (
+            "id",
+            "name",
+            "description",
+            "is_system",
+            "organization",
+            "permissions",
+            "permission_codes",
+        )
         read_only_fields = fields
 
     def get_permission_codes(self, obj):
@@ -168,7 +176,9 @@ class RoleAssignmentSerializer(serializers.Serializer):
                     pk=branch_id, organization_id=caller.organization_id
                 ).exists()
                 if not in_organization:
-                    raise serializers.ValidationError(f"Branch {branch_id} is not in your organization.")
+                    raise serializers.ValidationError(
+                        f"Branch {branch_id} is not in your organization."
+                    )
             key = (role.pk, branch_id)
             if key in seen:
                 raise serializers.ValidationError(f"'{name}' is listed twice for the same scope.")
@@ -194,8 +204,12 @@ class BranchAccessAssignmentSerializer(serializers.Serializer):
             if branch_id in seen:
                 raise serializers.ValidationError(f"Branch {branch_id} is listed twice.")
             seen.add(branch_id)
-            if not Branch.objects.filter(pk=branch_id, organization_id=organization_id).exists():
-                raise serializers.ValidationError(f"Branch {branch_id} is not in your organization.")
+            if not Branch.objects.filter(
+                pk=branch_id, organization_id=organization_id
+            ).exists():
+                raise serializers.ValidationError(
+                    f"Branch {branch_id} is not in your organization."
+                )
             if entry["is_default"]:
                 defaults += 1
             resolved.append(entry)
