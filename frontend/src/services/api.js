@@ -1,11 +1,8 @@
 import axios from 'axios';
 
-// The API is served from the same origin under /api:
-// - In production, Vercel rewrites /api/* to the backend service
-//   and /api/realtime/* to the realtime service.
-// - In local dev, the Vite dev server proxies /api to http://localhost:5000
-//   (see vite.config.js).
-const getBaseURL = () => '/api';
+// Production and local builds use the Django REST API under /api/v2.
+// Vercel rewrites /api/v2/* to the Render Django service.
+const getBaseURL = () => '/api/v2';
 
 const api = axios.create({
   baseURL: getBaseURL(),
