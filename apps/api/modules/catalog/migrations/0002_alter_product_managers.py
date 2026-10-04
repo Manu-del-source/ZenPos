@@ -1,5 +1,6 @@
-import django.db.models.manager
 from django.db import migrations
+
+from modules.core.managers import AllObjectsManager, SoftDeleteManager
 
 
 class Migration(migrations.Migration):
@@ -12,8 +13,8 @@ class Migration(migrations.Migration):
         migrations.AlterModelManagers(
             name="product",
             managers=[
-                ("objects", django.db.models.manager.Manager()),
-                ("all_objects", django.db.models.manager.Manager()),
+                ("objects", SoftDeleteManager()),
+                ("all_objects", AllObjectsManager()),
             ],
         ),
     ]
