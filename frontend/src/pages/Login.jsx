@@ -10,22 +10,25 @@ import '../styles/site.css';
 import '../styles/login.css';
 
 const benefits = [
-  {
-    icon: CircleDollarSign,
-    title: 'Fast point of sale',
-    text: 'Products, cart and totals in one clear checkout.',
-  },
-  {
-    icon: Warehouse,
-    title: 'Stock-aware selling',
-    text: 'Catalogue and stock levels connected to sales.',
-  },
-  {
-    icon: Smartphone,
-    title: 'Cash or M-Pesa',
-    text: 'Start an M-Pesa STK push or take cash at the counter.',
-  },
+  { icon: CircleDollarSign, title: 'Fast point of sale', text: 'Products, cart and totals in one clear checkout.' },
+  { icon: Warehouse, title: 'Stock-aware selling', text: 'Catalogue and stock levels connected to sales.' },
+  { icon: Smartphone, title: 'Cash or M-Pesa', text: 'Start an M-Pesa STK push or take cash at the counter.' },
 ];
+
+const apiError = (err, fallback) => {
+  const data = err?.response?.data;
+  if (typeof data?.detail === 'string') return data.detail;
+  if (typeof data === 'string') return data;
+  if (data && typeof data === 'object') {
+    for (const value of Object.values(data)) {
+      if (Array.isArray(value) && value.length) return String(value[0]);
+      if (typeof value === 'string') return value;
+    }
+  }
+  if (err?.response?.status) return `${fallback} (HTTP ${err.response.status})`;
+  if (err?.message) return err.message;
+  return fallback;
+};
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -38,37 +41,37 @@ const Login = () => {
     setError('');
 
     try {
-      // Django SimpleJWT expects /auth/login/ and returns access/refresh.
       const { data } = await api.post('/auth/login/', { username, password });
 
+      // Authentication succeeded. Store the JWT before doing anything else.
       localStorage.setItem('token', data.access);
       localStorage.setItem('refreshToken', data.refresh);
 
-      // Load the authoritative user/role/branch data from Django rather than
-      // trusting a stale user object from the old Express API.
-      const me = await api.get('/auth/me/');
-      localStorage.setItem('user', JSON.stringify(me.data));
+      // Profile loading is useful but must never turn a successful credential
+      // exchange into an "Authentication failed" message.
+      try {
+        const me = await api.get('/auth/me/');
+        localStorage.setItem('user', JSON.stringify(me.data));
+      } catch (profileError) {
+        console.warn('Authenticated, but /auth/me/ could not be loaded:', profileError);
+        localStorage.setItem('user', JSON.stringify({ username }));
+      }
 
       navigate('/pos');
-      window.location.reload();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Authentication failed');
+      // Only the actual token request reaches this branch.
+      setError(apiError(err, 'Authentication failed'));
     }
   };
 
   return (
     <div className="login-page">
       <aside className="login-brand-panel" aria-label="About ZenPOS">
-        <div className="login-brand-top">
-          <Brand tone="dark" />
-        </div>
-
+        <div className="login-brand-top"><Brand tone="dark" /></div>
         <div className="login-brand-body">
           <span className="eyebrow eyebrow--light">Retail, brought together</span>
           <h1>Everything you need to run your <em>retail business.</em></h1>
-          <p>
-            Bring sales, inventory, payments, customers and business management together in one simple system.
-          </p>
+          <p>Bring sales, inventory, payments, customers and business management together in one simple system.</p>
           <ul className="login-benefits">
             {benefits.map(({ icon: Icon, title, text }) => (
               <li key={title}>
@@ -78,7 +81,6 @@ const Login = () => {
             ))}
           </ul>
         </div>
-
         <div className="login-float-note login-float-note--a">
           <span className="float-note-icon"><Check size={16} /></span>
           <span><b>Stock-aware checkout</b><small>Items and totals, together</small></span>
@@ -87,7 +89,6 @@ const Login = () => {
           <span className="float-note-icon"><ShieldCheck size={16} /></span>
           <span><b>Role-aware workspace</b><small>Tools for your staff account</small></span>
         </div>
-
         <div className="login-brand-foot">
           <span>© {new Date().getFullYear()} ZenPOS</span>
           <Link to="/"><ArrowLeft size={14} /> Back to home</Link>
@@ -99,61 +100,38 @@ const Login = () => {
           <span>New to ZenPOS?</span>
           <Link to="/">Get started <ArrowUpRight size={14} /></Link>
         </div>
-
         <div className="login-form-wrap">
           <div className="login-form-card">
             <div className="login-mobile-brand"><Brand /></div>
             <h2>Welcome back</h2>
             <p>Sign in to your workspace to reach the retail tools available to your role.</p>
-
             {error && (
               <div className="login-error" role="alert">
-                <ShieldCheck size={17} />
-                {error}
+                <ShieldCheck size={17} /> {error}
               </div>
             )}
-
             <form onSubmit={handleLogin} className="login-form">
               <div className="login-field">
                 <label htmlFor="login-username">Username</label>
                 <div className="login-input-wrap">
                   <User size={17} />
-                  <input
-                    id="login-username"
-                    type="text"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                    autoComplete="username"
-                  />
+                  <input id="login-username" type="text" placeholder="Enter your username"
+                    value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" />
                 </div>
               </div>
-
               <div className="login-field">
                 <label htmlFor="login-password">Password</label>
                 <div className="login-input-wrap">
                   <Lock size={17} />
-                  <input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                  />
+                  <input id="login-password" type="password" placeholder="••••••••"
+                    value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
                 </div>
               </div>
-
               <button type="submit" className="login-submit">Sign in</button>
             </form>
-
             <div className="login-hint">
-              <ShieldCheck size={16} />
-              Use the staff account provided by your administrator. Ask them if you need access.
+              <ShieldCheck size={16} /> Use the staff account provided by your administrator. Ask them if you need access.
             </div>
-
             <Link className="login-back-link" to="/"><ArrowLeft size={14} /> Back to ZenPOS home</Link>
           </div>
         </div>
