@@ -96,7 +96,7 @@ class TestSaleCreation:
         # A caller must not be able to attribute a sale to somebody else.
         assert Sale.objects.get().cashier_id == cashier.id
 
-    def test_mpesa_sale_is_rejected_until_payment_is_initiated(self, authenticated_client, product):
+    def test_mpesa_sale_reserves_stock_until_payment_result(self, authenticated_client, product):
         response = authenticated_client.post(
             SALES_URL,
             sale_payload(product, sale_number="SALE-MPESA", quantity=1)
@@ -104,11 +104,29 @@ class TestSaleCreation:
             format="json",
         )
 
-        assert response.status_code == 400
-        assert "payments endpoint" in str(response.data)
-        assert Sale.objects.count() == 0
+        assert response.status_code == 201, response.data
+        assert Sale.objects.count() == 1
         product.refresh_from_db()
-        assert product.stock_level == 50
+        assert product.stock_level == 49
+
+    def test_non_stocked_product_does_not_consume_inventory(self, authenticated_client, make_product):
+        service = make_product(
+            name="Delivery service",
+            price="500.00",
+            cost_price="0.00",
+            stock_level=0,
+            track_inventory=False,
+        )
+        response = authenticated_client.post(
+            SALES_URL,
+            sale_payload(service, sale_number="SALE-SERVICE", quantity=1),
+            format="json",
+        )
+
+        assert response.status_code == 201, response.data
+        service.refresh_from_db()
+        assert service.stock_level == 0
+        assert StockAdjustment.objects.count() == 0
 
     def test_empty_item_list_is_rejected(self, authenticated_client):
         payload = {
