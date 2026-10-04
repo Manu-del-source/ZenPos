@@ -33,8 +33,8 @@ class SoftDeleteModel(BaseModel):
 
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
-    objects = SoftDeleteManager()  # noqa: DJ012
     all_objects = models.Manager()
+    objects = SoftDeleteManager()
 
     class Meta:
         abstract = True
