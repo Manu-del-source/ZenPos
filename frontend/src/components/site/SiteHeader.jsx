@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Menu, X } from 'lucide-react';
+import { ArrowUpRight, Menu, Moon, Sun, X } from 'lucide-react';
 import Brand from './Brand';
 
 const NAV_LINKS = [
@@ -9,7 +9,7 @@ const NAV_LINKS = [
   { href: '#how-it-works', label: 'How it works' },
 ];
 
-function SiteHeader() {
+function SiteHeader({ isDark, onToggleTheme }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
 
@@ -38,6 +38,16 @@ function SiteHeader() {
             ))}
           </div>
           <div className="site-nav-actions">
+            <button
+              className="theme-toggle"
+              type="button"
+              onClick={onToggleTheme}
+              aria-label="Dark mode"
+              aria-pressed={isDark}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
+            </button>
             <Link className="nav-signin" to="/login" onClick={closeMenu}>Sign in</Link>
             <Link className="btn btn--small btn--primary" to="/login" onClick={closeMenu}>
               Open ZenPOS <ArrowUpRight size={15} />

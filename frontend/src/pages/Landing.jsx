@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, Barcode, Building2, Check,
@@ -237,11 +237,55 @@ function FinalCta() {
   );
 }
 
+function readThemePreference() {
+  try {
+    const savedTheme = window.localStorage.getItem('zenpos-theme');
+    return savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : null;
+  } catch {
+    return null;
+  }
+}
+
 function Landing() {
+  const [themeOverride, setThemeOverride] = useState(readThemePreference);
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
+    window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  );
+  const isDark = themeOverride ? themeOverride === 'dark' : systemPrefersDark;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mediaQuery) return undefined;
+
+    const updateSystemPreference = (event) => setSystemPrefersDark(event.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', updateSystemPreference);
+    } else {
+      mediaQuery.addListener?.(updateSystemPreference);
+    }
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', updateSystemPreference);
+      } else {
+        mediaQuery.removeListener?.(updateSystemPreference);
+      }
+    };
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = isDark ? 'light' : 'dark';
+    setThemeOverride(nextTheme);
+    try {
+      window.localStorage.setItem('zenpos-theme', nextTheme);
+    } catch {
+      // The theme still changes for this visit if storage is unavailable.
+    }
+  };
+
   return (
-    <div className="zenpos-site landing-page">
+    <div className="zenpos-site landing-page" data-theme={isDark ? 'dark' : 'light'}>
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <SiteHeader />
+      <SiteHeader isDark={isDark} onToggleTheme={toggleTheme} />
       <main id="main-content">
         <Hero />
         <ProductProof />
