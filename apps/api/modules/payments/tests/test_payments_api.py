@@ -398,7 +398,7 @@ class TestCashPaymentIsAtomicWithTheSale:
         )
 
         assert response.status_code == 201, response.data
-        sale = Sale.objects.get(sale_number="SALE-CASHFLOW")
+        sale = Sale.objects.get()
         payment = sale.payments.get()
         assert payment.method == Payment.Method.CASH
         assert payment.status == Payment.Status.COMPLETED
