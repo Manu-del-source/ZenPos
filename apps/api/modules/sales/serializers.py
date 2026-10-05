@@ -120,6 +120,7 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         )
         read_only_fields = (
             "sale_number",
+            "cashier",
             "total_amount",
             "tax_amount",
             "discount_amount",
