@@ -65,14 +65,14 @@ class SaleViewSet(
 
         Served through ``get_queryset``, so it requires ``sales.view`` and
         returns 404 across the tenant boundary, consistent with every other
-        sale route. ``?paper=a4`` widens the HTML for A4; ``?format=thermal``
+        sale route. ``?paper=a4`` widens the HTML for A4; ``?output=thermal``
         renders the plain-text 42/48-column source a POS terminal pipes to a
         thermal printer (ESC/POS bytes are a phase-6 concern).
         """
         sale = self.get_object()
         context = {"context": build_receipt_context(sale), "paper": "80mm"}
 
-        if request.query_params.get("format") == "thermal":
+        if request.query_params.get("output") == "thermal":
             widths = {"48": COLUMNS_80MM_WIDE, "58": COLUMNS_58MM}
             columns = widths.get(request.query_params.get("width"), COLUMNS_80MM)
             text = render_thermal_receipt(context["context"], columns=columns)
