@@ -1,5 +1,5 @@
 """
-WSGI config for the Kipchi POS API.
+WSGI config for the ZenPOS API.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
