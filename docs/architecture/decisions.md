@@ -66,17 +66,17 @@ databases must be dumped and reconciled before phase 3 migrations are applied.
 
 ---
 
-## ADR-0004 — Product identity is Kipchi POS (supermarket retail)
+## ADR-0004 — Product identity is ZenPOS (supermarket retail)
 
 **Status:** Accepted
 
 **Context.** The repository mixed two identities. The repository name, README,
-`index.html` title and Django models said supermarket retail ("Kipchi POS"), but
-the live React UI, login page and the Textual TUI said "ROHI Hardware & Moto"
+`index.html` title and Django models said supermarket retail ("ZenPOS"), but
+the live React UI, login page and the Textual TUI said "the previous hardware/motorcycle branding"
 and the TUI seeded hardware/motorcycle categories.
 
-**Decision.** Kipchi POS — supermarket, mini-market, wholesaler and retail.
-The "ROHI Hardware & Moto" strings persisting in the archived `apps/web` pages
+**Decision.** ZenPOS — supermarket, mini-market, wholesaler and retail.
+The "the previous hardware/motorcycle branding" strings persisting in the archived `apps/web` pages
 are removed as those pages are rebuilt in phases 6 and 10.
 
 **Consequences.** Category seeding, receipt headers and branding follow
