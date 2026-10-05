@@ -141,4 +141,5 @@ def render_thermal_receipt(context: dict, columns: int = DEFAULT_THERMAL_COLUMNS
 
     lines.append(LINE * width)
     lines.append(centered("Thank you for shopping with us!"))
+    lines = [line[:width] for line in lines]
     return "\n".join(lines) + "\n"
