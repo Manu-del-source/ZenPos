@@ -1,5 +1,5 @@
 """
-ASGI config for the Kipchi POS API.
+ASGI config for the ZenPOS API.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 
