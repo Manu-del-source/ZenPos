@@ -19,6 +19,8 @@ export default function POS() {
   const [cashReceived, setCashReceived] = useState('');
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState('');
+  const [screen, setScreen] = useState('sale');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const searchRef = useRef(null);
 
   const total = getTotal();
@@ -111,6 +113,9 @@ export default function POS() {
     updateQuantity(item.id, delta);
   };
 
+  const startCheckout = () => { if (cart.length) setScreen('checkout'); };
+  const backToSale = () => { if (!checkoutLoading) { setScreen('sale'); setPaymentMethod(''); } };
+
   const completeCashSale = async () => {
     if (!cart.length || cash < total) return;
     setCheckoutLoading(true);
@@ -125,6 +130,8 @@ export default function POS() {
       await printReceipt(sale.id);
       clearCart();
       setCashReceived('');
+      setPaymentMethod('');
+      setScreen('sale');
       await loadProducts(searchTerm);
     } catch (err) {
       const data = err.response?.data;
@@ -171,6 +178,8 @@ export default function POS() {
           await printReceipt(sale.id);
           clearCart();
           setPhone('');
+          setPaymentMethod('');
+          setScreen('sale');
           await loadProducts(searchTerm);
           return;
         }
@@ -192,6 +201,22 @@ export default function POS() {
   };
 
   return (
+    <div className="page-shell !max-w-none">
+      {screen === 'checkout' && (
+        <section className="fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-4 sm:p-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-5 flex items-center justify-between"><div><div className="eyebrow">Front Office / Checkout</div><h1 className="page-title">Review Sale</h1><p className="page-subtitle">Confirm the order before taking payment.</p></div><button className="btn-secondary" onClick={backToSale}>← Back to sale</button></div>
+            <div className="panel overflow-hidden">
+              <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-950 text-left text-xs uppercase text-slate-500"><tr><th className="p-4">Code</th><th className="p-4">Product</th><th className="p-4">Unit</th><th className="p-4">Qty</th><th className="p-4 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-800">{cart.map((item) => <tr key={item.id}><td className="p-4 text-slate-500">{item.sku}</td><td className="p-4 font-medium text-white">{item.name}</td><td className="p-4">KES {money(item.price)}</td><td className="p-4">{item.quantity}</td><td className="p-4 text-right font-semibold">KES {money(item.subtotal)}</td></tr>)}</tbody></table></div>
+              <div className="border-t border-slate-800 p-6"><div className="flex items-end justify-between"><span className="text-sm uppercase text-slate-500">Amount Due</span><strong className="text-4xl font-black text-white">KES {money(total)}</strong></div><div className="mt-6 grid gap-3 sm:grid-cols-2"><button className="border border-slate-700 bg-slate-900 p-6 text-left hover:border-blue-500" onClick={() => { setPaymentMethod('CASH'); setScreen('payment'); }}><Wallet className="mb-3 text-blue-400"/><b className="block text-lg text-white">Cash</b><span className="text-sm text-slate-500">Enter cash received and calculate change.</span></button><button className="border border-slate-700 bg-slate-900 p-6 text-left hover:border-emerald-500" onClick={() => { setPaymentMethod('MPESA'); setScreen('payment'); }}><Smartphone className="mb-3 text-emerald-400"/><b className="block text-lg text-white">M-Pesa</b><span className="text-sm text-slate-500">Send STK Push and wait for confirmation.</span></button></div></div>
+            </div>
+          </div>
+        </section>
+      )}
+      {screen === 'payment' && (
+        <section className="fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-4 sm:p-8"><div className="mx-auto max-w-xl"><div className="mb-5 flex items-center justify-between"><div><div className="eyebrow">Front Office / Payment</div><h1 className="page-title">{paymentMethod === 'CASH' ? 'Cash Payment' : 'M-Pesa Payment'}</h1></div><button className="btn-secondary" disabled={checkoutLoading} onClick={() => setScreen('checkout')}>← Back</button></div><div className="panel p-6"><div className="mb-6 text-center"><span className="text-xs uppercase text-slate-500">Amount Due</span><div className="text-4xl font-black text-white">KES {money(total)}</div></div>{paymentMethod === 'CASH' ? <><label className="text-xs font-semibold text-slate-400">Cash received</label><input autoFocus type="number" className="input mt-2 h-14 text-xl" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && cash >= total) completeCashSale(); }} placeholder="0.00"/><div className="my-7 border-y border-slate-800 py-6 text-center"><span className="text-xs uppercase text-slate-500">Change</span><div className={cash >= total ? 'text-4xl font-black text-emerald-400' : 'text-4xl font-black text-red-400'}>KES {money(change)}</div></div><button className="w-full bg-blue-600 p-4 font-bold text-white disabled:opacity-40" disabled={checkoutLoading || cash < total} onClick={completeCashSale}>{checkoutLoading ? 'Completing…' : 'COMPLETE CASH SALE'}</button></> : <><label className="text-xs font-semibold text-slate-400">Customer M-Pesa phone</label><input autoFocus className="input mt-2 h-14 text-xl" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') completeMpesaSale(); }} placeholder="0712345678"/><div className="my-7 border border-slate-800 bg-slate-950 p-6 text-center"><Smartphone className="mx-auto mb-3 text-emerald-400" size={32}/><p className="font-semibold text-white">Customer confirmation required</p><p className="mt-1 text-sm text-slate-500">An STK Push will be sent to this number.</p></div><button className="w-full bg-emerald-600 p-4 font-bold text-white disabled:opacity-40" disabled={checkoutLoading} onClick={completeMpesaSale}>{checkoutLoading ? 'Waiting for M-Pesa…' : 'SEND STK PUSH'}</button></>}</div></div></section>
+      )}
+
     <div className="page-shell !max-w-none">
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
