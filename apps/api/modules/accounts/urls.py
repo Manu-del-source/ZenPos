@@ -5,6 +5,7 @@ from config.routing import ModuleRouter
 from .views import (
     AuditLogViewSet,
     LoginView,
+    LogoutView,
     MeView,
     PermissionViewSet,
     RefreshView,
@@ -22,5 +23,6 @@ urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="token_obtain_pair"),
     path("auth/refresh/", RefreshView.as_view(), name="token_refresh"),
     path("auth/me/", MeView.as_view(), name="me"),
+    path("auth/logout/", LogoutView.as_view(), name="logout"),
     *router.urls,
 ]

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import api from '../services/api';
+import api, { apiError } from '../services/api';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ArrowUpRight, Check, CircleDollarSign, Lock, ShieldCheck,
@@ -14,21 +14,6 @@ const benefits = [
   { icon: Warehouse, title: 'Stock-aware selling', text: 'Catalogue and stock levels connected to sales.' },
   { icon: Smartphone, title: 'Cash or M-Pesa', text: 'Start an M-Pesa STK push or take cash at the counter.' },
 ];
-
-const apiError = (err, fallback) => {
-  const data = err?.response?.data;
-  if (typeof data?.detail === 'string') return data.detail;
-  if (typeof data === 'string') return data;
-  if (data && typeof data === 'object') {
-    for (const value of Object.values(data)) {
-      if (Array.isArray(value) && value.length) return String(value[0]);
-      if (typeof value === 'string') return value;
-    }
-  }
-  if (err?.response?.status) return `${fallback} (HTTP ${err.response.status})`;
-  if (err?.message) return err.message;
-  return fallback;
-};
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -57,6 +42,9 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify({ username }));
       }
 
+      // The app shell reads the session from localStorage on this event; it is
+      // what makes the navigation to the workspace render as signed in.
+      window.dispatchEvent(new Event('zenpos:auth'));
       navigate('/pos');
     } catch (err) {
       // Only the actual token request reaches this branch.

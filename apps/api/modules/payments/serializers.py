@@ -55,15 +55,6 @@ class InitiatePaymentSerializer(OrganizationScopedSerializerMixin, serializers.S
     organization_bound_fields = ()
 
     sale = serializers.PrimaryKeyRelatedField(queryset=Sale.objects.all())
-
-    def validate_sale(self, sale):
-        caller = self.request_user
-        if caller is not None and caller.is_authenticated and not caller.is_superuser:
-            if sale.cashier.organization_id != caller.organization_id:
-                raise serializers.ValidationError(
-                    "That record belongs to a different organization."
-                )
-        return sale
     method = serializers.ChoiceField(choices=Payment.Method.choices)
     phone = serializers.RegexField(
         regex=r"^0(1|7)\d{8}$",
@@ -71,6 +62,30 @@ class InitiatePaymentSerializer(OrganizationScopedSerializerMixin, serializers.S
         allow_blank=False,
         help_text="Safaricom number, e.g. 0722000000. Required for MPESA.",
     )
+
+    def validate_sale(self, sale):
+        caller = self.request_user
+        if caller is not None and caller.is_authenticated and not caller.is_superuser:
+            if sale.organization_id != caller.organization_id:
+                raise serializers.ValidationError(
+                    "That record belongs to a different organization."
+                )
+
+            # The sale's branch must be one the caller is posted to, exactly as
+            # the sales endpoint requires: paying another shop's sale would let
+            # a cashier settle money they can neither see nor reconcile. A sale
+            # with no branch at all (written before branches were recorded) is
+            # not another shop's, so it stays payable.
+            allowed = set(caller.branch_access.values_list("branch_id", flat=True))
+            if allowed and sale.branch_id is not None and sale.branch_id not in allowed:
+                raise serializers.ValidationError(
+                    "That sale belongs to a branch you are not posted to."
+                )
+
+            if sale.status == Sale.Status.VOIDED:
+                raise serializers.ValidationError("This sale has been voided.")
+
+        return sale
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

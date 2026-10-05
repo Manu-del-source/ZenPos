@@ -1,16 +1,16 @@
 import { useEffect } from 'react';
-import api from '../services/api';
-import { db } from '../services/db';
 
-// Offline sales are intentionally not pushed until the frontend and Django
-// sales contract are aligned. The old Express endpoint (/v1/sales) is gone.
+/**
+ * Offline sale capture is not implemented.
+ *
+ * It remains a genuine gap rather than a hidden one: a queued sale would have
+ * to be replayed with its own idempotency key and a fixed price snapshot, and
+ * the previous version of this hook posted to an Express endpoint that no
+ * longer exists. Until that lands, the POS requires a connection and says so.
+ */
 const useOfflineSync = (token) => {
   useEffect(() => {
-    if (!navigator.onLine || !token) return undefined;
-
-    // Keep the queue intact while online. A later sales-sync implementation
-    // can submit the exact Django SaleSerializer payload atomically.
-    // Do not call the removed Express API endpoint here.
+    if (!token) return undefined;
     return undefined;
   }, [token]);
 

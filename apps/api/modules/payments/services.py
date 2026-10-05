@@ -15,11 +15,13 @@ Two rules from ADR-0012 shape this file:
   is what the ``webhook_events`` unique constraint provides.
 """
 
-from django.db import transaction
+from decimal import Decimal
+
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from modules.core.audit import record_audit
-from modules.inventory.models import StockAdjustment
+from modules.sales.services import restore_sale_stock
 
 from .base import PaymentCallbackError, PaymentGatewayError, PaymentProvider
 from .models import Payment, PaymentAttempt, WebhookEvent
@@ -29,32 +31,36 @@ from .models import Payment, PaymentAttempt, WebhookEvent
 #: where ADR-0001 calls out that this check was worth keeping.
 PENDING_STK_WINDOW = timezone.timedelta(minutes=5)
 
+#: How long a PENDING STK request is left alone before polling asks Safaricom
+#: for the truth. The customer's prompt is long expired by then, so a missing
+#: callback is either late delivery or a lost message.
+STK_RECONCILE_AFTER = timezone.timedelta(minutes=5)
+
+#: The point at which an unverifiable payment stops holding stock. Reaching it
+#: means the provider could not be asked (or would not answer), which is very
+#: different from "the provider said no".
+STK_HARD_TIMEOUT = timezone.timedelta(minutes=10)
+
+#: Whole shillings are what STK push charges, so a callback amount may differ
+#: from the sale total by the rounding. A whole shilling of slack covers that
+#: and nothing else.
+AMOUNT_TOLERANCE = Decimal("1.00")
+
 
 def release_mpesa_stock_reservation(*, sale, actor=None, request=None) -> int:
-    """Release stock reserved for an M-Pesa sale exactly once."""
-    release_note = f"Release M-Pesa reservation for sale {sale.sale_number}"
-    if StockAdjustment.objects.filter(notes=release_note).exists():
-        return 0
-    released = 0
-    adjustments = StockAdjustment.objects.filter(
-        notes__startswith=f"Sale {sale.sale_number}", quantity__lt=0
-    ).select_related("product")
-    for adjustment in adjustments:
-        product = adjustment.product
-        product.stock_level += -adjustment.quantity
-        product.save(update_fields=["stock_level", "updated_at"])
-        StockAdjustment.objects.create(
-            product=product, user=actor, quantity=-adjustment.quantity,
-            type=StockAdjustment.AdjustmentType.RETURN, notes=release_note,
-        )
-        released += -adjustment.quantity
-    if released:
-        record_audit(
-            action="stock.reservation_released", entity_type="sale", entity_id=sale.pk,
-            actor=actor, request=request,
-            after={"sale": sale.sale_number, "quantity": released},
-        )
-    return released
+    """Release stock reserved for an M-Pesa sale exactly once.
+
+    A thin, well-named entry point onto the shared ledger restore, which is
+    idempotent by construction: calling it twice restores nothing the second
+    time.
+    """
+    return restore_sale_stock(
+        sale=sale,
+        actor=actor,
+        request=request,
+        reason="M-Pesa payment not completed",
+        audit_action="stock.reservation_released",
+    )
 
 
 def get_payment_provider():
@@ -184,14 +190,61 @@ def initiate_payment(*, payment, phone: str, provider: PaymentProvider) -> Payme
     return payment
 
 
+def _attempt_for(payment) -> PaymentAttempt | None:
+    """The attempt that carries the provider's request id, newest first."""
+    return (
+        payment.attempts.exclude(checkout_request_id="")
+        .order_by("-attempt_number")
+        .first()
+    )
+
+
+def expected_provider_amount(payment) -> Decimal:
+    """What we asked the provider to charge, in whole shillings.
+
+    The attempt's ``provider_amount`` is what was actually sent (STK push
+    charges whole shillings), which is the number a callback should echo. The
+    payment total is the fallback for a payment with no attempt row.
+    """
+    attempt = _attempt_for(payment)
+    if attempt is not None and attempt.provider_amount is not None:
+        return attempt.provider_amount
+    return payment.amount
+
+
+def _record_webhook_event(*, provider_name: str, external_id: str, payload) -> bool:
+    """Store the callback, answering ``False`` if it was already stored.
+
+    Uniqueness is the database's job: the ``(provider, external_id)``
+    constraint is what makes two concurrent redeliveries safe, and the nested
+    atomic block is a savepoint so losing that race does not poison the
+    surrounding transaction.
+    """
+    try:
+        with transaction.atomic():
+            WebhookEvent.objects.create(
+                provider=provider_name,
+                external_id=external_id,
+                payload=payload,
+            )
+    except IntegrityError:
+        return False
+    return True
+
+
 def handle_mpesa_callback(*, provider: PaymentProvider, payload, request=None) -> dict:
     """Process one M-Pesa callback: verify, de-duplicate, complete.
 
     Trust is layered (ADR-0012): the caller has already matched the secret URL
-    segment; here the ``CheckoutRequestID`` must match a PENDING attempt we
-    issued, and the ``webhook_events`` unique constraint makes a redelivery a
-    no-op that still answers 200 — Safaricom retries non-200 responses, which
-    is correct for real failures but would duplicate work on mere redelivery.
+    segment; here the ``CheckoutRequestID`` must match an attempt we issued,
+    the amount must match what we asked for, and the ``webhook_events`` unique
+    constraint makes a redelivery a no-op that still answers 200 — Safaricom
+    retries non-200 responses, which is correct for real failures but would
+    duplicate work on mere redelivery.
+
+    A callback for a payment that already settled (because polling reconciled
+    it first, say) is answered 200 as a duplicate rather than rejected, so
+    Safaricom does not retry a decision that was already made.
 
     Returns a small result dict for the view: ``{"processed": bool,
     "duplicate": bool, "status": str}``.
@@ -228,6 +281,25 @@ def handle_mpesa_callback(*, provider: PaymentProvider, payload, request=None) -
             .first()
         )
         if payment is None:
+            settled = (
+                Payment.objects.filter(
+                    method=Payment.Method.MPESA,
+                    attempts__checkout_request_id=callback.checkout_request_id,
+                )
+                .exclude(status=Payment.Status.PENDING)
+                .first()
+            )
+            if settled is not None:
+                # We already know the outcome (a poll reconciled it, or an
+                # earlier copy of this callback arrived). Answer 200: there is
+                # nothing left to decide.
+                _record_webhook_event(
+                    provider_name=provider.provider_name,
+                    external_id=callback.external_id,
+                    payload=payload,
+                )
+                return {"processed": False, "duplicate": True, "status": settled.status}
+
             # Not a payment we asked for. Rejected, and never stored as a
             # webhook event: this table must not carry success semantics for
             # requests we did not issue (ADR-0012).
@@ -235,45 +307,138 @@ def handle_mpesa_callback(*, provider: PaymentProvider, payload, request=None) -
                 "No pending payment matches this callback's CheckoutRequestID."
             )
 
-        try:
-            with transaction.atomic():
-                WebhookEvent.objects.create(
-                    provider=provider.provider_name,
-                    external_id=callback.external_id,
-                    payload=payload,
-                )
-        except Exception:
+        if not _record_webhook_event(
+            provider_name=provider.provider_name,
+            external_id=callback.external_id,
+            payload=payload,
+        ):
             # IntegrityError from the unique (provider, external_id)
             # constraint: a redelivery. Answer 200 without re-effecting
             # anything.
             return {"processed": False, "duplicate": True, "status": payment.status}
 
-        if callback.success:
+        mismatch = callback.success and not _amount_matches(payment, callback.amount)
+
+        if callback.success and not mismatch:
             payment.status = Payment.Status.COMPLETED
             payment.provider_reference = callback.provider_reference
             payment.save(update_fields=["status", "provider_reference", "updated_at"])
+            audit_action = "payment.completed"
         else:
+            # A success we cannot account for fails closed, so a mis-reported
+            # amount never enters the paid ledger; the audit row keeps the
+            # evidence for whoever reconciles the till. A provider-reported
+            # failure releases the reservation it was holding.
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=["status", "updated_at"])
-            release_mpesa_stock_reservation(
-                sale=payment.sale,
-                request=request,
-            )
+            release_mpesa_stock_reservation(sale=payment.sale, request=request)
+            audit_action = "payment.amount_mismatch" if mismatch else "payment.failed"
 
-        WebhookEvent.objects.filter(
-            provider=provider.provider_name, external_id=callback.external_id
-        ).update(processed_at=timezone.now())
+        _mark_processed(provider.provider_name, callback.external_id)
 
         record_audit(
-            action="payment.completed" if callback.success else "payment.failed",
+            action=audit_action,
             entity_type="payment",
             entity_id=payment.pk,
+            request=request,
             before={"status": Payment.Status.PENDING},
             after={
                 "status": payment.status,
-                "provider_reference": payment.provider_reference,
+                "provider_reference": payment.provider_reference or callback.provider_reference,
                 "result": callback.result_desc,
+                # Present only on a mismatch, where it is the whole point.
+                **(
+                    {
+                        "expected_amount": str(expected_provider_amount(payment)),
+                        "reported_amount": (
+                            None if callback.amount is None else str(callback.amount)
+                        ),
+                    }
+                    if mismatch
+                    else {}
+                ),
             },
         )
 
     return {"processed": True, "duplicate": False, "status": payment.status}
+
+
+def _amount_matches(payment, reported: Decimal | None) -> bool:
+    """Whether the provider's reported amount is the one we asked for.
+
+    A callback that carries no amount (some sandbox responses omit it) is not
+    treated as a mismatch: the request id and the secret URL have already
+    established this is our payment, and refusing to complete on a missing
+    optional field would strand a real payment.
+    """
+    if reported is None:
+        return True
+    expected = expected_provider_amount(payment)
+    return abs(Decimal(reported) - Decimal(expected)) <= AMOUNT_TOLERANCE
+
+
+def _mark_processed(provider_name: str, external_id: str) -> None:
+    WebhookEvent.objects.filter(provider=provider_name, external_id=external_id).update(
+        processed_at=timezone.now()
+    )
+
+
+def reconcile_pending_payment(*, payment, provider, request=None) -> Payment:
+    """Ask the provider what really happened to a pending STK request.
+
+    A lost callback is the dangerous case, not the abandoned one: the money may
+    already have moved while our row still says PENDING, and the retry that
+    follows would charge the customer twice. Safaricom's own status query is
+    the only authority that can settle it, so polling calls it before any
+    retry is allowed.
+
+    Returns the payment, refreshed. A provider that cannot be reached leaves
+    the payment PENDING — unknowable is not the same as failed.
+    """
+    attempt = _attempt_for(payment)
+    if attempt is None:
+        return payment
+
+    result = provider.query(attempt.checkout_request_id)
+    result_code = result.get("ResultCode")
+    if result_code is None:
+        # 500.001.1001 and friends: the request is not settled yet.
+        return payment
+
+    try:
+        code = int(result_code)
+    except (TypeError, ValueError):
+        return payment
+
+    with transaction.atomic():
+        payment = Payment.objects.select_for_update().select_related("sale").get(pk=payment.pk)
+        if payment.status != Payment.Status.PENDING:
+            # Something else settled it while the provider was being asked.
+            return payment
+
+        if code == 0:
+            payment.status = Payment.Status.COMPLETED
+            payment.provider_reference = str(result.get("MpesaReceiptNumber") or "")
+            payment.save(update_fields=["status", "provider_reference", "updated_at"])
+            audit_action = "payment.completed"
+        else:
+            payment.status = Payment.Status.FAILED
+            payment.save(update_fields=["status", "updated_at"])
+            release_mpesa_stock_reservation(sale=payment.sale, request=request)
+            audit_action = "payment.failed"
+
+        record_audit(
+            action=audit_action,
+            entity_type="payment",
+            entity_id=payment.pk,
+            request=request,
+            before={"status": Payment.Status.PENDING},
+            after={
+                "status": payment.status,
+                "source": "provider_query",
+                "provider_reference": payment.provider_reference,
+                "result": str(result.get("ResultDesc", ""))[:255],
+            },
+        )
+    return payment
+

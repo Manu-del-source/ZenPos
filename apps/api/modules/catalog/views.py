@@ -48,10 +48,24 @@ class ProductViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
         search = self.request.query_params.get("search")
         if search:
             queryset = queryset.filter(
-                models.Q(name__icontains=search) | models.Q(sku__icontains=search)
-            )
+                models.Q(name__icontains=search)
+                | models.Q(sku__icontains=search)
+                | models.Q(barcodes__barcode=search)
+            ).distinct()
 
         return queryset
+
+    def perform_destroy(self, instance):
+        """Archive the product instead of deleting it.
+
+        Two reasons this is not ``instance.delete()``: a product that has ever
+        been sold is referenced by ``SaleItem`` with ``on_delete=PROTECT``, so a
+        hard delete raises ``ProtectedError`` and used to answer HTTP 500; and
+        deleting the row would erase the name a historical receipt prints. The
+        row is archived (``SoftDeleteModel``), which hides it from the catalogue
+        and keeps every past sale explainable.
+        """
+        instance.soft_delete()
 
     def _barcode_queryset(self):
         """Barcodes the caller may resolve, scoped the same way products are."""

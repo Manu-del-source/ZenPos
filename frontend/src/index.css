@@ -31,4 +31,26 @@ input::placeholder, textarea::placeholder { color: #64748b; }
   .input { @apply w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10; }
   .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50; }
   .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm font-bold text-slate-300 transition hover:bg-slate-800 hover:text-white; }
+  .panel-title { @apply text-base font-bold text-white; }
+  .panel-subtitle { @apply mt-1 text-xs text-slate-500; }
+
+  /* Keyboard hints sit next to the action they trigger, so the till can be
+     driven without a mouse and without a manual. */
+  .kbd { @apply inline-flex min-w-[1.6rem] items-center justify-center rounded-md border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-300; }
+  .kbd--dark { @apply border-black/20 bg-black/20 text-white/80; }
+
+  /* Product tiles stay flat and information-dense: a cashier scanning a grid
+     needs price, stock and name in the same place on every tile. */
+  .product-tile { @apply flex w-full flex-col rounded-xl border border-slate-800 bg-slate-950/70 p-4 text-left transition hover:border-blue-500/50 hover:bg-slate-900; }
+  .product-tile--out { @apply cursor-not-allowed opacity-50 hover:border-slate-800 hover:bg-slate-950/70; }
+  .product-tile--in-cart { @apply border-blue-500/60; }
+  .cart-chip { @apply grid h-6 min-w-[1.5rem] place-items-center rounded-full bg-blue-600 px-1.5 text-xs font-bold text-white; }
+
+  .payment-choice { @apply flex w-full items-start gap-3 rounded-xl border border-slate-700 bg-slate-900 p-5 text-left transition hover:border-blue-500; }
+  .payment-choice b { @apply block text-lg text-white; }
+  .payment-choice small { @apply text-sm text-slate-500; }
+  .payment-choice > span { @apply flex-1; }
+
+  .method-tab { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm font-bold text-slate-400 transition hover:text-white; }
+  .method-tab--active { @apply border-blue-500/60 bg-blue-500/10 text-white; }
 }

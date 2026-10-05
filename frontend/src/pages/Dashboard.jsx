@@ -46,8 +46,8 @@ const Dashboard = () => {
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-blue-400">Business overview</p>
-          <h1 className="page-title">Good business starts with visibility.</h1>
-          <p className="page-subtitle">A live snapshot of sales and inventory across your store.</p>
+          <h1 className="page-title">Overview</h1>
+          <p className="page-subtitle">Today's takings and the stock that needs attention.</p>
         </div>
         <button onClick={load} disabled={loading} className="btn-secondary self-start sm:self-auto">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh

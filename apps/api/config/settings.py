@@ -154,7 +154,7 @@ REST_FRAMEWORK = {
     # ``required_permissions``. A view that declares nothing still needs a login,
     # so forgetting a declaration fails closed rather than opening the endpoint.
     "DEFAULT_PERMISSION_CLASSES": ("modules.accounts.permissions.HasPermission",),
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "modules.core.pagination.StandardPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_THROTTLE_CLASSES": (
         "rest_framework.throttling.AnonRateThrottle",

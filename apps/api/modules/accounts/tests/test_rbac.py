@@ -1,4 +1,5 @@
 import pytest
+from rest_framework.test import APIClient
 
 from modules.accounts.models import Permission, Role, UserBranchAccess, UserRole
 from modules.accounts.permissions import permission_codes_for, user_has_permission
@@ -344,3 +345,54 @@ class TestUserBranchAccessModel:
 
         assert access.branch_id == branch.id
         assert access.is_default is True
+
+
+LOGOUT_URL = "/api/v2/auth/logout/"
+
+
+@pytest.mark.django_db
+class TestLogout:
+    """Signing out must revoke the refresh token, not just forget it locally."""
+
+    def test_logout_blacklists_the_callers_refresh_token(self, api_client, cashier, login):
+        tokens = login(cashier.username).data
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+        response = api_client.post(LOGOUT_URL, {"refresh": tokens["refresh"]}, format="json")
+        refreshed = APIClient().post(
+            "/api/v2/auth/refresh/", {"refresh": tokens["refresh"]}, format="json"
+        )
+
+        assert response.status_code == 200, response.data
+        assert refreshed.status_code == 401
+
+    def test_another_users_refresh_token_is_not_revoked(
+        self, api_client, cashier, other_cashier, login
+    ):
+        """Otherwise a stolen access token becomes a way to sign strangers out."""
+        victim = login(other_cashier.username).data
+        attacker = login(cashier.username).data
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {attacker['access']}")
+
+        response = api_client.post(LOGOUT_URL, {"refresh": victim["refresh"]}, format="json")
+        still_valid = APIClient().post(
+            "/api/v2/auth/refresh/", {"refresh": victim["refresh"]}, format="json"
+        )
+
+        assert response.status_code == 200
+        assert still_valid.status_code == 200
+
+    def test_logout_requires_a_session(self, api_client):
+        response = api_client.post(LOGOUT_URL, {"refresh": "whatever"}, format="json")
+
+        assert response.status_code in (401, 403)
+
+    def test_logout_is_recorded(self, api_client, cashier, login):
+        from modules.core.models import AuditLog
+
+        tokens = login(cashier.username).data
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+
+        api_client.post(LOGOUT_URL, {"refresh": tokens["refresh"]}, format="json")
+
+        assert AuditLog.objects.filter(action="auth.logout").count() == 1

@@ -52,9 +52,12 @@ def build_receipt_context(sale) -> dict:
         group["net"] += item.subtotal
         group["tax"] += item.tax_amount
 
+    organization = sale.organization or getattr(sale.cashier, "organization", None)
+
     return {
-        "organization_name": sale.cashier.organization.name if sale.cashier.organization_id else "",
-        "currency": sale.cashier.organization.currency if sale.cashier.organization_id else "KES",
+        "organization_name": organization.name if organization else "",
+        "currency": organization.currency if organization else "KES",
+        "branch_name": sale.branch.name if sale.branch_id else "",
         "sale_number": sale.sale_number,
         "created_at": sale.created_at,
         "cashier_name": sale.cashier.get_username(),
@@ -108,7 +111,8 @@ def render_thermal_receipt(context: dict, columns: int = DEFAULT_THERMAL_COLUMNS
 
     lines: list[str] = [centered(context["organization_name"]), centered(context["sale_number"])]
 
-    # Branch line is omitted until Sale has a branch (phase 6 rebuild).
+    if context.get("branch_name"):
+        lines.append(centered(context["branch_name"]))
     lines.append(context["created_at"].strftime("%Y-%m-%d %H:%M"))
     lines.append(f"Cashier: {context['cashier_name']}")
     if context["customer_name"]:

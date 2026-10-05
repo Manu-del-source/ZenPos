@@ -5,7 +5,9 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import MethodNotAllowed, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
+from rest_framework.views import APIView
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from modules.core.audit import record_audit, snapshot
@@ -54,6 +56,48 @@ class LoginView(TokenObtainPairView):
 
 class RefreshView(TokenRefreshView):
     throttle_classes = [RefreshRateThrottle]
+
+
+class LogoutView(APIView):
+    """End a session by blacklisting the caller's refresh token.
+
+    Clearing ``localStorage`` on the client does not revoke anything: the
+    refresh token stays valid until it expires, which is exactly what a stolen
+    token needs. Blacklisting it here is what actually ends the session.
+
+    A token that is expired, malformed, or belongs to somebody else is ignored
+    rather than reported: the first two are already useless, and telling a
+    caller that another user's token is theirs to revoke would be a way to
+    revoke strangers' sessions. Access tokens are short-lived by design, so a
+    signed-out device cannot outlive its access token by much.
+    """
+
+    throttle_classes = [RefreshRateThrottle]
+
+    def post(self, request):
+        refresh = request.data.get("refresh")
+        if refresh:
+            try:
+                token = RefreshToken(refresh)
+            except TokenError:
+                token = None
+
+            if token is not None and str(token.get("user_id")) == str(request.user.pk):
+                try:
+                    token.blacklist()
+                except AttributeError:
+                    # The blacklist app is not installed; the token simply
+                    # expires on its own terms.
+                    pass
+
+        record_audit(
+            action="auth.logout",
+            entity_type="user",
+            entity_id=request.user.pk,
+            actor=request.user,
+            request=request,
+        )
+        return Response({"detail": "Signed out."}, status=status.HTTP_200_OK)
 
 
 class MeView(generics.RetrieveAPIView):
