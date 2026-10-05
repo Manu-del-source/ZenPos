@@ -16,13 +16,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: kipchi_pos
-          POSTGRES_USER: kipchi
-          POSTGRES_PASSWORD: kipchi
+          POSTGRES_DB: zenpos
+          POSTGRES_USER: zenpos
+          POSTGRES_PASSWORD: zenpos
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U kipchi -d kipchi_pos"
+          --health-cmd "pg_isready -U zenpos -d zenpos"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -34,9 +34,9 @@ jobs:
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
       CORS_ALLOWED_ORIGINS: http://localhost:5173
       MPESA_CALLBACK_SECRET: test-callback-secret
-      POSTGRES_DB: kipchi_pos
-      POSTGRES_USER: kipchi
-      POSTGRES_PASSWORD: kipchi
+      POSTGRES_DB: zenpos
+      POSTGRES_USER: zenpos
+      POSTGRES_PASSWORD: zenpos
       POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
 
