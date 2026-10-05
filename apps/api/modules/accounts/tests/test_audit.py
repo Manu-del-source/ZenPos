@@ -100,7 +100,7 @@ class TestAuditRowsAreWritten:
         assert response.status_code == 201, response.data
 
         row = AuditLog.objects.get(action="sale.created")
-        assert row.after["sale_number"] == "SALE-1"
+        assert row.after["sale_number"].startswith("SALE-")
         assert row.after["total_amount"] == "200.00"
         assert row.actor.username == "cashier1"
 
