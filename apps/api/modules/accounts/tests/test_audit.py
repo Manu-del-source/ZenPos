@@ -123,14 +123,16 @@ class TestAuditRowsAreWritten:
         assert row.after == {"stock_level": 55}
 
     def test_organization_and_branch_changes_are_recorded(
-        self, admin_client, manager_client, organization
+        self, admin_client, admin_user, manager, organization
     ):
+        admin_client.force_authenticate(user=admin_user)
         renamed = admin_client.patch(
             f"{ORGS_URL}{organization.id}/", {"name": "Kipchi Mart"}, format="json"
         )
         assert renamed.status_code == 200, renamed.data
 
-        opened = manager_client.post(
+        admin_client.force_authenticate(user=manager)
+        opened = admin_client.post(
             BRANCHES_URL,
             {"name": "Kilimani", "code": "BR-003"},
             format="json",
