@@ -189,7 +189,7 @@ class TestServerComputedMoney:
         product = make_product(price=Decimal("116.00"), tax_rate=vat)
 
         response = authenticated_client.post(
-            SALES_URL, sale_payload(product, sale_number="SALE-VAT-IN"), format="json"
+            SALES_URL, sale_payload(product, sale_number="SALE-VAT-IN", quantity=1), format="json"
         )
 
         assert response.status_code == 201, response.data
@@ -214,7 +214,7 @@ class TestServerComputedMoney:
         product = make_product(price=Decimal("100.00"), tax_rate=vat)
 
         response = authenticated_client.post(
-            SALES_URL, sale_payload(product, sale_number="SALE-VAT-EX"), format="json"
+            SALES_URL, sale_payload(product, sale_number="SALE-VAT-EX", quantity=1), format="json"
         )
 
         assert response.status_code == 201, response.data
