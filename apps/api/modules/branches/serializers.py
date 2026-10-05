@@ -15,7 +15,9 @@ class BranchSerializer(serializers.ModelSerializer):
         if self.instance is not None:
             queryset = queryset.exclude(pk=self.instance.pk)
         if queryset.exists():
-            raise serializers.ValidationError("A branch with this code already exists in your organization.")
+            raise serializers.ValidationError(
+                "A branch with this code already exists in your organization."
+            )
         return value
 
     class Meta:
