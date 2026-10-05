@@ -1,5 +1,5 @@
 """
-Django settings for the Kipchi POS API.
+Django settings for the ZenPOS API.
 
 All configuration is environment-driven. No secrets, database credentials or
 host names are hard-coded here. See `.env.example` for the supported variables.
@@ -124,8 +124,8 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ.get("POSTGRES_DB", "kipchi_pos"),
-            "USER": os.environ.get("POSTGRES_USER", "kipchi"),
+            "NAME": os.environ.get("POSTGRES_DB", "zenpos"),
+            "USER": os.environ.get("POSTGRES_USER", "zenpos"),
             "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
             "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
             "PORT": os.environ.get("POSTGRES_PORT", "5432"),
