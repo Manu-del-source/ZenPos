@@ -24,13 +24,13 @@ class UserAdmin(DjangoUserAdmin):
     list_select_related = ("organization", "default_branch")
     fieldsets = DjangoUserAdmin.fieldsets + (
         (
-            "Kipchi POS",
+            "ZenPOS",
             {"fields": ("organization", "default_branch")},
         ),
     )
     add_fieldsets = DjangoUserAdmin.add_fieldsets + (
         (
-            "Kipchi POS",
+            "ZenPOS",
             {"fields": ("organization", "default_branch")},
         ),
     )
