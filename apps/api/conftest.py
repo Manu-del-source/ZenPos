@@ -61,7 +61,7 @@ def login(api_client):
 
 @pytest.fixture
 def organization(db):
-    return Organization.objects.create(name="Kipchi Supermarket", slug="kipchi")
+    return Organization.objects.create(name="ZenPOS Demo Store", slug="zenpos-demo-store")
 
 
 @pytest.fixture
