@@ -1,303 +1,179 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowDownRight, ArrowRight, ArrowUpRight, Barcode, Building2, Check,
-  ChevronDown, CircleDot, CreditCard, Package, Search, ShoppingCart,
-  Smartphone, Users, Wallet,
+  ArrowRight, ArrowUpRight, BarChart3, Barcode, Building2, Check,
+  ChevronRight, CreditCard, Package, ReceiptText, ScanBarcode,
+  ShoppingCart, Smartphone, Store, Users, Wallet
 } from 'lucide-react';
 import SiteHeader from '../components/site/SiteHeader';
 import SiteFooter from '../components/site/SiteFooter';
 import '../styles/site.css';
 import '../styles/landing.css';
 
-function WindowFrame({ children, title = 'ZenPOS · Point of Sale', className = '', ariaLabel = 'Illustrative ZenPOS interface preview' }) {
+function Metric({ label, value, detail, positive = true }) {
   return (
-    <div className={`product-window ${className}`} role="img" aria-label={ariaLabel}>
-      <div className="product-window-bar">
-        <span className="window-controls" aria-hidden="true"><i /><i /><i /></span>
-        <span className="window-title">{title}</span>
-        <span className="window-live"><CircleDot size={10} /> Interface preview</span>
-      </div>
-      {children}
+    <div className="dash-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small className={positive ? 'is-positive' : ''}>{detail}</small>
     </div>
   );
 }
 
-function CheckoutScreen({ compact = false }) {
+function DashboardPreview() {
   return (
-    <WindowFrame
-      className={compact ? 'checkout-window checkout-window--compact' : 'checkout-window'}
-      ariaLabel="Illustrative ZenPOS point-of-sale preview with product search, an empty cart, totals, and cash or M-Pesa payment options"
-    >
-      <div className="checkout-screen">
-        <aside className="app-rail" aria-label="ZenPOS sections">
-          <span className="rail-brand">Z</span>
-          <span className="rail-item rail-item--active"><ShoppingCart size={16} /></span>
-          <span className="rail-item"><Package size={16} /></span>
-          <span className="rail-item"><Users size={16} /></span>
+    <div className="dashboard-shell">
+      <div className="dash-topbar">
+        <div className="dash-brand"><span>Z</span><b>ZenPOS</b></div>
+        <div className="dash-search">Search anything...</div>
+        <div className="dash-user"><span>MK</span><div><b>Manager</b><small>ZenPOS Demo Store</small></div></div>
+      </div>
+      <div className="dash-body">
+        <aside className="dash-sidebar">
+          <b>WORKSPACE</b>
+          <span className="active"><ShoppingCart size={13} /> Dashboard</span>
+          <span><ReceiptText size={13} /> Sales</span>
+          <span><Package size={13} /> Inventory</span>
+          <span><Users size={13} /> Customers</span>
+          <span><Building2 size={13} /> Branches</span>
+          <b className="dash-sidebar-label">MANAGEMENT</b>
+          <span><BarChart3 size={13} /> Reports</span>
         </aside>
-        <div className="checkout-catalog">
-          <div className="screen-heading">
-            <span><small>POINT OF SALE</small><b>New sale</b></span>
-            <span className="screen-location"><Building2 size={13} /> Business</span>
+        <main className="dash-main">
+          <div className="dash-heading"><div><small>MONDAY, 5 OCTOBER</small><h3>Good afternoon, Manager</h3></div><button>+ New sale</button></div>
+          <div className="dash-metrics">
+            <Metric label="Today's sales" value="KES 84,250" detail="+18.4% vs yesterday" />
+            <Metric label="Transactions" value="126" detail="+12 today" />
+            <Metric label="Items in stock" value="4,832" detail="42 low stock" positive={false} />
+            <Metric label="Customers" value="1,284" detail="+26 this week" />
           </div>
-          <div className="screen-search"><Search size={15} /><span>Search by product or scan barcode</span><Barcode size={15} /></div>
-          <div className="screen-tab-row"><b>Products</b><span>All products</span><span>Categories</span></div>
-          {!compact && (
-            <div className="screen-product-table">
-              <div className="screen-table-head"><span>Product</span><span>SKU</span><span>Price</span><span>Stock</span></div>
-              <div className="screen-empty"><Package size={21} /><span>Search your product catalogue to begin</span></div>
+          <div className="dash-grid">
+            <div className="dash-card sales-chart">
+              <div className="dash-card-head"><span><b>Sales overview</b><small>Last 7 days</small></span><em>KES 421,680</em></div>
+              <div className="chart-area">
+                <div className="chart-lines"><i/><i/><i/><i/></div>
+                <svg viewBox="0 0 520 150" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,125 70,106 140,116 210,73 280,92 350,48 420,65 520,22" fill="none" stroke="currentColor" strokeWidth="3"/><polyline points="0,125 70,106 140,116 210,73 280,92 350,48 420,65 520,22 520,150 0,150" fill="currentColor" opacity=".08"/></svg>
+                <div className="chart-days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+              </div>
             </div>
-          )}
-          {compact && (
-            <div className="screen-product-skeleton" aria-hidden="true">
-              <div><i /><span><b /><small /></span><em /></div>
-              <div><i /><span><b /><small /></span><em /></div>
-              <div><i /><span><b /><small /></span><em /></div>
+            <div className="dash-card recent-sales">
+              <div className="dash-card-head"><span><b>Recent sales</b><small>Live activity</small></span><ChevronRight size={15}/></div>
+              <div className="sale-row"><span className="sale-icon"><ShoppingCart size={13}/></span><div><b>SALE-10284</b><small>Cash · 4 items</small></div><strong>KES 8,450</strong></div>
+              <div className="sale-row"><span className="sale-icon mpesa"><Smartphone size={13}/></span><div><b>SALE-10283</b><small>M-Pesa · 7 items</small></div><strong>KES 12,700</strong></div>
+              <div className="sale-row"><span className="sale-icon"><ShoppingCart size={13}/></span><div><b>SALE-10282</b><small>Cash · 2 items</small></div><strong>KES 3,250</strong></div>
             </div>
-          )}
-        </div>
-        <aside className="checkout-cart">
-          <div className="cart-title"><span><ShoppingCart size={15} /> Cart</span><small>0 items</small></div>
-          <div className="cart-empty"><span className="cart-empty-icon"><ShoppingCart size={20} /></span><b>Your cart is empty</b><small>Add products to start a sale</small></div>
-          <div className="cart-summary">
-            <div><span>Subtotal</span><b>KES 0</b></div>
-            <div><span>Total to pay</span><b>KES 0</b></div>
           </div>
-          <div className="cart-payments"><span><Wallet size={14} /> Cash</span><span><Smartphone size={14} /> M-Pesa</span></div>
-          <button className="screen-checkout" type="button" disabled>Complete sale <ArrowRight size={14} /></button>
-        </aside>
+        </main>
       </div>
-    </WindowFrame>
-  );
-}
-
-function InventoryScreen() {
-  return (
-    <WindowFrame title="ZenPOS · Inventory" className="inventory-window" ariaLabel="Illustrative ZenPOS inventory preview with product, SKU, price and stock fields">
-      <div className="inventory-screen">
-        <div className="inventory-side-label"><Package size={16} /><span>Inventory</span></div>
-        <div className="inventory-main">
-          <div className="inventory-heading"><span><small>CATALOGUE</small><b>Inventory</b></span><button type="button" className="inventory-add" disabled>+ Add product</button></div>
-          <div className="inventory-search"><Search size={14} /><span>Search products by name or SKU</span></div>
-          <div className="inventory-table">
-            <div className="inventory-table-head"><span>Product</span><span>SKU</span><span>Price</span><span>Stock</span></div>
-            <div className="inventory-empty"><Package size={20} /><span>Your product catalogue</span><small>Product names, prices and stock levels appear here.</small></div>
-          </div>
-        </div>
-      </div>
-    </WindowFrame>
-  );
-}
-
-function RecordsScreen() {
-  return (
-    <WindowFrame title="ZenPOS · Business records" className="records-window" ariaLabel="Illustrative ZenPOS business records preview showing sales history, customers, revenue and inventory">
-      <div className="records-screen">
-        <aside className="records-nav"><b>Workspace</b><span className="records-active">Sales</span><span>Inventory</span><span>Customers</span></aside>
-        <div className="records-main">
-          <div className="records-heading"><span><small>BUSINESS RECORDS</small><b>Sales history</b></span><span className="records-filter">Recent sales <ChevronDown size={13} /></span></div>
-          <div className="records-columns"><span>Sale</span><span>Customer</span><span>Payment</span><span>Total</span></div>
-          <div className="records-empty">Recorded sales appear here after checkout.</div>
-          <div className="records-bottom"><span>Customers</span><span>Revenue</span><span>Inventory</span></div>
-        </div>
-      </div>
-    </WindowFrame>
-  );
-}
-
-function PaymentScreen() {
-  return (
-    <div className="payment-ui" aria-label="ZenPOS cash and M-Pesa payment options">
-      <div className="payment-ui-top"><span><ShoppingCart size={15} /> Checkout</span><span>Payment</span></div>
-      <div className="payment-ui-total"><small>TOTAL TO PAY</small><b>KES —</b></div>
-      <div className="payment-option payment-option--selected"><span className="payment-option-icon"><Wallet size={17} /></span><span><b>Cash</b><small>Record a cash sale</small></span><span className="payment-radio" /></div>
-      <div className="payment-option"><span className="payment-option-icon payment-option-icon--green"><Smartphone size={17} /></span><span><b>M-Pesa</b><small>Initiate an STK push</small></span><span className="payment-radio" /></div>
-      <div className="payment-ui-note"><Check size={14} /> Choose a payment method at the counter</div>
     </div>
   );
 }
 
-function Hero() {
+function POSPreview() {
   return (
-    <section className="hero-section" aria-labelledby="hero-heading">
-      <div className="hero-inner">
-        <div className="hero-copy">
-          <span className="hero-kicker"><i /> RETAIL OPERATIONS · KENYA</span>
-          <h1 id="hero-heading">Your shop,<br />running in <em>one place.</em></h1>
-          <p className="hero-description">Sales, inventory, customers and payments in one system built for everyday retail.</p>
-          <div className="hero-actions">
-            <Link className="btn btn--primary" to="/login">Open ZenPOS <ArrowUpRight size={16} /></Link>
-            <a className="hero-secondary" href="#how-it-works">See how it works <ArrowDownRight size={16} /></a>
+    <div className="pos-preview">
+      <div className="pos-head"><span><ShoppingCart size={15}/> New sale</span><small>Branch: Main Store</small></div>
+      <div className="pos-content">
+        <div className="pos-products">
+          <div className="pos-search"><ScanBarcode size={14}/><span>Search product or scan barcode</span><kbd>⌘ K</kbd></div>
+          <div className="pos-categories"><b>All products</b><span>Electronics</span><span>Household</span><span>Motorcycle</span></div>
+          <div className="product-grid">
+            <div><span className="product-thumb">HP</span><b>HP Wireless Mouse</b><small>SKU HP-MOUSE-01</small><strong>KES 1,250</strong></div>
+            <div><span className="product-thumb">KB</span><b>Keyboard USB</b><small>SKU KB-USB-04</small><strong>KES 1,800</strong></div>
+            <div><span className="product-thumb">USB</span><b>USB-C Cable 1m</b><small>SKU USB-C-1M</small><strong>KES 650</strong></div>
+            <div><span className="product-thumb">AD</span><b>65W Laptop Adapter</b><small>SKU AD-65W-02</small><strong>KES 3,500</strong></div>
           </div>
-          <p className="hero-proof"><span /> Built for everyday retail in Kenya</p>
         </div>
-        <div className="hero-product-wrap"><CheckoutScreen compact /></div>
+        <aside className="pos-cart">
+          <div className="pos-cart-title"><b>Current sale</b><span>3 items</span></div>
+          <div className="cart-line"><span>HP Wireless Mouse × 1</span><strong>KES 1,250</strong></div>
+          <div className="cart-line"><span>USB-C Cable 1m × 2</span><strong>KES 1,300</strong></div>
+          <div className="cart-total"><span>Total</span><strong>KES 2,550</strong></div>
+          <div className="pay-options"><button><Wallet size={14}/> Cash</button><button className="selected"><Smartphone size={14}/> M-Pesa</button></div>
+          <button className="complete-sale">Complete sale <ArrowRight size={14}/></button>
+        </aside>
       </div>
-      <div className="hero-index"><span>01</span><span>THE DAILY COUNTER</span><span>SCROLL TO EXPLORE ↓</span></div>
-    </section>
+    </div>
   );
 }
 
-function ProductProof() {
+function InventoryPreview() {
   return (
-    <section className="product-proof" id="product" aria-labelledby="product-heading">
-      <div className="proof-heading">
-        <div><span className="eyebrow">A closer look</span><h2 id="product-heading">The counter, clearly laid out.</h2></div>
-        <p>Search the catalogue, see the cart and choose how to take payment in the same checkout.</p>
+    <div className="inventory-preview">
+      <div className="inventory-preview-head"><div><small>PRODUCT CATALOGUE</small><h3>Inventory</h3></div><button>+ Add product</button></div>
+      <div className="inventory-toolbar"><span><Barcode size={13}/> Search by product, SKU or barcode</span><span>All branches ▾</span></div>
+      <div className="inventory-rows">
+        <div className="inventory-row header"><span>Product</span><span>SKU</span><span>Price</span><span>Stock</span><span>Status</span></div>
+        <div className="inventory-row"><span><b>HP Wireless Mouse</b><small>Computer accessories</small></span><span>HP-MOUSE-01</span><span>KES 1,250</span><strong>42</strong><em>In stock</em></div>
+        <div className="inventory-row"><span><b>USB-C Cable 1m</b><small>Cables & adapters</small></span><span>USB-C-1M</span><span>KES 650</span><strong>8</strong><em className="low">Low stock</em></div>
+        <div className="inventory-row"><span><b>65W Laptop Adapter</b><small>Power accessories</small></span><span>AD-65W-02</span><span>KES 3,500</span><strong>24</strong><em>In stock</em></div>
       </div>
-      <CheckoutScreen />
-      <div className="product-caption"><span>01 / POINT OF SALE</span><span>Product search · Cart · Cash · M-Pesa</span></div>
-    </section>
+    </div>
   );
 }
 
-function ProblemSolution() {
-  return (
-    <section className="problem-section" id="features" aria-labelledby="problem-heading">
-      <div className="problem-aside"><span className="eyebrow">The everyday reality</span><span className="section-number">01—04</span></div>
-      <div className="problem-copy">
-        <h2 id="problem-heading">Retail gets messy when the tools don’t talk to each other.</h2>
-        <div className="problem-lines"><p>Sales in one place.</p><p>Stock somewhere else.</p><p>Customer details in a notebook.</p><p>Payments handled separately.</p></div>
-        <div className="solution-line"><span className="solution-mark">Z</span><p><b>ZenPOS brings the daily workflow together.</b><small>One workspace for the counter and the business behind it.</small></p></div>
-      </div>
-    </section>
-  );
-}
-
-function PosSection() {
-  return (
-    <section className="feature-section feature-section--pos" aria-labelledby="pos-heading">
-      <div className="feature-copy">
-        <span className="eyebrow">01 · Point of sale</span>
-        <h2 id="pos-heading">Sell clearly at the counter.</h2>
-        <p>Find a product, build the cart and complete the sale from one checkout screen.</p>
-        <ul className="feature-list"><li><Check size={15} /> Search by name, SKU or barcode</li><li><Check size={15} /> Keep the cart and total in view</li><li><Check size={15} /> Take cash or initiate an M-Pesa STK push</li><li><Check size={15} /> Record completed cash sales</li></ul>
-        <Link className="text-link" to="/login">Open ZenPOS <ArrowRight size={15} /></Link>
-      </div>
-      <div className="feature-visual feature-visual--pos"><CheckoutScreen /></div>
-    </section>
-  );
-}
-
-function InventorySection() {
-  return (
-    <section className="inventory-feature" aria-labelledby="inventory-heading">
-      <div className="inventory-feature-visual"><InventoryScreen /><div className="visual-index"><span>02</span><span>PRODUCT CATALOGUE</span></div></div>
-      <div className="inventory-feature-copy">
-        <span className="eyebrow">02 · Inventory</span>
-        <h2 id="inventory-heading">Know what you have before you sell it.</h2>
-        <p>Keep product details and stock levels close to the work at the counter.</p>
-        <div className="inventory-facts"><div><b>Products</b><span>One searchable catalogue</span></div><div><b>Prices</b><span>Product prices at a glance</span></div><div><b>Stock</b><span>Recorded quantities and low-stock visibility</span></div></div>
-        <Link className="text-link" to="/login">View inventory in ZenPOS <ArrowRight size={15} /></Link>
-      </div>
-    </section>
-  );
-}
-
-function ManagementSection() {
-  return (
-    <section className="management-section" id="business-management" aria-labelledby="management-heading">
-      <div className="management-heading"><span className="eyebrow">03 · Business management</span><h2 id="management-heading">Run the business,<br />not just the till.</h2><p>Follow recorded sales, keep customer records and review business activity across your workspace.</p></div>
-      <div className="management-screen-wrap"><RecordsScreen /><div className="management-label"><span>SALES HISTORY</span><span>Customers · Revenue · Inventory</span></div></div>
-      <div className="management-bottom"><span><Users size={16} /> Customer records</span><span><Building2 size={16} /> Business and staff access</span><span><Package size={16} /> Inventory visibility</span></div>
-    </section>
-  );
-}
-
-function PaymentsSection() {
-  return (
-    <section className="payments-section" aria-labelledby="payments-heading">
-      <div className="payments-copy">
-        <span className="eyebrow eyebrow--light">04 · Payments</span>
-        <h2 id="payments-heading">Cash when you need it. M-Pesa when your customer prefers it.</h2>
-        <p>Choose cash at checkout to record the sale, or initiate an M-Pesa STK push from the counter. M-Pesa availability depends on your payment configuration.</p>
-        <div className="roadmap-note"><span className="roadmap-rule" /><span><b>On the roadmap</b><small>eTIMS integration</small></span></div>
-      </div>
-      <div className="payments-visual"><PaymentScreen /><div className="payment-caption"><span><CreditCard size={14} /> CASH SALE</span><span><Smartphone size={14} /> M-PESA STK PUSH</span></div></div>
-    </section>
-  );
-}
-
-function HowItWorks() {
-  return (
-    <section className="how-section" id="how-it-works" aria-labelledby="how-heading">
-      <div className="how-intro"><span className="eyebrow">A straightforward daily flow</span><h2 id="how-heading">From product search to paid.</h2></div>
-      <div className="how-steps"><div><span>01</span><b>Find the product</b><small>Search by name, SKU or barcode.</small></div><div><span>02</span><b>Build the cart</b><small>Review items and the amount due.</small></div><div><span>03</span><b>Take payment</b><small>Record cash or initiate M-Pesa.</small></div><div><span>04</span><b>Review activity</b><small>Return to sales and business records.</small></div></div>
-    </section>
-  );
-}
-
-function FinalCta() {
-  return (
-    <section className="final-cta" id="contact" aria-labelledby="cta-heading">
-      <div><span className="eyebrow">ZENPOS · RETAIL OPERATIONS</span><h2 id="cta-heading">Ready to run your shop better?</h2><p>Bring the everyday work of your shop into one place.</p></div>
-      <Link className="btn btn--primary" to="/login">Open ZenPOS <ArrowUpRight size={16} /></Link>
-    </section>
-  );
-}
-
-function readThemePreference() {
-  try {
-    const savedTheme = window.localStorage.getItem('zenpos-theme');
-    return savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : null;
-  } catch {
-    return null;
-  }
+function Feature({ icon: Icon, number, title, text }) {
+  return <div className="feature-card"><span className="feature-icon"><Icon size={19}/></span><small>{number}</small><h3>{title}</h3><p>{text}</p><Link to="/login">Explore <ArrowRight size={14}/></Link></div>;
 }
 
 function Landing() {
-  const [themeOverride, setThemeOverride] = useState(readThemePreference);
-  const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
-    window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
-  );
-  const isDark = themeOverride ? themeOverride === 'dark' : systemPrefersDark;
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
-    if (!mediaQuery) return undefined;
-
-    const updateSystemPreference = (event) => setSystemPrefersDark(event.matches);
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', updateSystemPreference);
-    } else {
-      mediaQuery.addListener?.(updateSystemPreference);
-    }
-    return () => {
-      if (mediaQuery.removeEventListener) {
-        mediaQuery.removeEventListener('change', updateSystemPreference);
-      } else {
-        mediaQuery.removeListener?.(updateSystemPreference);
-      }
-    };
-  }, []);
-
-  const toggleTheme = () => {
-    const nextTheme = isDark ? 'light' : 'dark';
-    setThemeOverride(nextTheme);
-    try {
-      window.localStorage.setItem('zenpos-theme', nextTheme);
-    } catch {
-      // The theme still changes for this visit if storage is unavailable.
-    }
-  };
-
   return (
-    <div className="zenpos-site landing-page" data-theme={isDark ? 'dark' : 'light'}>
+    <div className="zenpos-site landing-page">
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <SiteHeader isDark={isDark} onToggleTheme={toggleTheme} />
+      <SiteHeader isDark={false} onToggleTheme={() => {}} />
       <main id="main-content">
-        <Hero />
-        <ProductProof />
-        <ProblemSolution />
-        <PosSection />
-        <InventorySection />
-        <ManagementSection />
-        <PaymentsSection />
-        <HowItWorks />
-        <FinalCta />
+        <section className="hero">
+          <div className="hero-bg-orb orb-one"/><div className="hero-bg-orb orb-two"/>
+          <div className="hero-inner">
+            <div className="hero-copy">
+              <div className="hero-badge"><span/> Built for Kenyan businesses</div>
+              <h1>Run your business.<br/><em>Know your numbers.</em></h1>
+              <p>ZenPOS puts sales, inventory, customers, payments and business reporting in one simple system.</p>
+              <div className="hero-actions"><Link className="btn btn--primary" to="/login">Get started with ZenPOS <ArrowUpRight size={16}/></Link><a className="hero-watch" href="#product">See how it works <ArrowRight size={15}/></a></div>
+              <div className="hero-trust"><span><Check size={13}/> Cash sales</span><span><Check size={13}/> M-Pesa</span><span><Check size={13}/> Inventory</span></div>
+            </div>
+            <div className="hero-product"><div className="browser-chrome"><span/><span/><span/><b>app.zenpos.co.ke</b><i>● LIVE</i></div><DashboardPreview/></div>
+          </div>
+        </section>
+
+        <section className="trust-strip"><div><Store size={17}/><span>Retail shops</span></div><div><Package size={17}/><span>Hardware & spare parts</span></div><div><ShoppingCart size={17}/><span>Supermarkets</span></div><div><ReceiptText size={17}/><span>Everyday sales</span></div></section>
+
+        <section className="product-section" id="product">
+          <div className="section-intro"><div><span className="eyebrow">The point of sale</span><h2>Fast at the counter.<br/>Clear behind the counter.</h2></div><p>Everything your cashier needs is on one screen. Search products, scan barcodes, build the cart and take payment without jumping between systems.</p></div>
+          <POSPreview/>
+        </section>
+
+        <section className="feature-section">
+          <div className="feature-heading"><span className="eyebrow">One system for the whole shop</span><h2>More than a till.</h2><p>ZenPOS connects the daily work that keeps a retail business moving.</p></div>
+          <div className="feature-grid">
+            <Feature icon={ShoppingCart} number="01" title="Point of sale" text="Process cash and M-Pesa sales quickly, with stock updated as you sell."/>
+            <Feature icon={Package} number="02" title="Inventory control" text="Track products, SKUs, prices and stock levels across your catalogue."/>
+            <Feature icon={Users} number="03" title="Customers" text="Keep customer records connected to the sales they make."/>
+            <Feature icon={BarChart3} number="04" title="Business reports" text="See sales activity, inventory value and the numbers that matter."/>
+          </div>
+        </section>
+
+        <section className="inventory-section">
+          <div className="inventory-copy"><span className="eyebrow">Inventory that stays current</span><h2>Sell with confidence, not guesswork.</h2><p>Every completed sale updates tracked stock. Low-stock visibility helps you know what needs attention before it becomes a problem.</p><div className="check-list"><span><Check size={14}/> Product catalogue & SKUs</span><span><Check size={14}/> Barcode lookup</span><span><Check size={14}/> Stock adjustments</span><span><Check size={14}/> Low-stock visibility</span></div><Link className="text-link" to="/login">Manage inventory <ArrowRight size={15}/></Link></div>
+          <InventoryPreview/>
+        </section>
+
+        <section className="payments-section">
+          <div><span className="eyebrow eyebrow--light">Kenyan payments</span><h2>Cash or M-Pesa.<br/><em>Your counter is ready.</em></h2><p>Record cash sales or initiate an M-Pesa STK push directly from checkout. Payment status stays connected to the sale.</p><div className="payment-pills"><span><Wallet size={15}/> Cash</span><span><Smartphone size={15}/> M-Pesa STK</span></div></div>
+          <div className="payment-card"><div><span className="payment-brand"><Smartphone size={18}/> M-Pesa</span><small>PAYMENT REQUEST</small></div><strong>KES 2,550</strong><span className="payment-phone">+254 7•• ••• 482</span><div className="payment-status"><span/> Waiting for customer confirmation</div><div className="payment-progress"><i/></div></div>
+        </section>
+
+        <section className="business-section">
+          <div className="business-copy"><span className="eyebrow">Built to grow with you</span><h2>One business today.<br/><em>Multiple branches tomorrow.</em></h2><p>Start with one shop and keep your operations organized as you add staff, products and locations.</p><div className="business-points"><span><Building2 size={17}/><b>Branches</b><small>Organize locations and operations</small></span><span><Users size={17}/><b>Staff access</b><small>Keep business access under control</small></span><span><ReceiptText size={17}/><b>Audit trail</b><small>Know what happened and when</small></span></div></div>
+          <div className="branch-card"><div className="branch-card-top"><span>YOUR BUSINESS</span><b>3 branches</b></div><div className="branch"><span className="branch-dot active"/> <div><b>Main Store</b><small>Nairobi · 4 staff</small></div><strong>KES 84,250</strong></div><div className="branch"><span className="branch-dot"/> <div><b>Westlands Branch</b><small>Nairobi · 2 staff</small></div><strong>KES 51,800</strong></div><div className="branch"><span className="branch-dot"/> <div><b>Industrial Area</b><small>Nairobi · 3 staff</small></div><strong>KES 37,420</strong></div><div className="branch-total"><span>Total today</span><b>KES 173,470</b></div></div>
+        </section>
+
+        <section className="cta-section">
+          <div><span className="eyebrow eyebrow--light">ZENPOS</span><h2>Your business deserves<br/><em>better numbers.</em></h2><p>Bring your sales, stock and payments into one place.</p></div>
+          <Link className="btn btn--light" to="/login">Open ZenPOS <ArrowUpRight size={16}/></Link>
+        </section>
       </main>
-      <SiteFooter />
+      <SiteFooter/>
     </div>
   );
 }
