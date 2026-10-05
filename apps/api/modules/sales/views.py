@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.db.models import Sum
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from rest_framework import mixins, viewsets
@@ -76,11 +76,9 @@ class SaleViewSet(
             widths = {"48": COLUMNS_80MM_WIDE, "58": COLUMNS_58MM}
             columns = widths.get(request.query_params.get("width"), COLUMNS_80MM)
             text = render_thermal_receipt(context["context"], columns=columns)
-            return Response(
-                text,
-                content_type="text/plain; charset=utf-8",
-                headers={"Content-Disposition": f'inline; filename="{sale.sale_number}.txt"'},
-            )
+            response = HttpResponse(text, content_type="text/plain; charset=utf-8")
+            response["Content-Disposition"] = f'inline; filename="{sale.sale_number}.txt"'
+            return response
 
         paper = request.query_params.get("paper", "80mm")
         if paper not in {"80mm", "a4"}:
