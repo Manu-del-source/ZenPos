@@ -5,7 +5,7 @@ from .models import Branch
 
 class BranchSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True, format="hex_verbose")
-    organization = serializers.UUIDField(read_only=True, format="hex_verbose")
+    organization = serializers.PrimaryKeyRelatedField(read_only=True)
     organization_name = serializers.ReadOnlyField(source="organization.name")
 
     def validate_code(self, value):
