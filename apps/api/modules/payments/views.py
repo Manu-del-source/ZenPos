@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
 from modules.core.audit import record_audit
+from modules.core.mixins import OrganizationScopedMixin
 
 from .base import PaymentCallbackError, PaymentGatewayError
 from .models import Payment
