@@ -5,11 +5,20 @@ from django.db import models
 class Sale(models.Model):
     """A completed sale.
 
-    Phase 6 adds branch, till, cash session and line-level pricing columns, and
-    moves payment details off this table into a ``payments`` table so split and
-    partial payments become possible. Money columns are computed by the server
-    from the catalogue at sale time; phase 5 stopped accepting them from the
-    request body.
+    Money columns are computed by the server from the catalogue at sale time;
+    the request body can only disagree with them, never set them.
+
+    ``branch`` and ``organization`` are denormalised onto the sale so branch
+    scoping and branch reporting do not have to join through the cashier on
+    every query. ``organization`` is nullable only for rows written before
+    multi-tenancy reached this table; every sale created through the API has
+    one.
+
+    ``client_reference`` is the POS-supplied idempotency key. A cashier whose
+    connection drops mid-checkout retries with the same reference, and the
+    unique ``(organization, client_reference)`` constraint — not a frontend
+    guard — is what stops the retry from becoming a second sale with a second
+    stock movement.
     """
 
     class PaymentMethod(models.TextChoices):
@@ -17,8 +26,35 @@ class Sale(models.Model):
         MPESA = "MPESA", "M-Pesa"
         SPLIT = "SPLIT", "Split Payment"
 
+    class Status(models.TextChoices):
+        COMPLETED = "COMPLETED", "Completed"
+        VOIDED = "VOIDED", "Voided"
+
     sale_number = models.CharField(max_length=50, unique=True, db_index=True)
     cashier = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        null=True,
+        blank=True,
+        related_name="sales",
+        on_delete=models.PROTECT,
+        help_text="Denormalised from the cashier; the tenant boundary for this row.",
+    )
+    branch = models.ForeignKey(
+        "branches.Branch",
+        null=True,
+        blank=True,
+        related_name="sales",
+        on_delete=models.PROTECT,
+        help_text="Where the sale was rung up. Null only for pre-branch rows.",
+    )
+    client_reference = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="POS idempotency key: repeating it returns the first sale.",
+    )
     customer = models.ForeignKey(
         "customers.Customer",
         on_delete=models.SET_NULL,
@@ -29,10 +65,38 @@ class Sale(models.Model):
     tax_amount = models.DecimalField(max_digits=10, decimal_places=2)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=10, choices=PaymentMethod.choices)
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.COMPLETED,
+        db_index=True,
+    )
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        related_name="sales_voided",
+        on_delete=models.PROTECT,
+    )
+    void_reason = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        constraints = [
+            # Postgres treats empty strings as ordinary values, so the partial
+            # condition keeps legacy rows (no reference) from colliding.
+            models.UniqueConstraint(
+                fields=["organization", "client_reference"],
+                condition=~models.Q(client_reference=""),
+                name="uniq_sale_org_client_ref",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["organization", "created_at"], name="idx_sale_org_created"),
+            models.Index(fields=["branch", "created_at"], name="idx_sale_branch_created"),
+        ]
 
     def __str__(self):
         return self.sale_number

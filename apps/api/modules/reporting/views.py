@@ -39,7 +39,25 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
     @property
     def _sales(self):
-        return self._scoped(Sale.objects.all(), "cashier__organization_id")
+        """Completed sales only: a voided sale was reversed, so it is not revenue.
+
+        Branch-posted callers also see only their own branches' takings, which
+        is the same narrowing the sales endpoint applies.
+        """
+        # Scoped through the cashier rather than the denormalised column so
+        # rows written before sales carried a tenant are still counted.
+        queryset = self._scoped(Sale.objects.all(), "cashier__organization_id").exclude(
+            status=Sale.Status.VOIDED
+        )
+
+        user = self.request.user
+        if getattr(user, "is_superuser", False):
+            return queryset
+
+        branch_ids = list(user.branch_access.values_list("branch_id", flat=True))
+        if branch_ids:
+            return queryset.filter(branch_id__in=branch_ids)
+        return queryset
 
     @property
     def _products(self):

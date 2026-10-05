@@ -45,6 +45,7 @@
 <body>
     <div class="receipt">
         <h1>{{ context.organization_name }}</h1>
+        {% if context.branch_name %}<p class="muted">{{ context.branch_name }}</p>{% endif %}
         <p class="muted">{{ context.sale_number }}</p>
 
         <div class="meta">

@@ -1,9 +1,10 @@
 import uuid
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
+from modules.branches.models import Branch
 from modules.catalog.models import Product
 from modules.core.audit import record_audit
 from modules.core.serializers import OrganizationScopedSerializerMixin
@@ -100,20 +101,41 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
     payments = PaymentSerializer(many=True, read_only=True)
     cashier_name = serializers.ReadOnlyField(source="cashier.username")
     customer_name = serializers.ReadOnlyField(source="customer.name")
+    branch_name = serializers.ReadOnlyField(source="branch.name")
+    voided_by_name = serializers.ReadOnlyField(source="voided_by.username")
+    client_reference = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Idempotency key: two requests with the same value produce one sale.",
+    )
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = Sale
         fields = (
             "id",
             "sale_number",
+            "client_reference",
             "cashier",
             "cashier_name",
+            "organization",
+            "branch",
+            "branch_name",
             "customer",
             "customer_name",
             "total_amount",
             "tax_amount",
             "discount_amount",
             "payment_method",
+            "status",
+            "voided_at",
+            "voided_by",
+            "voided_by_name",
+            "void_reason",
             "payments",
             "items",
             "created_at",
@@ -121,9 +143,14 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         read_only_fields = (
             "sale_number",
             "cashier",
+            "organization",
             "total_amount",
             "tax_amount",
             "discount_amount",
+            "status",
+            "voided_at",
+            "voided_by",
+            "void_reason",
         )
 
     def validate_payment_method(self, value):
@@ -142,6 +169,75 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
                     {"quantity": "Quantity must be at least 1."}
                 )
         return value
+
+    def validate_branch(self, branch):
+        """A branch the caller may actually sell from."""
+        if branch is None:
+            return None
+        user = self.request_user
+        if user is None or not getattr(user, "is_authenticated", False):
+            return branch
+
+        if getattr(user, "is_superuser", False):
+            return branch
+
+        organization_id = getattr(user, "organization_id", None)
+        if branch.organization_id != organization_id:
+            raise serializers.ValidationError(
+                "That branch belongs to a different organization."
+            )
+
+        allowed = set(user.branch_access.values_list("branch_id", flat=True))
+        if allowed and branch.pk not in allowed:
+            raise serializers.ValidationError(
+                "You are not posted to that branch, so you cannot sell from it."
+            )
+        return branch
+
+    def _resolve_branch(self, cashier):
+        """Where this sale happened.
+
+        An explicit, permitted branch always wins. Otherwise the cashier's
+        default branch, then the posting they flagged as default, then a single
+        posting, then the organization's only branch. A head-office user in a
+        multi-branch organization has to say which shop they are selling from
+        rather than have real money attributed to a guess.
+        """
+        requested = self.validated_data.get("branch")
+        if requested is not None:
+            return requested
+
+        user = self.request_user or cashier
+        if user is None:
+            return None
+
+        if getattr(user, "default_branch", None) is not None:
+            return user.default_branch
+
+        postings = list(user.branch_access.select_related("branch").all())
+        flagged = [posting.branch for posting in postings if posting.is_default]
+        if flagged:
+            return flagged[0]
+        if len(postings) == 1:
+            return postings[0].branch
+
+        if not postings:
+            from modules.branches.models import Branch
+
+            organization_id = getattr(user, "organization_id", None)
+            if organization_id is not None:
+                branches = list(Branch.objects.filter(organization_id=organization_id)[:2])
+                if len(branches) == 1:
+                    return branches[0]
+                if not branches:
+                    # A business that never opened a branch record has nothing
+                    # to attribute the sale to; the row stays unattributed
+                    # rather than blocking the till.
+                    return None
+
+        raise serializers.ValidationError(
+            {"branch": "Select the branch this sale belongs to."}
+        )
 
     def _check_client_total_hint(self, computed_total: Decimal) -> None:
         client_total = self.initial_data.get("total_amount")
@@ -163,6 +259,11 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
                 }
             )
 
+    @property
+    def replayed(self) -> bool:
+        """True when this request returned an existing sale instead of a new one."""
+        return getattr(self, "_replayed", False)
+
     @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop("items")
@@ -182,12 +283,50 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         validated_data.pop("sale_number", None)
         sale_number = f"SALE-{timezone_now_stamp()}-{uuid.uuid4().hex[:8].upper()}"
 
-        sale = Sale.objects.create(
+        cashier = validated_data["cashier"]
+        branch = self._resolve_branch(cashier)
+        reference = validated_data.pop("client_reference", "")
+
+        # Idempotency, decided by the client's reference rather than by
+        # anything the client claims about the sale: a POS retry after a
+        # dropped connection must not become a second sale with a second stock
+        # movement. The unique constraint below is the authority; this lookup
+        # only avoids the exception on the common path.
+        if reference:
+            existing = Sale.objects.filter(
+                organization_id=cashier.organization_id, client_reference=reference
+            ).first()
+            if existing is not None:
+                self._replayed = True
+                return existing
+
+        payload = {
             **validated_data,
-            sale_number=sale_number,
-            total_amount=computed_total,
-            tax_amount=tax_total,
-        )
+            "organization_id": cashier.organization_id,
+            "branch": branch,
+        }
+
+        try:
+            with transaction.atomic():
+                sale = Sale.objects.create(
+                    **payload,
+                    sale_number=sale_number,
+                    client_reference=reference,
+                    total_amount=computed_total,
+                    tax_amount=tax_total,
+                )
+        except IntegrityError:
+            # Two retries raced. The loser reads the winner's sale and returns
+            # it: same money, same stock movement, answered once.
+            if not reference:
+                raise
+            replay = Sale.objects.filter(
+                organization_id=cashier.organization_id, client_reference=reference
+            ).first()
+            if replay is None:
+                raise
+            self._replayed = True
+            return replay
 
         if sale.payment_method == Sale.PaymentMethod.CASH:
             payment = complete_cash_payment(

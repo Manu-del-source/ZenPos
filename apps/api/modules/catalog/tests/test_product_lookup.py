@@ -161,3 +161,71 @@ class TestCataloguePermissions:
         )
 
         assert PriceHistory.objects.count() == 0
+
+
+@pytest.mark.django_db
+class TestCataloguePagination:
+    def test_page_size_is_honoured(self, authenticated_client, make_product):
+        """The POS asks for a large page; the server must not silently cap at 50."""
+        for index in range(60):
+            make_product(name=f"Widget {index}", sku=f"W-{index}")
+
+        response = authenticated_client.get(PRODUCTS_URL, {"page_size": 100})
+
+        assert response.status_code == 200
+        assert response.data["count"] == 60
+        assert len(response.data["results"]) == 60
+
+    def test_page_size_has_a_ceiling(self, authenticated_client, make_product):
+        make_product(name="Only one")
+
+        response = authenticated_client.get(PRODUCTS_URL, {"page_size": 100000})
+
+        assert response.status_code == 200
+        assert len(response.data["results"]) == 1
+
+
+@pytest.mark.django_db
+class TestArchivingAProduct:
+    def test_deleting_a_sold_product_archives_it_instead_of_failing(
+        self, authenticated_client, manager_client, product
+    ):
+        """A product that has been sold still appears on historical receipts.
+
+        The first version of this path raised ProtectedError and answered 500;
+        the row is archived instead, and the sale keeps its name.
+        """
+        authenticated_client.post(
+            "/api/v2/sales/",
+            {
+                "payment_method": "CASH",
+                "items": [{"product": str(product.id), "quantity": 1}],
+            },
+            format="json",
+        )
+
+        response = manager_client.delete(f"{PRODUCTS_URL}{product.id}/")
+
+        assert response.status_code == 204, getattr(response, "data", None)
+        # Hidden from the catalogue...
+        assert manager_client.get(f"{PRODUCTS_URL}{product.id}/").status_code == 404
+        # ...but still the product the receipt refers to.
+        from modules.sales.models import SaleItem
+
+        assert SaleItem.objects.get().product.name == "Milk 1L"
+
+    def test_an_archived_product_cannot_be_sold(
+        self, authenticated_client, manager_client, product
+    ):
+        manager_client.delete(f"{PRODUCTS_URL}{product.id}/")
+
+        response = authenticated_client.post(
+            "/api/v2/sales/",
+            {
+                "payment_method": "CASH",
+                "items": [{"product": str(product.id), "quantity": 1}],
+            },
+            format="json",
+        )
+
+        assert response.status_code == 400

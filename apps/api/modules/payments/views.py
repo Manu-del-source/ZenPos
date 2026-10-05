@@ -6,22 +6,26 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
 from modules.core.audit import record_audit
-from modules.core.mixins import OrganizationScopedMixin
+from modules.core.mixins import BranchScopedMixin
+from modules.sales.services import reserve_sale_stock
 
 from .base import PaymentCallbackError, PaymentGatewayError
 from .models import Payment
 from .serializers import InitiatePaymentSerializer, PaymentSerializer
 from .services import (
+    STK_HARD_TIMEOUT,
+    STK_RECONCILE_AFTER,
     assert_no_pending_stk,
     get_payment_provider,
     handle_mpesa_callback,
     initiate_payment,
+    reconcile_pending_payment,
     release_mpesa_stock_reservation,
 )
 
 
 class PaymentViewSet(
-    OrganizationScopedMixin,
+    BranchScopedMixin,
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -30,16 +34,17 @@ class PaymentViewSet(
     """Payments against sales, created and polled by the POS.
 
     Initiation is a cashier act, so it is gated by ``sales.create``; polling is
-    ``sales.view``. Scoping follows the sale — ``Payment`` has no organization
-    of its own, and phase 6 rebuilds ``Sale`` with a direct tenant column,
-    which this filter path will then become.
+    ``sales.view``. Scoping follows the sale: a payment inherits its tenant and
+    its branch, so a supervisor cannot read another shop's takings through this
+    table when the sales endpoint would refuse them.
     """
 
     queryset = (
         Payment.objects.select_related("sale", "received_by").prefetch_related("attempts").all()
     )
     serializer_class = PaymentSerializer
-    organization_field = "sale__cashier__organization"
+    organization_field = "sale__organization"
+    branch_field = "sale__branch"
 
     required_permissions = ("sales.view",)
     required_permissions_by_action = {
@@ -51,20 +56,84 @@ class PaymentViewSet(
             return InitiatePaymentSerializer
         return PaymentSerializer
 
+    def get_queryset(self):
+        """Optional narrowing by sale, status or method.
+
+        The POS recovers from a dropped connection with ``?sale=<id>``: after a
+        push whose response never arrived, it asks what payments this sale
+        already has instead of starting a second one. Filtering is additive —
+        a request that sends no parameters gets the whole (scoped) list it
+        always did.
+        """
+        queryset = super().get_queryset()
+        params = self.request.query_params
+
+        sale = params.get("sale")
+        if sale:
+            queryset = queryset.filter(sale_id=sale)
+
+        status_param = params.get("status")
+        if status_param:
+            queryset = queryset.filter(status=status_param.upper())
+
+        method = params.get("method")
+        if method:
+            queryset = queryset.filter(method=method.upper())
+
+        return queryset
+
     def retrieve(self, request, *args, **kwargs):
         payment = self.get_object()
-        # A stale STK request must not hold inventory forever when a provider
-        # callback is lost. Polling the payment naturally performs the cleanup.
+        # A pending STK request must not be taken at face value. Once the
+        # customer's prompt has expired, ask Safaricom what happened before the
+        # POS is allowed to retry: a lost callback would otherwise mean a
+        # second charge for the same sale.
         if (
             payment.method == Payment.Method.MPESA
             and payment.status == Payment.Status.PENDING
-            and payment.created_at <= timezone.now() - timezone.timedelta(minutes=10)
+            and payment.created_at <= timezone.now() - STK_RECONCILE_AFTER
         ):
+            payment = self._reconcile(payment)
+        return Response(PaymentSerializer(payment, context={"request": request}).data)
+
+    def _reconcile(self, payment):
+        """Ask the provider, then fall back to a bounded timeout.
+
+        The provider is the authority. Only when it cannot be asked at all —
+        credentials absent, network down — does the hard timeout apply, and
+        that path releases the reservation so an abandoned sale cannot hold
+        stock forever. Neither path can mark a payment COMPLETED; that remains
+        the callback's job, so a forged response here buys nothing.
+        """
+        try:
+            provider = get_payment_provider()
+        except ValueError:
+            provider = None
+
+        if provider is not None:
+            try:
+                return reconcile_pending_payment(payment=payment, provider=provider, request=None)
+            except Exception:
+                # A status poll must never 500 because a provider misbehaved;
+                # the timeout below is the safety net.
+                pass
+
+        if payment.created_at <= timezone.now() - STK_HARD_TIMEOUT:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=["status", "updated_at"])
-            release_mpesa_stock_reservation(sale=payment.sale, request=request)
+            release_mpesa_stock_reservation(sale=payment.sale, request=self.request)
+            record_audit(
+                action="payment.timed_out",
+                entity_type="payment",
+                entity_id=payment.pk,
+                actor=self.request.user,
+                request=self.request,
+                before={"status": Payment.Status.PENDING},
+                after={"status": payment.status},
+            )
             payment.refresh_from_db()
-        return Response(PaymentSerializer(payment, context={"request": request}).data)
+
+        return payment
 
 
     def create(self, request, *args, **kwargs):
@@ -96,7 +165,11 @@ class PaymentViewSet(
         if method == Payment.Method.MPESA:
             try:
                 # One un-answered push at a time, within the retry window.
-                assert_no_pending_stk(serializer.validated_data["sale"])
+                sale = serializer.validated_data["sale"]
+                assert_no_pending_stk(sale)
+                # A retry after a failed attempt must hold the stock again
+                # before the customer is asked for money a second time.
+                reserve_sale_stock(sale=sale, actor=self.request.user, request=self.request)
                 payment = serializer.save()
                 initiate_payment(
                     payment=payment,

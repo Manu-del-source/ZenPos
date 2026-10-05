@@ -27,6 +27,7 @@ class Payment(BaseModel):
         PENDING = "PENDING", "Pending"
         COMPLETED = "COMPLETED", "Completed"
         FAILED = "FAILED", "Failed"
+        REFUNDED = "REFUNDED", "Refunded"
 
     sale = models.ForeignKey(
         Sale,

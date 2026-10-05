@@ -1,15 +1,15 @@
 import React from 'react';
 import { Bell, Building2, LogOut, ShieldCheck, UserRound } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { logout } from '../services/api';
 
 export default function Settings() {
   let user = {};
   try { user = JSON.parse(localStorage.getItem('user') || '{}'); } catch {}
   const organization = user?.organization_name || user?.organization?.name || 'ZenPOS Store';
-  const signOut = () => {
-    localStorage.removeItem('token'); localStorage.removeItem('refreshToken'); localStorage.removeItem('user');
-    window.location.href = '/login';
-  };
+  // Reuse the shared helper: it blacklists the refresh token server-side
+  // before clearing local state.
+  const signOut = () => { logout(); };
   return <div className="page-shell">
     <div><div className="eyebrow">Workspace configuration</div><h1 className="page-title">Settings</h1><p className="page-subtitle">Review the workspace and account connected to this terminal.</p></div>
     <div className="mt-6 grid gap-5 lg:grid-cols-2">

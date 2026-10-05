@@ -57,6 +57,9 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify({ username }));
       }
 
+      // The app shell reads the session from localStorage on this event; it is
+      // what makes the navigation to the workspace render as signed in.
+      window.dispatchEvent(new Event('zenpos:auth'));
       navigate('/pos');
     } catch (err) {
       // Only the actual token request reaches this branch.

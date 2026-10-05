@@ -55,7 +55,7 @@ class TestOrganizationSettings:
 
         assert response.status_code == 403
         organization.refresh_from_db()
-        assert organization.name == "Kipchi Supermarket"
+        assert organization.name == "ZenPOS Demo Store"
 
     def test_a_cashier_cannot_change_organization_settings(
         self, authenticated_client, organization
@@ -66,7 +66,7 @@ class TestOrganizationSettings:
 
         assert response.status_code == 403
         organization.refresh_from_db()
-        assert organization.name == "Kipchi Supermarket"
+        assert organization.name == "ZenPOS Demo Store"
 
     def test_the_slug_is_not_client_editable(self, admin_client, organization):
         response = admin_client.patch(
@@ -75,7 +75,7 @@ class TestOrganizationSettings:
 
         assert response.status_code == 200
         organization.refresh_from_db()
-        assert organization.slug == "kipchi"
+        assert organization.slug == "zenpos-demo-store"
 
     def test_organizations_cannot_be_created_through_the_api(self, admin_client):
         """Creating a tenant is a platform-operator action, done in the admin."""
