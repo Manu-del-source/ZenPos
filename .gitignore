@@ -10,6 +10,5 @@ node_modules/
 dist/
 .DS_Store
 *.log
-package-lock.json
 prisma/migrations/
 __pycache__/
