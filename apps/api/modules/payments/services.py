@@ -115,20 +115,9 @@ def assert_no_pending_stk(sale) -> None:
 
 
 def initiate_payment(*, payment, phone: str, provider: PaymentProvider) -> Payment:
-    """Start a provider payment: attempt row, provider call, audit row.
-
-    Transaction boundaries are the interesting part. The attempt row and its
-    provider exchange commit (or fail) *independently* of the payment's
-    PENDING creation, which the caller did inside their own transaction:
-
-    - if the exchange fails, the FAILED attempt and the FAILED payment must
-      survive as history — rolling them back with an outer transaction would
-      erase the record of a refused charge;
-    - if the exchange succeeds, the attempt's payloads must survive even if
-      the caller's outer transaction later rolls back, because the provider
-      really was asked and a customer prompt really is on its way.
-    """
+    """Start a provider payment and persist failures before returning the error."""
     attempt_number = PaymentAttempt.objects.filter(payment=payment).count() + 1
+    provider_error = None
 
     with transaction.atomic():
         attempt = PaymentAttempt.objects.create(
@@ -150,10 +139,8 @@ def initiate_payment(*, payment, phone: str, provider: PaymentProvider) -> Payme
             attempt.request_payload = exc.request_payload or {}
             attempt.response_payload = exc.response_payload or {}
             attempt.save(update_fields=["status", "error", "request_payload", "response_payload"])
-            Payment.objects.filter(pk=payment.pk, status=Payment.Status.PENDING).update(
-                status=Payment.Status.FAILED
-            )
-            payment.refresh_from_db(fields=["status"])
+            payment.status = Payment.Status.FAILED
+            payment.save(update_fields=["status", "updated_at"])
             record_audit(
                 action="payment.failed",
                 entity_type="payment",
@@ -165,32 +152,34 @@ def initiate_payment(*, payment, phone: str, provider: PaymentProvider) -> Payme
                 },
             )
             release_mpesa_stock_reservation(sale=payment.sale)
-            raise
+            provider_error = exc
+        else:
+            attempt.checkout_request_id = initiation.checkout_request_id
+            attempt.request_payload = initiation.request_payload
+            attempt.response_payload = initiation.response_payload
+            attempt.provider_amount = initiation.provider_amount
+            attempt.save(
+                update_fields=[
+                    "checkout_request_id",
+                    "request_payload",
+                    "response_payload",
+                    "provider_amount",
+                ]
+            )
+            record_audit(
+                action="payment.initiated",
+                entity_type="payment",
+                entity_id=payment.pk,
+                after={
+                    "sale": str(payment.sale_id),
+                    "method": payment.method,
+                    "provider": provider.provider_name,
+                    "checkout_request_id": initiation.checkout_request_id,
+                },
+            )
 
-        attempt.checkout_request_id = initiation.checkout_request_id
-        attempt.request_payload = initiation.request_payload
-        attempt.response_payload = initiation.response_payload
-        attempt.provider_amount = initiation.provider_amount
-        attempt.save(
-            update_fields=[
-                "checkout_request_id",
-                "request_payload",
-                "response_payload",
-                "provider_amount",
-            ]
-        )
-
-        record_audit(
-            action="payment.initiated",
-            entity_type="payment",
-            entity_id=payment.pk,
-            after={
-                "sale": str(payment.sale_id),
-                "method": payment.method,
-                "provider": provider.provider_name,
-                "checkout_request_id": initiation.checkout_request_id,
-            },
-        )
+    if provider_error is not None:
+        raise provider_error
 
     return payment
 
