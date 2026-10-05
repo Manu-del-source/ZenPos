@@ -52,9 +52,18 @@ class InitiatePaymentSerializer(OrganizationScopedSerializerMixin, serializers.S
     another shop's sale id is a validation error, not a payment.
     """
 
-    organization_bound_fields = ("sale",)
+    organization_bound_fields = ()
 
     sale = serializers.PrimaryKeyRelatedField(queryset=Sale.objects.all())
+
+    def validate_sale(self, sale):
+        caller = self.request_user
+        if caller is not None and caller.is_authenticated and not caller.is_superuser:
+            if sale.cashier.organization_id != caller.organization_id:
+                raise serializers.ValidationError(
+                    "That record belongs to a different organization."
+                )
+        return sale
     method = serializers.ChoiceField(choices=Payment.Method.choices)
     phone = serializers.RegexField(
         regex=r"^0(1|7)\d{8}$",
