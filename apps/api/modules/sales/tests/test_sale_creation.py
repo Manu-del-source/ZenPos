@@ -195,7 +195,7 @@ class TestServerComputedMoney:
         assert response.status_code == 201, response.data
 
         # The customer pays 116.00; 16.00 of that is VAT and 100.00 is net.
-        sale = Sale.objects.get(sale_number="SALE-VAT-IN")
+        sale = Sale.objects.get()
         assert sale.total_amount == Decimal("116.00")
         assert sale.tax_amount == Decimal("16.00")
 
@@ -219,7 +219,7 @@ class TestServerComputedMoney:
 
         assert response.status_code == 201, response.data
 
-        sale = Sale.objects.get(sale_number="SALE-VAT-EX")
+        sale = Sale.objects.get()
         assert sale.total_amount == Decimal("116.00")
         assert sale.tax_amount == Decimal("16.00")
         assert sale.items.get().subtotal == Decimal("100.00")
@@ -238,7 +238,7 @@ class TestServerComputedMoney:
 
         assert response.status_code == 201, response.data
 
-        sale = Sale.objects.get(sale_number="SALE-ROUND")
+        sale = Sale.objects.get()
         # One line of 3 units: gross 99.99, VAT carved out rounds to 13.79.
         assert sale.total_amount == Decimal("99.99")
         assert sale.tax_amount == Decimal("13.79")
