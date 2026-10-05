@@ -37,7 +37,7 @@ class StockAdjustmentSerializer(
         )
         before = snapshot(product, ("stock_level",))
         adjustment = StockAdjustment.objects.create(
-            **{**validated_data, "product": product}
+            **{**validated_data, "product": product, "user": self.context["request"].user}
         )
         product.stock_level += adjustment.quantity
         product.save(update_fields=["stock_level", "updated_at"])
