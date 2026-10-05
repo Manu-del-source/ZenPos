@@ -1,4 +1,4 @@
-# Runtime dependencies for the Kipchi POS API.
+# Runtime dependencies for the ZenPOS API.
 #
 # Verified compatible set: Django 6.0 supports Python 3.12-3.14, and Django REST
 # Framework 3.18 officially supports Django 5.2/6.0/6.1.
