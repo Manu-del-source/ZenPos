@@ -73,8 +73,8 @@ class SetRolePermissionsSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True, format="hex_verbose")
-    organization = serializers.UUIDField(read_only=True, format="hex_verbose", allow_null=True)
-    default_branch = serializers.UUIDField(read_only=True, format="hex_verbose", allow_null=True)
+    organization = serializers.PrimaryKeyRelatedField(read_only=True)
+    default_branch = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
     roles = serializers.SerializerMethodField()
     branch_ids = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
