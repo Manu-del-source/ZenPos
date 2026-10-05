@@ -74,7 +74,7 @@ class PriceHistorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(OrganizationScopedSerializerMixin, serializers.ModelSerializer):
-    organization = serializers.PrimaryKeyRelatedField(read_only=True)
+    organization = serializers.SerializerMethodField()
     organization_bound_fields = ("category", "brand", "unit", "tax_rate")
 
     barcodes = ProductBarcodeSerializer(many=True, read_only=True)
@@ -119,6 +119,9 @@ class ProductSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeri
         )
 
     @transaction.atomic
+    def get_organization(self, obj):
+        return str(obj.organization_id)
+
     def update(self, instance, validated_data):
         """Apply the update and, if the selling price moved, record why."""
         old_price = instance.price
