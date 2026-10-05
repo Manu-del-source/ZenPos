@@ -160,7 +160,7 @@ loyalty_transactions id, customer_id, sale_id, type (EARN|REDEEM|EXPIRE|ADJUST),
                      points, balance_after, reason, actor_id, created_at
 ```
 
-Balances are derived from the ledger. Directly assigning a balance is prohibited
+Balances are derived from the ledger. Directly assigning a balance is pzenposbited
 because it destroys the ability to explain why a customer has the points they do.
 
 Phase 4 gave `customers` its `organization_id` and moved phone uniqueness from
