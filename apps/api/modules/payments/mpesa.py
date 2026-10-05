@@ -192,7 +192,7 @@ class MpesaProvider(PaymentProvider):
             "PhoneNumber": phone,
             "CallBackURL": self.callback_url,
             "AccountReference": f"SALE-{payment.sale_id}",
-            "TransactionDesc": "Kipchi POS payment",
+            "TransactionDesc": "ZenPOS payment",
         }
         body = self._post("/mpesa/stkpush/v1/processrequest", payload, token)
 
