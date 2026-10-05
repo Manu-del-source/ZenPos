@@ -21,7 +21,7 @@ pages do not match the Django API:
 | `Inventory.jsx` | CRUD | Create/edit are stubs that `toast.error("Cloud edit restricted…")` |
 
 Additionally, the pages still carry the old "ROHI Hardware & Moto" branding that
-ADR-0004 replaced with Kipchi POS supermarket retail.
+ADR-0004 replaced with ZenPOS supermarket retail.
 
 ## What has been fixed
 
