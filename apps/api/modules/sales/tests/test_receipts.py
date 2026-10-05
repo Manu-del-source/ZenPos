@@ -34,7 +34,7 @@ class TestReceiptHtml:
     def test_receipt_shows_computed_totals(self, authenticated_client, product):
         created = create_sale_via_api(authenticated_client, product)
         assert created.status_code == 201, created.data
-        sale = Sale.objects.get(sale_number="SALE-R1")
+        sale = Sale.objects.get()
 
         response = authenticated_client.get(RECEIPT_URL.format(id=sale.id))
 
@@ -64,7 +64,7 @@ class TestReceiptHtml:
             },
             format="json",
         )
-        sale = Sale.objects.get(sale_number="SALE-TAXGROUP")
+        sale = Sale.objects.get()
 
         response = authenticated_client.get(RECEIPT_URL.format(id=sale.id))
 
