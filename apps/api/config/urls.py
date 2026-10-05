@@ -13,6 +13,7 @@ api_v2_patterns = [
     path("", include("modules.catalog.urls")),
     path("", include("modules.customers.urls")),
     path("", include("modules.inventory.urls")),
+    path("", include("modules.purchasing.urls")),
     path("", include("modules.organizations.urls")),
     path("", include("modules.payments.urls")),
     path("", include("modules.reporting.urls")),

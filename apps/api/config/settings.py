@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "modules.accounts",
     "modules.catalog",
     "modules.inventory",
+    "modules.purchasing",
     "modules.customers",
     "modules.sales",
     "modules.payments",
