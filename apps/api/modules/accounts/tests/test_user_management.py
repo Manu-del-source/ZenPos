@@ -24,7 +24,7 @@ class TestWhoMayManageStaff:
 
         assert response.status_code == 403
 
-    def test_a_manager_can_list_their_own_staff(self, manager_client):
+    def test_a_manager_can_list_their_own_staff(self, manager_client, cashier):
         response = manager_client.get(USERS_URL)
 
         assert response.status_code == 200, response.data
