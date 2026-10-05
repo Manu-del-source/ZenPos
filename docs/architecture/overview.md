@@ -6,7 +6,7 @@ Before the rebuild, this repository contained **five separate applications**:
 
 | System | Location (pre-rebuild) | Persistence | Verdict |
 |---|---|---|---|
-| Django REST back-office | `api/`, `kipchi_core/`, `manage.py` | PostgreSQL | Promoted to the single backend |
+| Django REST back-office | `api/`, the former legacy core package, `manage.py` | PostgreSQL | Promoted to the single backend |
 | Node/Express + Prisma API | `backend/src/`, `server.js` | PostgreSQL (raw SQL) | Archived |
 | FastAPI + SQLite API | `backend/api.py`, `database.py` | SQLite | Archived |
 | Textual desktop TUI | `main.py`, `screens.py` | SQLite | Archived |
