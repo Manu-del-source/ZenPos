@@ -115,7 +115,7 @@ class TestReceiptHtml:
         sale = Sale.objects.get()
 
         response = authenticated_client.get(
-            RECEIPT_URL.format(id=sale.id) + "?format=thermal"
+            RECEIPT_URL.format(id=sale.id) + "?output=thermal"
         )
 
         assert response.status_code == 200
