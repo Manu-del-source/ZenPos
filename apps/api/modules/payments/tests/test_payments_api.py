@@ -10,6 +10,13 @@ from unittest import mock
 import pytest
 from rest_framework.test import APIClient
 
+
+@pytest.fixture
+def accountant_client(api_client, make_user):
+    user = make_user("payment-accountant", role="ACCOUNTANT")
+    api_client.force_authenticate(user=user)
+    return api_client
+
 from modules.core.models import AuditLog
 from modules.payments.base import ProviderCallback, StkInitiation
 from modules.payments.models import Payment, PaymentAttempt, WebhookEvent
