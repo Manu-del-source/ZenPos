@@ -1,7 +1,7 @@
 [project]
-name = "kipchi-pos-api"
+name = "zenpos-api"
 version = "0.1.0"
-description = "Kipchi POS - multi-branch retail platform API"
+description = "ZenPOS - multi-branch retail platform API"
 requires-python = ">=3.12"
 
 # ---------------------------------------------------------------------------
