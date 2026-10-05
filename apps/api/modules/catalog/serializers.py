@@ -74,6 +74,7 @@ class PriceHistorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(OrganizationScopedSerializerMixin, serializers.ModelSerializer):
+    organization = serializers.PrimaryKeyRelatedField(read_only=True)
     organization_bound_fields = ("category", "brand", "unit", "tax_rate")
 
     barcodes = ProductBarcodeSerializer(many=True, read_only=True)
