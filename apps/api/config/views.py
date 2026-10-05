@@ -11,9 +11,9 @@ def landing_page(request):
     return HttpResponse(
         """
         <html>
-            <head><title>Kipchi POS API</title></head>
+            <head><title>ZenPOS API</title></head>
             <body style="font-family: sans-serif; padding: 50px;">
-                <h1>Kipchi POS API</h1>
+                <h1>ZenPOS API</h1>
                 <p>The service is running.</p>
                 <p><a href="/admin/">Admin</a></p>
             </body>
