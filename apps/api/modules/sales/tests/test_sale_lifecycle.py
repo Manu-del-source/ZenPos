@@ -10,9 +10,12 @@ implementation that provides them:
   whatever state the payment was in.
 """
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 
 import pytest
+from django.db import connection
 from rest_framework.test import APIClient
 
 from modules.accounts.models import UserBranchAccess
@@ -310,3 +313,47 @@ class TestVoidingASale:
         assert sale.total_amount == Decimal("200.00")
         assert sale.items.count() == 1
         assert sale.payments.get().amount == Decimal("200.00")
+
+
+@pytest.mark.django_db(transaction=True)
+class TestTwoCashiersOnTheLastItem:
+    """Two tills, one item left, at the same instant.
+
+    The stock check and the decrement happen while the product row is locked,
+    so the loser must see the shelf emptied by the winner rather than both
+    selling the same unit. This is the one failure mode a serial test suite
+    cannot prove, because it only exists when the requests overlap.
+    """
+
+    def test_only_one_cashier_sells_the_last_item(self, cashier, product):
+        product.stock_level = 1
+        product.save(update_fields=["stock_level"])
+
+        barrier = threading.Barrier(2, timeout=15)
+        statuses = []
+
+        def sell(reference):
+            client = APIClient()
+            client.force_authenticate(user=cashier)
+            barrier.wait()
+            try:
+                response = client.post(
+                    SALES_URL,
+                    sale_payload(product, quantity=1, client_reference=reference),
+                    format="json",
+                )
+                statuses.append(response.status_code)
+            finally:
+                # Each thread owns its own connection; leaving it open would
+                # keep the test database busy after the assertion.
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(sell, ["last-item-a", "last-item-b"]))
+
+        product.refresh_from_db()
+        assert sorted(statuses) == [201, 400], statuses
+        assert product.stock_level == 0
+        assert Sale.objects.count() == 1
+        assert StockAdjustment.objects.filter(notes__startswith="Sale ").count() == 1
+
