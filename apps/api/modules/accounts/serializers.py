@@ -73,8 +73,8 @@ class SetRolePermissionsSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True, format="hex_verbose")
-    organization = serializers.PrimaryKeyRelatedField(read_only=True)
-    default_branch = serializers.PrimaryKeyRelatedField(read_only=True, allow_null=True)
+    organization = serializers.SerializerMethodField()
+    default_branch = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
     branch_ids = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
@@ -87,6 +87,12 @@ class UserSerializer(serializers.ModelSerializer):
             "permissions", "is_active", "is_superuser",
         )
         read_only_fields = fields
+
+    def get_organization(self, obj):
+        return str(obj.organization_id) if obj.organization_id else None
+
+    def get_default_branch(self, obj):
+        return str(obj.default_branch_id) if obj.default_branch_id else None
 
     def get_roles(self, obj):
         return obj.role_names()
