@@ -79,7 +79,7 @@ class TestReceiptHtml:
     ):
         created = create_sale_via_api(authenticated_client, product)
         assert created.status_code == 201, created.data
-        sale = Sale.objects.get(sale_number="SALE-R1")
+        sale = Sale.objects.get()
 
         Payment.objects.create(
             sale=sale,
