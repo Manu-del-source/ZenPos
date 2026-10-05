@@ -20,6 +20,7 @@ from .services import (
 
 
 class PaymentViewSet(
+    OrganizationScopedMixin,
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
