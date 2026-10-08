@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Package, ReceiptText, Users, Settings,
-  LogOut, Menu, X, ChevronRight, Store, ShieldAlert, Truck,
+  LogOut, Menu, X, ChevronRight, Store, ShieldAlert, Truck, ClipboardList,
 } from 'lucide-react';
 import POS from './pages/POS';
 import Login from './pages/Login';
@@ -11,6 +11,7 @@ import Inventory from './pages/Inventory';
 import Orders from './pages/Orders';
 import Customers from './pages/Customers';
 import Suppliers from './pages/Suppliers';
+import PurchaseOrders from './pages/PurchaseOrders';
 import Landing from './pages/Landing';
 import SettingsPage from './pages/Settings';
 import { logout } from './services/api';
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { to: '/orders', label: 'Sales', icon: ReceiptText, permission: 'sales.view' },
   { to: '/inventory', label: 'Inventory', icon: Package, permission: ['inventory.view', 'products.view'] },
   { to: '/suppliers', label: 'Suppliers', icon: Truck, permission: ['purchases.view', 'purchases.create'] },
+  { to: '/purchase-orders', label: 'Purchase Orders', icon: ClipboardList, permission: ['purchases.view', 'purchases.create'] },
   { to: '/customers', label: 'Customers', icon: Users, permission: 'customers.manage' },
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, permission: 'reports.view' },
 ];
@@ -211,6 +213,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
             <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
             <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
+            <Route path="/purchase-orders" element={<ProtectedRoute><PurchaseOrders /></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
