@@ -17,6 +17,13 @@ class SupplierAdmin(admin.ModelAdmin):
     list_select_related = ("organization",)
 
 
+@admin.register(PurchaseOrderLine)
+class PurchaseOrderLineAdmin(admin.ModelAdmin):
+    list_display = ("purchase_order", "product", "quantity", "quantity_received", "unit_cost")
+    search_fields = ("purchase_order__number", "product__name", "product__barcode")
+    list_select_related = ("purchase_order", "product")
+
+
 class PurchaseOrderLineInline(admin.TabularInline):
     model = PurchaseOrderLine
     extra = 0
