@@ -226,6 +226,12 @@ class PurchaseOrderLine(BaseModel):
         validators=[MinValueValidator(Decimal("0.001"))],
         help_text="Ordered quantity. Decimals for weighed goods sold by the kg/litre.",
     )
+    quantity_received = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=Decimal("0"),
+        help_text="Cumulative quantity posted through goods received notes.",
+    )
     unit_cost = models.DecimalField(
         validators=[MinValueValidator(Decimal("0"))],
         help_text="Cost per unit the supplier agreed. Defaults to the product's cost price.",
@@ -244,3 +250,176 @@ class PurchaseOrderLine(BaseModel):
 
     def __str__(self):
         return f"{self.purchase_order_id}: {self.product_id} x {self.quantity}"
+
+    @property
+    def quantity_outstanding(self):
+        remaining = self.quantity - self.quantity_received
+        return remaining if remaining > 0 else Decimal("0")
+
+    @property
+    def line_total(self):
+        return self.quantity * self.unit_cost
+
+
+class GoodsReceivedNote(SoftDeleteModel):
+    """A delivery against one purchase order, for one branch.
+
+    Inventory changes only when the note is POSTED, and posting is atomic:
+    the note is locked, outstanding quantities are re-checked against the
+    live PO lines, stock moves, the PO's received totals update, and the
+    note flips to POSTED in one transaction. Repeating post is refused by
+    the status check under that lock.
+
+    Lifecycle:
+
+        DRAFT -> POSTED
+        DRAFT -> CANCELLED
+
+    POSTED and CANCELLED are terminal. A posted receipt is not un-received;
+    a mistake is a reversing adjustment, which keeps both facts.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        POSTED = "POSTED", "Posted"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    ALLOWED_TRANSITIONS = {
+        Status.DRAFT: {Status.POSTED, Status.CANCELLED},
+        Status.POSTED: set(),
+        Status.CANCELLED: set(),
+    }
+
+    EDITABLE_STATUSES = {Status.DRAFT}
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        related_name="goods_received_notes",
+        on_delete=models.CASCADE,
+    )
+    branch = models.ForeignKey(
+        "branches.Branch",
+        related_name="goods_received_notes",
+        on_delete=models.PROTECT,
+    )
+    supplier = models.ForeignKey(
+        Supplier,
+        related_name="goods_received_notes",
+        on_delete=models.PROTECT,
+    )
+    purchase_order = models.ForeignKey(
+        PurchaseOrder,
+        related_name="goods_receipts",
+        on_delete=models.PROTECT,
+    )
+    number = models.CharField(max_length=32, db_index=True)
+    delivery_note = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="Supplier delivery / reference number.",
+    )
+    received_date = models.DateField()
+    received_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        related_name="goods_receipts_received",
+        on_delete=models.SET_NULL,
+    )
+    posted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        related_name="goods_receipts_posted",
+        on_delete=models.SET_NULL,
+    )
+    posted_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "number"],
+                name="uniq_grn_org_number",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["organization", "status"], name="idx_grn_org_status"),
+            models.Index(fields=["purchase_order", "status"], name="idx_grn_po_status"),
+            models.Index(fields=["branch", "status"], name="idx_grn_branch_status"),
+        ]
+
+    def __str__(self):
+        return self.number
+
+    def can_transition_to(self, new_status) -> bool:
+        return new_status in self.ALLOWED_TRANSITIONS[self.status]
+
+    def is_editable(self) -> bool:
+        return self.status in self.EDITABLE_STATUSES
+
+
+class GoodsReceivedLine(BaseModel):
+    """One product on a goods received note.
+
+    ``ordered_quantity`` and ``previously_received`` are snapshots taken when
+    the line was written, so a posted GRN still explains what the receiver
+    saw. Posting re-checks the live PO line, not this snapshot, so two draft
+    GRNs cannot over-receive the same outstanding quantity.
+    """
+
+    grn = models.ForeignKey(
+        GoodsReceivedNote,
+        related_name="lines",
+        on_delete=models.CASCADE,
+    )
+    purchase_order_line = models.ForeignKey(
+        PurchaseOrderLine,
+        related_name="receipt_lines",
+        on_delete=models.PROTECT,
+    )
+    product = models.ForeignKey(
+        "catalog.Product",
+        related_name="goods_received_lines",
+        on_delete=models.PROTECT,
+    )
+    ordered_quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    previously_received = models.DecimalField(max_digits=12, decimal_places=3)
+    quantity_received = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
+    unit_cost = models.DecimalField(validators=[MinValueValidator(Decimal("0"))], **MONEY)
+    batch_number = models.CharField(max_length=64, blank=True, default="")
+    expiry_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["grn", "purchase_order_line"],
+                name="uniq_grn_line_po_line",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.grn_id}: {self.product_id} x {self.quantity_received}"
+
+    @property
+    def quantity_outstanding(self):
+        remaining = self.ordered_quantity - self.previously_received
+        return remaining if remaining > 0 else Decimal("0")
+
+    @property
+    def line_total(self):
+        return self.quantity_received * self.unit_cost
+

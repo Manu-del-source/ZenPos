@@ -18,7 +18,7 @@ class BranchViewSet(BranchScopedMixin, viewsets.ModelViewSet):
     client filtering a full list.
     """
 
-    queryset = Branch.objects.select_related("organization").all()
+    queryset = Branch.objects.select_related("organization", "manager").all()
     serializer_class = BranchSerializer
 
     # The Branch *is* the branch, so scoping filters on its own key.

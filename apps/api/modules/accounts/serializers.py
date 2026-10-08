@@ -8,7 +8,7 @@ from modules.core.audit import record_audit, snapshot
 from modules.core.models import AuditLog
 from modules.core.serializers import OrganizationScopedSerializerMixin
 
-from .models import Permission, Role, User
+from .models import Employee, Permission, Role, User
 from .permissions import permission_codes_for
 
 SAFE_USER_FIELDS = (
@@ -247,6 +247,54 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "after", "ip_address", "attempted_username",
         )
         read_only_fields = fields
+
+
+class EmployeeSerializer(OrganizationScopedSerializerMixin, serializers.ModelSerializer):
+    full_name = serializers.CharField(read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    role_name = serializers.CharField(source="role.name", read_only=True)
+    user_username = serializers.CharField(source="user.username", read_only=True)
+    organization_bound_fields = ("branch", "user")
+
+    class Meta:
+        model = Employee
+        fields = (
+            "id",
+            "organization",
+            "employee_number",
+            "first_name",
+            "last_name",
+            "full_name",
+            "phone",
+            "email",
+            "branch",
+            "branch_name",
+            "role",
+            "role_name",
+            "user",
+            "user_username",
+            "status",
+            "start_date",
+            "notes",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "organization",
+            "employee_number",
+            "full_name",
+            "branch_name",
+            "role_name",
+            "user_username",
+            "created_at",
+            "updated_at",
+        )
+
+    def validate_status(self, value):
+        if value not in Employee.Status.values:
+            raise serializers.ValidationError("Unknown employment status.")
+        return value
 
 
 class AuditedTokenObtainPairSerializer(TokenObtainPairSerializer):

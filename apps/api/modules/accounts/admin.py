@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import Permission, Role, RolePermission, User, UserBranchAccess, UserRole
+from .models import Employee, Permission, Role, RolePermission, User, UserBranchAccess, UserRole
 
 
 class UserRoleInline(admin.TabularInline):
@@ -71,3 +71,18 @@ class UserBranchAccessAdmin(admin.ModelAdmin):
     list_filter = ("is_default",)
     list_select_related = ("user", "branch")
     autocomplete_fields = ("user", "branch")
+
+
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = (
+        "employee_number",
+        "first_name",
+        "last_name",
+        "branch",
+        "status",
+        "organization",
+    )
+    list_filter = ("status", "organization")
+    search_fields = ("employee_number", "first_name", "last_name", "phone")
+    list_select_related = ("branch", "organization", "role", "user")

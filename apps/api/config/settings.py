@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "modules.customers",
     "modules.sales",
     "modules.payments",
+    "modules.loyalty",
     "modules.reporting",
 ]
 

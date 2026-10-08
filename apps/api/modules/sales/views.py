@@ -12,7 +12,10 @@ from rest_framework.response import Response
 from modules.core.audit import record_audit
 from modules.core.mixins import BranchScopedMixin
 
-from .models import Sale, SaleItem
+from django.db import transaction
+from rest_framework.status import HTTP_400_BAD_REQUEST as HTTP_BAD_REQUEST
+
+from .models import Sale, SaleItem, SaleReturn
 from .receipts import (
     COLUMNS_58MM,
     COLUMNS_80MM,
@@ -20,8 +23,8 @@ from .receipts import (
     build_receipt_context,
     render_thermal_receipt,
 )
-from .serializers import SaleSerializer
-from .services import void_sale
+from .serializers import SaleReturnSerializer, SaleSerializer
+from .services import complete_return, void_sale
 
 
 class SaleViewSet(
@@ -57,6 +60,7 @@ class SaleViewSet(
         "create": ("sales.create",),
         "void": ("sales.refund",),
         "reports": ("reports.view",),
+        "return_items": ("returns.request",),
     }
 
     def get_queryset(self):
@@ -118,6 +122,27 @@ class SaleViewSet(
         headers = self.get_success_headers(serializer.data)
         status_code = 200 if serializer.replayed else 201
         return Response(serializer.data, status=status_code, headers=headers)
+
+    @action(detail=True, methods=["post"], url_path="returns")
+    def return_items(self, request, pk=None):
+        """Cashier requests a return against this sale."""
+        sale = self.get_object()
+        payload = {**request.data, "sale": str(sale.pk)}
+        serializer = SaleReturnSerializer(data=payload, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            serializer.save(requested_by=request.user, number=_next_return_number())
+            ret = serializer.instance
+            record_audit(
+                action="return.requested",
+                entity_type="sale_return",
+                entity_id=ret.pk,
+                actor=request.user,
+                request=request,
+                branch=sale.branch,
+                after={"sale": sale.sale_number, "reason": ret.reason},
+            )
+        return Response(SaleReturnSerializer(ret, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])
     def void(self, request, pk=None):
@@ -212,3 +237,160 @@ class SaleViewSet(
                 "top_products": top_products,
             }
         )
+
+
+def _next_return_number() -> str:
+    last = (
+        SaleReturn.objects.order_by("-number")
+        .values_list("number", flat=True)
+        .first()
+    )
+    if last is None or not last.startswith("RET-"):
+        return "RET-000001"
+    return f"RET-{int(last[4:]) + 1:06d}"
+
+
+class SaleReturnViewSet(
+    BranchScopedMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
+    queryset = SaleReturn.objects.select_related(
+        "sale", "branch", "customer", "requested_by", "authorized_by", "completed_by"
+    ).prefetch_related("lines__product")
+    serializer_class = SaleReturnSerializer
+    organization_field = "organization"
+    branch_field = "branch"
+
+    required_permissions = ("sales.view",)
+    required_permissions_by_action = {
+        "create": ("returns.request",),
+        "authorize": ("sales.refund",),
+        "complete": ("sales.refund",),
+        "reject": ("sales.refund",),
+        "cancel": ("returns.request",),
+    }
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        params = self.request.query_params
+        status_param = params.get("status")
+        if status_param:
+            queryset = queryset.filter(status=status_param.upper())
+        sale = params.get("sale")
+        if sale:
+            queryset = queryset.filter(sale_id=sale)
+        reason = params.get("reason")
+        if reason:
+            queryset = queryset.filter(reason=reason.upper())
+        return queryset
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            serializer.save(requested_by=self.request.user, number=_next_return_number())
+            ret = serializer.instance
+            record_audit(
+                action="return.requested",
+                entity_type="sale_return",
+                entity_id=ret.pk,
+                actor=self.request.user,
+                request=self.request,
+                branch=ret.branch,
+                after={"sale": str(ret.sale_id), "reason": ret.reason},
+            )
+
+    def _lock(self):
+        obj = self.get_object()
+        return SaleReturn.objects.select_for_update().select_related("sale").get(pk=obj.pk)
+
+    @action(detail=True, methods=["post"])
+    def authorize(self, request, pk=None):
+        with transaction.atomic():
+            ret = self._lock()
+            if not ret.can_transition_to(SaleReturn.Status.AUTHORIZED):
+                return Response(
+                    {"detail": f"Cannot authorize a return in status {ret.status}."},
+                    status=HTTP_BAD_REQUEST,
+                )
+            ret.status = SaleReturn.Status.AUTHORIZED
+            ret.authorized_by = request.user
+            ret.authorized_at = timezone.now()
+            ret.save(update_fields=["status", "authorized_by", "authorized_at"])
+            record_audit(
+                action="refund.authorized",
+                entity_type="sale_return",
+                entity_id=ret.pk,
+                actor=request.user,
+                request=request,
+                branch=ret.branch,
+                after={"status": ret.status, "sale": str(ret.sale_id)},
+            )
+        return Response(self.get_serializer(ret).data)
+
+    @action(detail=True, methods=["post"])
+    def complete(self, request, pk=None):
+        with transaction.atomic():
+            ret = self._lock()
+            if ret.status == SaleReturn.Status.REQUESTED:
+                ret.status = SaleReturn.Status.AUTHORIZED
+                ret.authorized_by = request.user
+                ret.authorized_at = timezone.now()
+                ret.save(update_fields=["status", "authorized_by", "authorized_at"])
+                record_audit(
+                    action="refund.authorized",
+                    entity_type="sale_return",
+                    entity_id=ret.pk,
+                    actor=request.user,
+                    request=request,
+                    branch=ret.branch,
+                    after={"status": ret.status},
+                )
+            ret = complete_return(sale_return=ret, actor=request.user, request=request)
+        return Response(self.get_serializer(ret).data)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        with transaction.atomic():
+            ret = self._lock()
+            if not ret.can_transition_to(SaleReturn.Status.REJECTED):
+                return Response(
+                    {"detail": f"Cannot reject a return in status {ret.status}."},
+                    status=HTTP_BAD_REQUEST,
+                )
+            ret.status = SaleReturn.Status.REJECTED
+            ret.save(update_fields=["status"])
+            record_audit(
+                action="return.rejected",
+                entity_type="sale_return",
+                entity_id=ret.pk,
+                actor=request.user,
+                request=request,
+                branch=ret.branch,
+                after={"status": ret.status},
+            )
+        return Response(self.get_serializer(ret).data)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        with transaction.atomic():
+            ret = self._lock()
+            if not ret.can_transition_to(SaleReturn.Status.CANCELLED):
+                return Response(
+                    {"detail": f"Cannot cancel a return in status {ret.status}."},
+                    status=HTTP_BAD_REQUEST,
+                )
+            ret.status = SaleReturn.Status.CANCELLED
+            ret.save(update_fields=["status"])
+            record_audit(
+                action="return.cancelled",
+                entity_type="sale_return",
+                entity_id=ret.pk,
+                actor=request.user,
+                request=request,
+                branch=ret.branch,
+                after={"status": ret.status},
+            )
+        return Response(self.get_serializer(ret).data)
+

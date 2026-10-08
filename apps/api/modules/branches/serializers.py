@@ -7,6 +7,12 @@ class BranchSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True, format="hex_verbose")
     organization = serializers.SerializerMethodField()
     organization_name = serializers.ReadOnlyField(source="organization.name")
+    manager_name = serializers.SerializerMethodField()
+
+    def get_manager_name(self, obj):
+        if obj.manager_id is None:
+            return None
+        return obj.manager.get_username()
 
     def get_organization(self, obj):
         return str(obj.organization_id)
@@ -33,6 +39,9 @@ class BranchSerializer(serializers.ModelSerializer):
             "code",
             "address",
             "phone",
+            "timezone",
+            "manager",
+            "manager_name",
             "is_active",
             "created_at",
             "updated_at",

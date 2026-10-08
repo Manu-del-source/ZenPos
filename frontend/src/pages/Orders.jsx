@@ -27,7 +27,10 @@ const StatusPill = ({ status }) => (
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export default function Orders({ user }) {
+export default function Orders({ user: userProp }) {
+  let storedUser = {};
+  try { storedUser = JSON.parse(localStorage.getItem('user') || '{}'); } catch { /* ignore */ }
+  const user = userProp || storedUser;
   const [sales, setSales] = useState([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -36,6 +39,8 @@ export default function Orders({ user }) {
   const [applied, setApplied] = useState({ search: '', status: '', date_from: '', date_to: '' });
   const [selected, setSelected] = useState(null);
   const [voiding, setVoiding] = useState(false);
+  const [returning, setReturning] = useState(null);
+  const [returnBusy, setReturnBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -296,6 +301,27 @@ export default function Orders({ user }) {
                   <button className="btn-secondary" onClick={() => printReceipt(selected.id)}>
                     <Printer size={16} /> Print receipt
                   </button>
+                  {selected.status === 'COMPLETED' && (
+                    <button
+                      className="btn-secondary"
+                      onClick={() => setReturning({
+                        sale: selected,
+                        reason: 'CUSTOMER_CHANGE',
+                        refund_method: 'CASH',
+                        lines: (selected.items || []).map((item) => ({
+                          sale_item: item.id,
+                          product_name: item.product_name,
+                          original: item.quantity,
+                          already: item.quantity_returned || 0,
+                          quantity: 0,
+                          restock: true,
+                          unit_price: item.unit_price,
+                        })),
+                      })}
+                    >
+                      Return items
+                    </button>
+                  )}
                   {selected.status !== 'VOIDED' && can(user, 'sales.refund') && (
                     <button
                       className="btn-secondary !border-red-500/30 !text-red-300 hover:!bg-red-500/10"
@@ -310,6 +336,111 @@ export default function Orders({ user }) {
                   <p className="text-xs uppercase tracking-wider text-slate-500">Total</p>
                   <p className="text-2xl font-black text-white">{money(selected.total_amount)}</p>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {returning && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="panel w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">Return items</h2>
+                <p className="panel-subtitle">{returning.sale.sale_number}</p>
+              </div>
+              <button className="btn-secondary !px-3" onClick={() => setReturning(null)}><X size={17} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-slate-500 text-[10px] uppercase tracking-widest">
+                    <th className="text-left pb-2">Product</th>
+                    <th className="text-right pb-2">Sold</th>
+                    <th className="text-right pb-2">Returned</th>
+                    <th className="text-right pb-2">Available</th>
+                    <th className="text-right pb-2">Return qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {returning.lines.map((line, i) => (
+                    <tr key={line.sale_item} className="border-t border-slate-800">
+                      <td className="py-2 text-white">{line.product_name}</td>
+                      <td className="py-2 text-right text-slate-400">{line.original}</td>
+                      <td className="py-2 text-right text-slate-400">{line.already}</td>
+                      <td className="py-2 text-right text-slate-300">{line.original - line.already}</td>
+                      <td className="py-2 text-right">
+                        <input
+                          type="number"
+                          min="0"
+                          max={line.original - line.already}
+                          className="w-20 bg-slate-950 border border-slate-800 p-2 rounded-lg text-white text-right"
+                          value={line.quantity}
+                          onChange={(e) => {
+                            const lines = returning.lines.map((l, idx) => idx === i ? { ...l, quantity: Number(e.target.value) } : l);
+                            setReturning({ ...returning, lines });
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="grid grid-cols-2 gap-3">
+                <select className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-white" value={returning.reason} onChange={(e) => setReturning({ ...returning, reason: e.target.value })}>
+                  <option value="CUSTOMER_CHANGE">Customer changed mind</option>
+                  <option value="DAMAGED">Damaged</option>
+                  <option value="WRONG_ITEM">Wrong item</option>
+                  <option value="EXPIRED">Expired</option>
+                  <option value="OTHER">Other</option>
+                </select>
+                <select className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-white" value={returning.refund_method} onChange={(e) => setReturning({ ...returning, refund_method: e.target.value })}>
+                  <option value="CASH">Cash refund</option>
+                  <option value="MPESA">M-Pesa</option>
+                  <option value="STORE_CREDIT">Store credit</option>
+                </select>
+              </div>
+              <p className="text-sm text-white font-bold">
+                Refund {money(returning.lines.reduce((s, l) => s + Number(l.quantity || 0) * Number(l.unit_price || 0), 0))}
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button className="btn-secondary" onClick={() => setReturning(null)}>Cancel</button>
+                <button
+                  className="btn-primary"
+                  disabled={returnBusy}
+                  onClick={async () => {
+                    const lines = returning.lines.filter((l) => Number(l.quantity) > 0).map((l) => ({
+                      sale_item: l.sale_item,
+                      quantity: l.quantity,
+                      restock: returning.reason !== 'DAMAGED',
+                    }));
+                    if (!lines.length) return toast.error('Enter a quantity to return.');
+                    setReturnBusy(true);
+                    try {
+                      const { data } = await api.post(`/sales/${returning.sale.id}/returns/`, {
+                        reason: returning.reason,
+                        refund_method: returning.refund_method,
+                        lines,
+                      });
+                      if (can(user, 'sales.refund')) {
+                        await api.post(`/returns/${data.id}/complete/`);
+                        toast.success('Return completed and refund recorded');
+                      } else {
+                        toast.success('Return requested — waiting for authorization');
+                      }
+                      setReturning(null);
+                      setSelected(null);
+                      load();
+                    } catch (err) {
+                      toast.error(apiError(err, 'Could not process the return'));
+                    } finally {
+                      setReturnBusy(false);
+                    }
+                  }}
+                >
+                  {returnBusy ? 'Submitting…' : 'Submit return'}
+                </button>
               </div>
             </div>
           </div>

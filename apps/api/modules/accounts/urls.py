@@ -4,6 +4,7 @@ from config.routing import ModuleRouter
 
 from .views import (
     AuditLogViewSet,
+    EmployeeViewSet,
     LoginView,
     LogoutView,
     MeView,
@@ -17,6 +18,7 @@ router = ModuleRouter()
 router.register("roles", RoleViewSet, basename="role")
 router.register("permissions", PermissionViewSet, basename="permission")
 router.register("users", UserViewSet, basename="user")
+router.register("employees", EmployeeViewSet, basename="employee")
 router.register("audit-logs", AuditLogViewSet, basename="audit-log")
 
 urlpatterns = [

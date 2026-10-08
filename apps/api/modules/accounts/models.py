@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from modules.core.models import BaseModel
+from modules.core.models import BaseModel, SoftDeleteModel
 
 
 class RoleQuerySet(models.QuerySet):
@@ -251,3 +251,75 @@ class UserBranchAccess(BaseModel):
 
     def __str__(self):
         return f"{self.user} @ {self.branch.name}"
+
+
+class Employee(SoftDeleteModel):
+    """A retail staff record, optionally linked to a login account.
+
+    The user account is how someone signs in. This row is how the shop talks
+    about them as an employee: number, status, start date. Biometric or
+    smart-card identifiers belong here later, not on User.
+    """
+
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE", "Active"
+        INACTIVE = "INACTIVE", "Inactive"
+        SUSPENDED = "SUSPENDED", "Suspended"
+        TERMINATED = "TERMINATED", "Terminated"
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        related_name="employees",
+        on_delete=models.CASCADE,
+    )
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        related_name="employee",
+        on_delete=models.SET_NULL,
+    )
+    employee_number = models.CharField(max_length=32)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=20, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    branch = models.ForeignKey(
+        "branches.Branch",
+        null=True,
+        blank=True,
+        related_name="employees",
+        on_delete=models.SET_NULL,
+    )
+    role = models.ForeignKey(
+        Role,
+        null=True,
+        blank=True,
+        related_name="employees",
+        on_delete=models.SET_NULL,
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        db_index=True,
+    )
+    start_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["last_name", "first_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "employee_number"],
+                name="uniq_employee_org_number",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.employee_number} {self.first_name} {self.last_name}"
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()
+
