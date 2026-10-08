@@ -13,6 +13,7 @@ export default function Customers() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [ledger, setLedger] = useState(null);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -137,6 +138,15 @@ export default function Customers() {
                   <p className="text-xs uppercase tracking-wider text-slate-500">Loyalty</p>
                   <p className="font-semibold text-slate-200">{customer.loyalty_points ?? 0} pts</p>
                 </div>
+                <button className="btn-secondary !px-3" onClick={async () => {
+                  try {
+                    const { data } = await api.get('/loyalty-accounts/', { params: { customer: customer.id } });
+                    const rows = Array.isArray(data) ? data : data.results || [];
+                    setLedger({ customer, account: rows[0] || { points_balance: customer.loyalty_points, entries: [] } });
+                  } catch {
+                    setLedger({ customer, account: { points_balance: customer.loyalty_points, entries: [] } });
+                  }
+                }}>Ledger</button>
                 <button className="btn-secondary !px-3" onClick={() => openEdit(customer)} aria-label={`Edit ${customer.name}`}>
                   <Pencil size={15} />
                 </button>
@@ -146,6 +156,36 @@ export default function Customers() {
         )}
       </div>
 
+      {ledger && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <div className="panel w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <div className="panel-header">
+              <div>
+                <h2 className="panel-title">{ledger.customer.name}</h2>
+                <p className="panel-subtitle">{ledger.account.points_balance || 0} points</p>
+              </div>
+              <button className="btn-secondary !px-3" onClick={() => setLedger(null)}><X size={16} /></button>
+            </div>
+            <div className="p-5">
+              {(ledger.account.entries || []).length === 0 ? (
+                <p className="text-sm text-slate-500">No ledger entries yet. Points are awarded on completed sales.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <tbody>
+                    {ledger.account.entries.map((row) => (
+                      <tr key={row.id} className="border-t border-slate-800">
+                        <td className="py-2 text-slate-400 text-xs">{new Date(row.created_at).toLocaleString()}</td>
+                        <td className="py-2 text-slate-300">{row.action}</td>
+                        <td className={`py-2 text-right font-bold ${row.points < 0 ? 'text-red-400' : 'text-emerald-400'}`}>{row.points > 0 ? '+' : ''}{row.points}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {modalOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="panel w-full max-w-md shadow-2xl">

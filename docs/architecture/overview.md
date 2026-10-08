@@ -60,13 +60,11 @@ reporting       read-only aggregates and reports
 sync            idempotency keys, sync events
 ```
 
-Implemented so far: `organizations`, `branches`, `accounts` and `catalog` as
-phase 3 designed them, plus `customers`, `inventory`, `sales` and `reporting` —
-which exist as packages but still hold the **pre-rebuild single-branch**
-implementations, replaced in phases 7, 6 and 9. `payments` is next: phase 5
-creates it for the payment table, the M-Pesa STK-push adapter and receipts.
-`purchasing`, `loyalty` and `sync` are not created yet; a package appears with
-the phase that first needs it, so empty directories are never added in advance.
+Implemented: `organizations`, `branches`, `accounts`, `catalog`, `inventory`
+(ledger, branch stock, transfers, adjustments), `purchasing` (suppliers, purchase
+orders, goods received notes), `customers`, `sales` (including returns/refunds),
+`payments`, `loyalty` (rule, account, ledger) and `reporting`. `sync` is not
+created yet; a package appears with the phase that first needs it.
 
 The package is `modules/` rather than `apps/` because the repository root
 already contains a directory named `apps/`. A nested `apps/api/apps/` package

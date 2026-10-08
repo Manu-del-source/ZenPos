@@ -22,6 +22,14 @@ class Branch(BaseModel):
     code = models.CharField(max_length=32)
     address = models.TextField(blank=True)
     phone = models.CharField(max_length=20, blank=True)
+    timezone = models.CharField(max_length=64, default="Africa/Nairobi")
+    manager = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        related_name="managed_branches",
+        on_delete=models.SET_NULL,
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:

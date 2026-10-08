@@ -138,6 +138,161 @@ class SaleItem(models.Model):
         null=True,
         blank=True,
     )
+    quantity_returned = models.IntegerField(
+        default=0,
+        help_text="Cumulative quantity posted through completed returns.",
+    )
 
     def __str__(self):
         return f"{self.quantity} x {self.product_id}"
+
+    @property
+    def quantity_returnable(self):
+        remaining = self.quantity - self.quantity_returned
+        return remaining if remaining > 0 else 0
+
+
+class SaleReturn(models.Model):
+    """A retail return against one completed sale.
+
+    Lifecycle:
+
+        REQUESTED -> AUTHORIZED -> COMPLETED
+        REQUESTED -> REJECTED
+        REQUESTED / AUTHORIZED -> CANCELLED
+
+    Inventory and refunds move only on COMPLETED, once, under a row lock.
+    """
+
+    class Status(models.TextChoices):
+        REQUESTED = "REQUESTED", "Requested"
+        AUTHORIZED = "AUTHORIZED", "Authorized"
+        COMPLETED = "COMPLETED", "Completed"
+        REJECTED = "REJECTED", "Rejected"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    class Reason(models.TextChoices):
+        DAMAGED = "DAMAGED", "Damaged"
+        WRONG_ITEM = "WRONG_ITEM", "Wrong item"
+        CUSTOMER_CHANGE = "CUSTOMER_CHANGE", "Customer changed mind"
+        EXPIRED = "EXPIRED", "Expired"
+        OTHER = "OTHER", "Other"
+
+    class RefundMethod(models.TextChoices):
+        CASH = "CASH", "Cash"
+        MPESA = "MPESA", "M-Pesa"
+        STORE_CREDIT = "STORE_CREDIT", "Store credit"
+
+    ALLOWED_TRANSITIONS = {
+        Status.REQUESTED: {Status.AUTHORIZED, Status.REJECTED, Status.CANCELLED},
+        Status.AUTHORIZED: {Status.COMPLETED, Status.CANCELLED},
+        Status.COMPLETED: set(),
+        Status.REJECTED: set(),
+        Status.CANCELLED: set(),
+    }
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        related_name="sale_returns",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+    branch = models.ForeignKey(
+        "branches.Branch",
+        related_name="sale_returns",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+    sale = models.ForeignKey(Sale, related_name="returns", on_delete=models.PROTECT)
+    customer = models.ForeignKey(
+        "customers.Customer",
+        null=True,
+        blank=True,
+        related_name="returns",
+        on_delete=models.SET_NULL,
+    )
+    number = models.CharField(max_length=50, unique=True, db_index=True)
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.REQUESTED,
+        db_index=True,
+    )
+    reason = models.CharField(max_length=20, choices=Reason.choices)
+    notes = models.TextField(blank=True, default="")
+    refund_method = models.CharField(
+        max_length=16,
+        choices=RefundMethod.choices,
+        default=RefundMethod.CASH,
+    )
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="returns_requested",
+        on_delete=models.PROTECT,
+    )
+    authorized_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        related_name="returns_authorized",
+        on_delete=models.PROTECT,
+    )
+    authorized_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        related_name="returns_completed",
+        on_delete=models.PROTECT,
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["organization", "created_at"], name="idx_return_org_created"),
+            models.Index(fields=["sale", "status"], name="idx_return_sale_status"),
+        ]
+
+    def __str__(self):
+        return self.number
+
+    def can_transition_to(self, new_status) -> bool:
+        return new_status in self.ALLOWED_TRANSITIONS[self.status]
+
+
+class SaleReturnLine(models.Model):
+    sale_return = models.ForeignKey(
+        SaleReturn, related_name="lines", on_delete=models.CASCADE
+    )
+    sale_item = models.ForeignKey(
+        SaleItem, related_name="return_lines", on_delete=models.PROTECT
+    )
+    product = models.ForeignKey("catalog.Product", on_delete=models.PROTECT)
+    original_quantity = models.IntegerField()
+    already_returned = models.IntegerField(default=0)
+    quantity = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    line_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    restock = models.BooleanField(
+        default=True,
+        help_text="False sends the units to damaged rather than sellable stock.",
+    )
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sale_return", "sale_item"],
+                name="uniq_return_line_sale_item",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.sale_return_id}: {self.product_id} x {self.quantity}"
+

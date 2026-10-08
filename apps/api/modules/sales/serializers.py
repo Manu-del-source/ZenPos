@@ -8,11 +8,12 @@ from modules.branches.models import Branch
 from modules.catalog.models import Product
 from modules.core.audit import record_audit
 from modules.core.serializers import OrganizationScopedSerializerMixin
-from modules.inventory.models import StockAdjustment
+from modules.inventory.models import InventoryMovement, StockAdjustment
+from modules.inventory.services import apply_stock_movement, available_for_sale
 from modules.payments.serializers import PaymentSerializer
 from modules.payments.services import complete_cash_payment
 
-from .models import Sale, SaleItem
+from .models import Sale, SaleItem, SaleReturn, SaleReturnLine
 
 # Money is handled to the cent everywhere. ROUND_HALF_UP is what a cashier's
 # till and every Kenyan tax invoice expect; Python's default (banker's
@@ -80,6 +81,7 @@ class SaleItemSerializer(OrganizationScopedSerializerMixin, serializers.ModelSer
             "line_total",
             "tax_rate_name",
             "tax_rate_percent",
+            "quantity_returned",
         )
         read_only_fields = (
             "unit_price",
@@ -88,6 +90,7 @@ class SaleItemSerializer(OrganizationScopedSerializerMixin, serializers.ModelSer
             "tax_amount",
             "tax_rate_name",
             "tax_rate_percent",
+            "quantity_returned",
         )
 
     def get_line_total(self, obj) -> Decimal:
@@ -356,9 +359,10 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             # Non-stocked products (services, fees, etc.) never participate in
             # inventory validation or stock movements.
             if product.track_inventory:
-                if product.stock_level < quantity:
+                available = available_for_sale(product, branch)
+                if available < quantity:
                     raise serializers.ValidationError(
-                        f"Insufficient stock for {product.name}. Available: {product.stock_level}."
+                        f"Insufficient stock for {product.name}. Available: {available}."
                     )
 
             SaleItem.objects.create(sale=sale, **item_data, **line)
@@ -368,23 +372,26 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
                 # customer completes the STK prompt and is released automatically
                 # if the provider reports failure. Cash sales are immediately
                 # completed, so the same movement is the final deduction.
-                product.stock_level -= quantity
-                product.save(update_fields=["stock_level", "updated_at"])
-
-                StockAdjustment.objects.create(
-                    product=product,
-                    user=sale.cashier,
-                    quantity=-quantity,
-                    type=StockAdjustment.AdjustmentType.ADJUST,
-                    notes=(
-                        f"Sale {sale.sale_number}"
-                        + (
-                            " - M-Pesa pending reservation"
-                            if sale.payment_method == Sale.PaymentMethod.MPESA
-                            else ""
-                        )
-                    ),
+                notes = f"Sale {sale.sale_number}" + (
+                    " - M-Pesa pending reservation"
+                    if sale.payment_method == Sale.PaymentMethod.MPESA
+                    else ""
                 )
+                apply_stock_movement(
+                    product=product,
+                    quantity=-quantity,
+                    movement_type=InventoryMovement.MovementType.SALE,
+                    organization=sale.organization,
+                    branch=branch,
+                    reference_type="sale",
+                    reference_id=sale.pk,
+                    actor=sale.cashier,
+                    unit_cost=line.get("unit_cost"),
+                    notes=notes,
+                    request=self.context.get("request"),
+                    legacy_adjustment_type=StockAdjustment.AdjustmentType.ADJUST,
+                )
+                product.refresh_from_db()
                 record_audit(
                     action="stock.adjusted",
                     entity_type="product",
@@ -415,3 +422,155 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
 def timezone_now_stamp():
     from django.utils import timezone
     return timezone.now().strftime("%Y%m%d%H%M%S")
+
+
+class SaleReturnLineSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+
+    class Meta:
+        model = SaleReturnLine
+        fields = (
+            "id",
+            "sale_item",
+            "product",
+            "product_name",
+            "original_quantity",
+            "already_returned",
+            "quantity",
+            "unit_price",
+            "line_amount",
+            "restock",
+        )
+        read_only_fields = (
+            "id",
+            "product",
+            "product_name",
+            "original_quantity",
+            "already_returned",
+            "unit_price",
+            "line_amount",
+        )
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Return quantity must be greater than zero.")
+        return value
+
+
+class SaleReturnSerializer(OrganizationScopedSerializerMixin, serializers.ModelSerializer):
+    lines = SaleReturnLineSerializer(many=True)
+    sale_number = serializers.CharField(source="sale.sale_number", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    requested_by_name = serializers.CharField(source="requested_by.username", read_only=True)
+    authorized_by_name = serializers.CharField(source="authorized_by.username", read_only=True)
+    customer_name = serializers.CharField(source="customer.name", read_only=True)
+
+    organization_bound_fields = ("sale",)
+
+    class Meta:
+        model = SaleReturn
+        fields = (
+            "id",
+            "number",
+            "organization",
+            "branch",
+            "branch_name",
+            "sale",
+            "sale_number",
+            "customer",
+            "customer_name",
+            "status",
+            "reason",
+            "notes",
+            "refund_method",
+            "refund_amount",
+            "lines",
+            "requested_by",
+            "requested_by_name",
+            "authorized_by",
+            "authorized_by_name",
+            "authorized_at",
+            "completed_by",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "number",
+            "organization",
+            "branch",
+            "branch_name",
+            "sale_number",
+            "customer",
+            "customer_name",
+            "status",
+            "refund_amount",
+            "requested_by",
+            "requested_by_name",
+            "authorized_by",
+            "authorized_by_name",
+            "authorized_at",
+            "completed_by",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        )
+
+    def validate_sale(self, sale):
+        if sale.status != Sale.Status.COMPLETED:
+            raise serializers.ValidationError("Only a completed sale can be returned.")
+        return sale
+
+    def create(self, validated_data):
+        lines = validated_data.pop("lines")
+        if not lines:
+            raise serializers.ValidationError({"lines": "Select at least one item to return."})
+        sale = validated_data["sale"]
+        built = []
+        refund = Decimal("0.00")
+        for line in lines:
+            item = line["sale_item"]
+            if item.sale_id != sale.pk:
+                raise serializers.ValidationError(
+                    {"lines": "A return line must belong to the original sale."}
+                )
+            qty = line["quantity"]
+            returnable = item.quantity_returnable
+            if qty > returnable:
+                raise serializers.ValidationError(
+                    {
+                        "lines": (
+                            f"Cannot return more than sold for {item.product.name}. "
+                            f"Available to return: {returnable}."
+                        )
+                    }
+                )
+            unit_price = item.unit_price
+            line_amount = (unit_price * qty).quantize(QUANTUM, rounding=ROUND_HALF_UP)
+            refund += line_amount
+            built.append(
+                {
+                    "sale_item": item,
+                    "product": item.product,
+                    "original_quantity": item.quantity,
+                    "already_returned": item.quantity_returned,
+                    "quantity": qty,
+                    "unit_price": unit_price,
+                    "line_amount": line_amount,
+                    "restock": line.get("restock", True),
+                }
+            )
+
+        sale_return = SaleReturn.objects.create(
+            **validated_data,
+            organization=sale.organization,
+            branch=sale.branch,
+            customer=sale.customer,
+            refund_amount=refund,
+        )
+        SaleReturnLine.objects.bulk_create(
+            SaleReturnLine(sale_return=sale_return, **data) for data in built
+        )
+        return sale_return
+

@@ -14,10 +14,11 @@ from modules.core.audit import record_audit, snapshot
 from modules.core.mixins import OrganizationScopedMixin
 from modules.core.models import AuditLog
 
-from .models import Permission, Role, User, UserBranchAccess, UserRole
+from .models import Employee, Permission, Role, User, UserBranchAccess, UserRole
 from .serializers import (
     AuditLogSerializer,
     BranchAccessAssignmentSerializer,
+    EmployeeSerializer,
     PermissionSerializer,
     RoleAssignmentSerializer,
     RoleSerializer,
@@ -483,3 +484,101 @@ class UserViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
             )
 
         return Response({"detail": "Password updated."}, status=status.HTTP_200_OK)
+
+
+def _next_employee_number(organization) -> str:
+    last = (
+        Employee.all_objects.filter(organization=organization)
+        .order_by("-employee_number")
+        .values_list("employee_number", flat=True)
+        .first()
+    )
+    if last is None or not last.startswith("EMP-"):
+        return "EMP-000001"
+    try:
+        return f"EMP-{int(last[4:]) + 1:06d}"
+    except ValueError:
+        return "EMP-000001"
+
+
+class EmployeeViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
+    queryset = Employee.objects.select_related("branch", "role", "user", "organization")
+    serializer_class = EmployeeSerializer
+
+    required_permissions = ("users.manage",)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        params = self.request.query_params
+        status_param = params.get("status")
+        if status_param:
+            queryset = queryset.filter(status=status_param.upper())
+        branch = params.get("branch")
+        if branch:
+            queryset = queryset.filter(branch_id=branch)
+        search = params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(employee_number__icontains=search)
+                | Q(phone__icontains=search)
+            )
+        return queryset
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            organization = self.get_organization()
+            serializer.save(
+                organization=organization,
+                employee_number=_next_employee_number(organization),
+            )
+            emp = serializer.instance
+            record_audit(
+                action="staff.created",
+                entity_type="employee",
+                entity_id=emp.pk,
+                actor=self.request.user,
+                request=self.request,
+                branch=emp.branch,
+                after=snapshot(emp),
+            )
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            before = snapshot(serializer.instance)
+            serializer.save()
+            action = (
+                "staff.status_changed"
+                if before.get("status") != serializer.instance.status
+                else "staff.updated"
+            )
+            record_audit(
+                action=action,
+                entity_type="employee",
+                entity_id=serializer.instance.pk,
+                actor=self.request.user,
+                request=self.request,
+                branch=serializer.instance.branch,
+                before=before,
+                after=snapshot(serializer.instance),
+            )
+
+    def destroy(self, request, *args, **kwargs):
+        emp = self.get_object()
+        with transaction.atomic():
+            before = snapshot(emp)
+            emp.status = Employee.Status.TERMINATED
+            emp.soft_delete()
+            record_audit(
+                action="staff.status_changed",
+                entity_type="employee",
+                entity_id=emp.pk,
+                actor=request.user,
+                request=request,
+                branch=emp.branch,
+                before=before,
+                after={"status": emp.status, "deleted_at": str(emp.deleted_at)},
+            )
+        return Response(EmployeeSerializer(emp, context={"request": request}).data)
+

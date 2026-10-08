@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  CheckCircle2, ClipboardList, FileText, Plus, RotateCcw, Search, Send, Trash2, X,
+  CheckCircle2, ClipboardList, FileText, PackageCheck, Plus, RotateCcw, Search, Send, Trash2, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { apiError } from '../services/api';
@@ -30,6 +31,7 @@ const money = (value) =>
 const emptyLine = { product: '', quantity: '', unit_cost: '' };
 
 const PurchaseOrders = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -282,6 +284,14 @@ const PurchaseOrders = () => {
                 </td>
                 <td className="p-5 text-center whitespace-nowrap">
                   {(STATUS_ACTIONS[order.status] || []).map((a) => actionButton(order, a))}
+                  {['APPROVED', 'PARTIALLY_RECEIVED'].includes(order.status) && (canCreate || canApprove) && (
+                    <button
+                      onClick={() => navigate(`/goods-receiving?po=${order.id}`)}
+                      className="ml-2 px-3 py-2 bg-slate-800 rounded-lg text-blue-400 text-xs font-bold hover:text-blue-300 inline-flex items-center gap-1"
+                    >
+                      <PackageCheck size={14} /> Receive
+                    </button>
+                  )}
                   {order.status === 'DRAFT' && canCreate && (
                     <button
                       onClick={() => remove(order)}

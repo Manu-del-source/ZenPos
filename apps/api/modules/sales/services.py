@@ -89,16 +89,22 @@ def restore_sale_stock(
         # the dependency order, and the import direction rule is worth keeping
         # honest even where Python would allow the shortcut.
         from modules.catalog.models import Product
+        from modules.inventory.models import InventoryMovement
+        from modules.inventory.services import apply_stock_movement
 
         product = Product.objects.select_for_update().get(pk=product_id)
-        product.stock_level += owed
-        product.save(update_fields=["stock_level", "updated_at"])
-        StockAdjustment.objects.create(
+        apply_stock_movement(
             product=product,
-            user=actor,
             quantity=owed,
-            type=StockAdjustment.AdjustmentType.RETURN,
+            movement_type=InventoryMovement.MovementType.RETURN,
+            organization=sale.organization,
+            branch=sale.branch,
+            reference_type="sale",
+            reference_id=f"{sale.pk}:restore",
+            actor=actor,
             notes=f"{sale_note_prefix(sale)} - stock restored ({reason or 'released'})",
+            request=request,
+            legacy_adjustment_type=StockAdjustment.AdjustmentType.RETURN,
         )
         released += owed
 
@@ -151,6 +157,9 @@ def reserve_sale_stock(*, sale, actor=None, request=None, reason: str = "") -> i
     for product_id, quantity in taken.items():
         if quantity - restored.get(product_id, 0) > 0:
             continue  # still held
+        from modules.inventory.models import InventoryMovement
+        from modules.inventory.services import apply_stock_movement
+
         product = Product.objects.select_for_update().get(pk=product_id)
         if not product.track_inventory:
             continue
@@ -158,17 +167,21 @@ def reserve_sale_stock(*, sale, actor=None, request=None, reason: str = "") -> i
             raise PaymentGatewayError(
                 f"Insufficient stock for {product.name}. Available: {product.stock_level}."
             )
-        product.stock_level -= quantity
-        product.save(update_fields=["stock_level", "updated_at"])
-        StockAdjustment.objects.create(
+        apply_stock_movement(
             product=product,
-            user=actor,
             quantity=-quantity,
-            type=StockAdjustment.AdjustmentType.ADJUST,
+            movement_type=InventoryMovement.MovementType.SALE,
+            organization=sale.organization,
+            branch=sale.branch,
+            reference_type="sale",
+            reference_id=f"{sale.pk}:reserve",
+            actor=actor,
             notes=(
                 f"{sale_note_prefix(sale)} - M-Pesa pending reservation"
                 + (f" ({reason})" if reason else "")
             ),
+            request=request,
+            legacy_adjustment_type=StockAdjustment.AdjustmentType.ADJUST,
         )
         record_audit(
             action="stock.reserved",
@@ -238,3 +251,162 @@ def void_sale(*, sale, actor, reason: str = "", request=None) -> Sale:
         },
     )
     return sale
+
+
+@transaction.atomic
+def complete_return(*, sale_return, actor, request=None):
+    """Authorize the money and the shelf for one return, exactly once."""
+    from decimal import Decimal
+
+    from modules.inventory.models import InventoryMovement, StockAdjustment
+    from modules.inventory.services import apply_stock_movement
+    from modules.payments.models import Payment
+
+    from .models import Sale, SaleItem, SaleReturn
+
+    sale_return = SaleReturn.objects.select_for_update().select_related("sale").get(
+        pk=sale_return.pk
+    )
+    if sale_return.status == SaleReturn.Status.COMPLETED:
+        return sale_return
+    if sale_return.status not in (
+        SaleReturn.Status.AUTHORIZED,
+        SaleReturn.Status.REQUESTED,
+    ):
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError(
+            {"detail": f"Cannot complete a return in status {sale_return.status}."}
+        )
+
+    sale = Sale.objects.select_for_update().get(pk=sale_return.sale_id)
+    if sale.status != Sale.Status.COMPLETED:
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError({"detail": "Cannot return a sale that is not completed."})
+
+    lines = list(sale_return.lines.select_related("product", "sale_item"))
+    if not lines:
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError({"detail": "A return needs at least one line."})
+
+    for line in lines:
+        item = SaleItem.objects.select_for_update().get(pk=line.sale_item_id)
+        if item.quantity_returned + line.quantity > item.quantity:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    "detail": (
+                        f"Cannot return more than sold for {item.product.name}. "
+                        f"Already returned: {item.quantity_returned}."
+                    )
+                }
+            )
+        item.quantity_returned += line.quantity
+        item.save(update_fields=["quantity_returned"])
+
+        movement_type = (
+            InventoryMovement.MovementType.RETURN
+            if line.restock
+            else InventoryMovement.MovementType.DAMAGE
+        )
+        # Damaged returns still leave the till; they do not go back to sellable
+        # stock. We record the movement with a zero shelf delta by skipping
+        # apply when not restocking — but the brief wants a ledger row. A
+        # DAMAGE movement of +qty into a non-sellable state is modelled as
+        # no BranchStock change: skip apply, write a notes-only movement
+        # via apply with allow and then reverse? Simpler: restock applies
+        # +qty RETURN; damaged applies +qty then immediately -qty DAMAGE
+        # so sellable stock is unchanged and both facts exist.
+        if line.restock:
+            apply_stock_movement(
+                product=line.product,
+                quantity=line.quantity,
+                movement_type=InventoryMovement.MovementType.RETURN,
+                organization=sale.organization,
+                branch=sale.branch,
+                reference_type="sale_return",
+                reference_id=sale_return.pk,
+                actor=actor,
+                notes=f"Return {sale_return.number} / {sale.sale_number}",
+                request=request,
+                legacy_adjustment_type=StockAdjustment.AdjustmentType.RETURN,
+            )
+        else:
+            apply_stock_movement(
+                product=line.product,
+                quantity=line.quantity,
+                movement_type=InventoryMovement.MovementType.RETURN,
+                organization=sale.organization,
+                branch=sale.branch,
+                reference_type="sale_return",
+                reference_id=sale_return.pk,
+                actor=actor,
+                notes=f"Return {sale_return.number} (damaged in) / {sale.sale_number}",
+                request=request,
+                legacy_adjustment_type=StockAdjustment.AdjustmentType.RETURN,
+            )
+            apply_stock_movement(
+                product=line.product,
+                quantity=-line.quantity,
+                movement_type=InventoryMovement.MovementType.DAMAGE,
+                organization=sale.organization,
+                branch=sale.branch,
+                reference_type="sale_return",
+                reference_id=sale_return.pk,
+                actor=actor,
+                notes=f"Return {sale_return.number} (damaged) / {sale.sale_number}",
+                request=request,
+                legacy_adjustment_type=StockAdjustment.AdjustmentType.DAMAGE,
+            )
+
+    if sale_return.refund_amount and sale_return.refund_method != SaleReturn.RefundMethod.STORE_CREDIT:
+        method = (
+            Payment.Method.MPESA
+            if sale_return.refund_method == SaleReturn.RefundMethod.MPESA
+            else Payment.Method.CASH
+        )
+        Payment.objects.create(
+            sale=sale,
+            method=method,
+            amount=sale_return.refund_amount,
+            status=Payment.Status.REFUNDED,
+            received_by=actor,
+            provider_reference=f"refund:{sale_return.number}",
+        )
+
+    now = timezone.now()
+    sale_return.status = SaleReturn.Status.COMPLETED
+    sale_return.completed_by = actor
+    sale_return.completed_at = now
+    if sale_return.authorized_by_id is None:
+        sale_return.authorized_by = actor
+        sale_return.authorized_at = now
+    sale_return.save(
+        update_fields=[
+            "status",
+            "completed_by",
+            "completed_at",
+            "authorized_by",
+            "authorized_at",
+        ]
+    )
+    record_audit(
+        action="refund.completed",
+        entity_type="sale_return",
+        entity_id=sale_return.pk,
+        actor=actor,
+        request=request,
+        branch=sale.branch,
+        after={
+            "sale": sale.sale_number,
+            "return": sale_return.number,
+            "amount": str(sale_return.refund_amount),
+            "reason": sale_return.reason,
+            "method": sale_return.refund_method,
+        },
+    )
+    return sale_return
+
