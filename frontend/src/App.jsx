@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useLocation 
 import {
   LayoutDashboard, ShoppingCart, Package, ReceiptText, Users, Settings,
   LogOut, Menu, X, ChevronRight, Store, ShieldAlert, Truck, ClipboardList,
-  PackageCheck, ScrollText, ArrowLeftRight, Contact, BarChart3,
+  PackageCheck, ScrollText, ArrowLeftRight, Contact, BarChart3, ShieldCheck,
 } from 'lucide-react';
 import POS from './pages/POS';
 import Login from './pages/Login';
@@ -20,6 +20,7 @@ import Staff from './pages/Staff';
 import Reports from './pages/Reports';
 import Landing from './pages/Landing';
 import SettingsPage from './pages/Settings';
+import SuperAdmin from './pages/SuperAdmin';
 import { logout } from './services/api';
 import useOfflineSync from './hooks/useOfflineSync';
 import { Toaster } from 'react-hot-toast';
@@ -51,6 +52,7 @@ const NAV_ITEMS = [
 
 const MANAGEMENT_ITEMS = [
   { to: '/settings', label: 'Settings', icon: Settings, permission: 'settings.manage' },
+  { to: '/super-admin', label: 'Super Admin', icon: ShieldCheck, platformOnly: true },
 ];
 
 /** The first screen this account may actually open. */
@@ -84,6 +86,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const allows = (item) => {
+    if (item.platformOnly) return Boolean(user?.is_superuser);
     const codes = Array.isArray(item.permission) ? item.permission : [item.permission];
     return codes.some((code) => can(user, code));
   };
@@ -234,6 +237,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage user={user} /></ProtectedRoute>} />
+            <Route path="/super-admin" element={<ProtectedRoute>{user?.is_superuser ? <SuperAdmin /> : <Navigate to={homePath(user) || '/login'} replace />}</ProtectedRoute>} />
             <Route path="*" element={<Navigate to={homePath(user) || '/login'} replace />} />
           </Routes>
         </main>
