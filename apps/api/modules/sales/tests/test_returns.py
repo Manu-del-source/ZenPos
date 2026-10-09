@@ -7,7 +7,7 @@ import pytest
 from modules.core.models import AuditLog
 from modules.inventory.models import InventoryMovement
 from modules.payments.models import Payment
-from modules.sales.models import Sale, SaleReturn
+from modules.sales.models import SaleReturn
 
 pytestmark = pytest.mark.django_db
 
@@ -113,7 +113,9 @@ class TestReturns:
 
     def test_cannot_return_voided_sale(self, authenticated_client, supervisor_client, product):
         sale = _sell(authenticated_client, product, 1)
-        supervisor_client.post(f"{SALES_URL}{sale['id']}/void/", {"reason": "mistake"}, format="json")
+        supervisor_client.post(
+            f"{SALES_URL}{sale['id']}/void/", {"reason": "mistake"}, format="json"
+        )
         item_id = sale["items"][0]["id"]
         response = authenticated_client.post(
             f"{SALES_URL}{sale['id']}/returns/",

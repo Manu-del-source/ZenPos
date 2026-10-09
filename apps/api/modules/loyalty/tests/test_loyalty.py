@@ -69,7 +69,7 @@ class TestLoyalty:
     def test_redeem_cannot_go_negative(
         self, manager_client, customer, loyalty_rule
     ):
-        from modules.loyalty.services import apply_ledger, get_or_create_account
+        from modules.loyalty.services import get_or_create_account
 
         account = get_or_create_account(customer)
         response = manager_client.post(

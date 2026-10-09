@@ -265,7 +265,6 @@ class TestGoodsReceiptPost:
 
     def test_post_requires_receive_permission(self, api_client, cashier, approved_order):
         # Build a draft as the inventory manager, then a cashier tries to post.
-        from modules.accounts.models import UserBranchAccess
         from modules.accounts.models import User as Staff
 
         manager = Staff.objects.get(username="inventory1")

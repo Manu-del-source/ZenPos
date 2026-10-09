@@ -144,7 +144,9 @@ def award_sale_points(sale, actor=None, request=None) -> LoyaltyLedger | None:
     )
 
 
-def reverse_sale_points(sale, *, actor=None, request=None, reference_id=None) -> LoyaltyLedger | None:
+def reverse_sale_points(
+    sale, *, actor=None, request=None, reference_id=None
+) -> LoyaltyLedger | None:
     if sale.customer_id is None:
         return None
     earned = LoyaltyLedger.objects.filter(

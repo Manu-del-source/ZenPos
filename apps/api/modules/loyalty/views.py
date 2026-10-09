@@ -14,7 +14,7 @@ from .serializers import (
     LoyaltyLedgerSerializer,
     LoyaltyRuleSerializer,
 )
-from .services import apply_ledger, get_or_create_account, rule_for
+from .services import apply_ledger, get_or_create_account
 
 
 class LoyaltyRuleViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
@@ -67,7 +67,8 @@ class LoyaltyAccountViewSet(
         serializer = LoyaltyAdjustSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        account = self.get_object() if self.action != "adjust" or getattr(self, "basename", "") else None
+        is_adjust = self.action == "adjust" and not getattr(self, "basename", "")
+        account = None if is_adjust else self.get_object()
         # detail actions have an account; list-style adjust uses customer id.
         if "pk" in self.kwargs:
             account = self.get_object()

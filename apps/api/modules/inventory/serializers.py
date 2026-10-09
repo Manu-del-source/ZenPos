@@ -266,7 +266,8 @@ class StockTransferSerializer(
         lines = validated_data.pop("lines", None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
-        instance.save(update_fields=[*validated_data.keys(), "updated_at"] if validated_data else None)
+        fields = [*validated_data.keys(), "updated_at"] if validated_data else None
+        instance.save(update_fields=fields)
 
         if lines is not None:
             instance.lines.all().delete()

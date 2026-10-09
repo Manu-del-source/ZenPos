@@ -256,7 +256,6 @@ def void_sale(*, sale, actor, reason: str = "", request=None) -> Sale:
 @transaction.atomic
 def complete_return(*, sale_return, actor, request=None):
     """Authorize the money and the shelf for one return, exactly once."""
-    from decimal import Decimal
 
     from modules.inventory.models import InventoryMovement, StockAdjustment
     from modules.inventory.services import apply_stock_movement
@@ -307,11 +306,6 @@ def complete_return(*, sale_return, actor, request=None):
         item.quantity_returned += line.quantity
         item.save(update_fields=["quantity_returned"])
 
-        movement_type = (
-            InventoryMovement.MovementType.RETURN
-            if line.restock
-            else InventoryMovement.MovementType.DAMAGE
-        )
         # Damaged returns still leave the till; they do not go back to sellable
         # stock. We record the movement with a zero shelf delta by skipping
         # apply when not restocking — but the brief wants a ledger row. A
@@ -362,7 +356,10 @@ def complete_return(*, sale_return, actor, request=None):
                 legacy_adjustment_type=StockAdjustment.AdjustmentType.DAMAGE,
             )
 
-    if sale_return.refund_amount and sale_return.refund_method != SaleReturn.RefundMethod.STORE_CREDIT:
+    if (
+        sale_return.refund_amount
+        and sale_return.refund_method != SaleReturn.RefundMethod.STORE_CREDIT
+    ):
         method = (
             Payment.Method.MPESA
             if sale_return.refund_method == SaleReturn.RefundMethod.MPESA

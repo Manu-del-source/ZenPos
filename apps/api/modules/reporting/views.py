@@ -155,7 +155,10 @@ class AnalyticsViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"])
     def inventory_movements(self, request):
         rows = self._date_filtered(
-            self._scoped(InventoryMovement.objects.select_related("product", "branch"), "organization_id")
+            self._scoped(
+                InventoryMovement.objects.select_related("product", "branch"),
+                "organization_id",
+            )
         )
         movement_type = request.query_params.get("movement_type")
         if movement_type:
@@ -181,7 +184,9 @@ class AnalyticsViewSet(viewsets.ViewSet):
             self._scoped(SaleReturn.objects.filter(status="COMPLETED"), "organization_id")
         )
         by_reason = list(
-            rows.values("reason").annotate(count=Count("id"), amount=Sum("refund_amount")).order_by("-count")
+            rows.values("reason")
+            .annotate(count=Count("id"), amount=Sum("refund_amount"))
+            .order_by("-count")
         )
         by_branch = list(
             rows.values("branch__name").annotate(count=Count("id"), amount=Sum("refund_amount"))
