@@ -105,6 +105,17 @@ class HasPermission(BasePermission):
         if not getattr(user, "is_authenticated", False):
             return False
 
+        # A deactivated organization is locked out of the API. Platform
+        # operators have no organization and are unaffected.
+        organization = getattr(user, "organization", None)
+        if (
+            not getattr(user, "is_superuser", False)
+            and organization is not None
+            and not organization.is_active
+        ):
+            self.message = "Your organization is deactivated. Contact support."
+            return False
+
         # Branch scope is not resolved here: at this point the view does not yet
         # know which branch is being touched. A branch-scoped *write* is checked
         # against the payload by BranchScopedMixin, and a branch-scoped *read* is

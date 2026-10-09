@@ -19,6 +19,7 @@ api_v2_patterns = [
     path("", include("modules.loyalty.urls")),
     path("", include("modules.reporting.urls")),
     path("", include("modules.sales.urls")),
+    path("", include("modules.platform_admin.urls")),
 ]
 
 urlpatterns = [

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import POS from './pages/POS';
 import Login from './pages/Login';
+import AcceptInvite from './pages/AcceptInvite';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import Orders from './pages/Orders';
@@ -120,6 +121,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
       <main className="min-h-screen bg-slate-950">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="/" element={<Landing />} />
           <Route path="*" element={<Navigate to={token ? '/pos' : '/login'} replace />} />
         </Routes>
