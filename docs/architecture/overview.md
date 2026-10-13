@@ -61,11 +61,14 @@ sync            idempotency keys, sync events
 ```
 
 Implemented: `organizations`, `branches` (branches, tills, cash sessions and
-append-only cash movements — see ADR-0014), `accounts`, `catalog`, `inventory`
-(ledger, branch stock, transfers, adjustments), `purchasing` (suppliers, purchase
-orders, goods received notes), `customers`, `sales` (including returns/refunds),
-`payments`, `loyalty` (rule, account, ledger) and `reporting`. `sync` is not
-created yet; a package appears with the phase that first needs it.
+append-only cash movements — see ADR-0014), `expenses` (categories and
+append-only expenses with reversals — see ADR-0015), `accounts`, `catalog`,
+`inventory` (ledger, branch stock, transfers, adjustments), `purchasing`
+(suppliers, purchase orders, goods received notes), `customers`, `sales`
+(including returns/refunds), `payments`, `loyalty` (rule, account, ledger)
+and `reporting` (operational analytics plus the finance statements: profit &
+loss, cash reconciliation, product margins). `sync` is not created yet; a
+package appears with the phase that first needs it.
 
 The package is `modules/` rather than `apps/` because the repository root
 already contains a directory named `apps/`. A nested `apps/api/apps/` package

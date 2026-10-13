@@ -360,3 +360,52 @@ including the void-refund and M-Pesa cases. Frontend till UI (session picker
 at the POS, shift-reconciliation screen) is the follow-on slice; the API is
 complete and usable without it, and `till` on sale creation is optional so no
 existing client changes.
+
+## ADR-0015 — Financial records are append-only ledgers; statements are reads
+
+**Status:** Accepted
+
+**Context.** Phase 2 adds expenses and the accounting statements (profit &
+loss, cash reconciliation, product margins). The design question was how a
+money figure can be wrong without the history being destroyed: an expense
+entered twice, or a till count entered wrongly, must be correctable, but
+silently editing a financial row makes the previous figure unexplainable —
+and the cash ledger (ADR-0014) had already committed to reversals over
+rewrites.
+
+**Decision.** The rule is generalised: **financial records are append-only
+ledgers, and statements are pure reads over them.** `modules.expenses` is
+new: per-organisation `ExpenseCategory` plus append-only `Expense` rows
+(branch, incurred date, positive Decimal amount, reference, actor). The API
+has no update or delete; a correction is a *reversal* row referencing the
+original, created through a `reverse` action, one per original, never for a
+reversal. Reports therefore treat reversals as negative and every published
+figure stays reproducible from the rows that built it. The Django admin is
+held to the same rule (`can_delete = False`, change view shut down).
+
+Statements live in `modules.reporting` (`/api/v2/finance/`): **profit-and-loss**
+(net revenue from completed sales minus completed returns; COGS from the
+landed `SaleItem.unit_cost` at sale time, net of returned units — damaged
+write-offs are expenses, booked by the accountant, not hidden in COGS; net
+expenses after reversals; tax reported as its own line and deducted, because
+it is collected for KRA, not earned); **cash-position** (money in by method
+from `Payment` rows — the source of truth a `sale.payment_method` column
+cannot express for split sales — closed-session expected/counted/variance
+totals from the cash ledger, and the gap between cash sales and cash the
+drawer recorded as coming in on a session, which is exactly the cash sold
+with no open till session); and **product-margins** (revenue and cost both
+net of returns, top 50 by revenue). All arithmetic is Decimal end to end;
+every query is tenant-scoped first and branch-narrowed like the operational
+analytics.
+
+**Consequences.** A wrong figure is always fixable without destroying the
+original, and the fix is itself audited. The cost is bookkeeping: two rows
+where a naive implementation would have edited one — accepted, because the
+alternative is an accountant who cannot trust what they are reading. The
+statements read the ledgers in `sales`, `payments`, `branches` and
+`expenses` rather than keeping their own copy, so there is exactly one place
+a number is true. Payment timestamps date M-Pesa money by attempt time
+(`created_at`), not by callback time — a same-day delay is the norm; tracking
+a `completed_at` on payments is deferred until it is actually needed.
+Frontend statements UI remains the phase-11 surface; the API is complete and
+isolated behind `reports.view` (cashiers do not hold it).
