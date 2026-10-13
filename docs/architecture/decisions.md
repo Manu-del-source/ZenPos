@@ -866,3 +866,60 @@ tenancy isolation audit that preceded this change found no unscoped
 viewset: everything is mixin-scoped, or manually scoped with a named
 reason and a cross-tenant test (the reporting aggregates are the manual
 case), so the platform surface adds a door without finding a hole.
+
+---
+
+## ADR-0023 — The security pass found the posture sound, added one missing control, and named the rest
+
+**Status:** Accepted
+
+**Context.** Phase 10 was the security pass over a system that had, by
+construction, most of its controls in place: authorization is server-side
+and fails closed (the default permission class requires both a login and the
+declared permission), the tenant boundary is a mixin plus a per-tenant
+cross-tenant test, secrets are environment-only with the settings module
+refusing to boot without a key, JWT refresh tokens rotate and blacklist on
+use, login and refresh are throttled, and production transport settings
+(HSTS preload, SSL redirect, secure cookies, CORS allowlist) are set. The
+question the pass had to answer was not "build the security model" but
+"find the gap the model did not think to close."
+
+**Decision.**
+
+- **One control was missing and is now added: the audit snapshot refuses
+  secrets.** `snapshot()` built before/after state from a model's concrete
+  columns and carried whatever the caller named — including, had anyone
+  written `snapshot(user)`, the password hash, into a log that tenant staff
+  can read with `audit.view`. Existing callers were audited (users are
+  snapshotted only through an explicit safe-field list, and the eTIMS
+  `api_key` is admin-only with no API exposure), and the filter is now
+  unconditional: sensitive field names (`password`, `api_key`, `secret`,
+  `passkey`, `token`, …) are dropped even from an explicit field list, with
+  tests pinning the behaviour for a user and a device. Fail-closed: a future
+  mistake is a missing audit column, never a leaked credential.
+- **The rest of the pass is an inventory, not a rebuild.** Every viewset
+  was checked for scoping (all mixin-scoped or manually scoped with a
+  cross-tenant test; the reporting aggregates are the manual case), the
+  repository was scanned for committed credentials (none; `.env` is
+  git-ignored and only `.env.example` templates are tracked), raw SQL and
+  file-handling attack surfaces were checked (absent), and `pip-audit`
+  found no vulnerable runtime dependency. The findings, the controls and
+  the compensations are recorded in `docs/security.md`.
+- **The limitations are named in that document with their mitigations:**
+  the browser keeps the refresh token in `localStorage` (XSS-readable;
+  rotation-with-blacklist and short access tokens are the compensation, and
+  httpOnly cookies are an architectural change to the offline client, not a
+  setting); the M-Pesa callback secret travels in the URL path (the only
+  channel the provider supports, compensated by correlation and amount
+  validation plus throttling); and the audit log is append-only but not
+  tamper-evident (off-host log shipping is a deployment concern for
+  phase 12).
+
+**Consequences.** The system's security story is now a document a reviewer
+can check against the code instead of a set of assurances: every control
+has a named location, every gap has a named mitigation, and the one hole
+the audit found — the audit trail itself as a credential leak — is closed
+with a fail-closed filter and tests. The cost is one unconditional filter
+in the audit helper and an explicit list of accepted limitations that
+future phases must not silently erase; a phase that removes one of them
+removes the mitigation and must say so in an ADR.
