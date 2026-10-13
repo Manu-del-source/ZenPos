@@ -136,15 +136,15 @@ export default function Customers() {
                 </div>
                 <div className="hidden text-right sm:block">
                   <p className="text-xs uppercase tracking-wider text-slate-500">Loyalty</p>
-                  <p className="font-semibold text-slate-200">{customer.loyalty_points ?? 0} pts</p>
+                  <p className="font-semibold text-slate-200">{customer.points_balance ?? 0} pts</p>
                 </div>
                 <button className="btn-secondary !px-3" onClick={async () => {
                   try {
                     const { data } = await api.get('/loyalty-accounts/', { params: { customer: customer.id } });
                     const rows = Array.isArray(data) ? data : data.results || [];
-                    setLedger({ customer, account: rows[0] || { points_balance: customer.loyalty_points, entries: [] } });
+                    setLedger({ customer, account: rows[0] || { points_balance: customer.points_balance, entries: [] } });
                   } catch {
-                    setLedger({ customer, account: { points_balance: customer.loyalty_points, entries: [] } });
+                    setLedger({ customer, account: { points_balance: customer.points_balance, entries: [] } });
                   }
                 }}>Ledger</button>
                 <button className="btn-secondary !px-3" onClick={() => openEdit(customer)} aria-label={`Edit ${customer.name}`}>

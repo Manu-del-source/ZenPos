@@ -381,6 +381,13 @@ def handle_mpesa_callback(*, provider: PaymentProvider, payload, request=None) -
         _mark_processed(provider.provider_name, callback.external_id)
         sync_attempt_outcome(payment)
 
+        if payment.status == Payment.Status.COMPLETED:
+            # Points follow the money: the sale is fully paid by this leg,
+            # whatever other legs there are. Idempotent per sale.
+            from modules.loyalty.services import award_sale_points_if_paid
+
+            award_sale_points_if_paid(payment.sale, request=request)
+
         record_audit(
             action=audit_action,
             entity_type="payment",
@@ -473,6 +480,14 @@ def reconcile_pending_payment(*, payment, provider, request=None) -> Payment:
             audit_action = "payment.failed"
 
         sync_attempt_outcome(payment)
+
+        if payment.status == Payment.Status.COMPLETED:
+            # A lost callback that the provider's query recovers is a payment
+            # that really happened: points follow it, exactly as on the
+            # callback path (same idempotent check).
+            from modules.loyalty.services import award_sale_points_if_paid
+
+            award_sale_points_if_paid(payment.sale, request=request)
 
         record_audit(
             action=audit_action,

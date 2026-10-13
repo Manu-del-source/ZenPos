@@ -102,8 +102,6 @@ def apply_ledger(
 
     account.points_balance = new_balance
     account.save(update_fields=["points_balance", "updated_at"])
-    customer.loyalty_points = new_balance
-    customer.save(update_fields=["loyalty_points"])
 
     record_audit(
         action=f"loyalty.{action.lower()}",
@@ -142,6 +140,29 @@ def award_sale_points(sale, actor=None, request=None) -> LoyaltyLedger | None:
         notes=f"Sale {sale.sale_number}",
         request=request,
     )
+
+
+def award_sale_points_if_paid(sale, actor=None, request=None) -> LoyaltyLedger | None:
+    """Award the sale's points once the sale is fully paid — never earlier.
+
+    Cash at the till is completed money, so a cash sale is fully paid at
+    creation and earns then. An M-Pesa sale is not: the customer's phone has
+    only been *asked*, and a sale that fails or times out must not leave
+    points behind. A split sale earns when its last leg completes.
+
+    The check is the payment ledger's own (``outstanding_for``: the sum over
+    COMPLETED legs, PENDING counting as unpaid), and the award is idempotent
+    per sale, so the creation signal and the payment-completion hook can both
+    call this and the points land exactly once.
+    """
+    if sale.customer_id is None:
+        return None
+
+    from modules.payments.services import outstanding_for
+
+    if outstanding_for(sale) > 0:
+        return None
+    return award_sale_points(sale, actor=actor, request=request)
 
 
 def reverse_sale_points(sale, *, actor=None, request=None, reference_id=None) -> LoyaltyLedger | None:

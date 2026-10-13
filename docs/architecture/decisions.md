@@ -739,3 +739,71 @@ branch prices the blend, which is how a blended shop prices its goods.
 Weighted average is a policy: a shop that runs standard cost can stop
 accepting the update by ignoring ``product.cost_updated`` and maintaining
 the column itself, without touching the ledger.
+
+---
+
+## ADR-0021 — Points follow the money: the ledger owns the balance, and a customer is archived, never deleted
+
+**Status:** Accepted
+
+**Context.** The loyalty ledger existed and worked, but the money and the
+points disagreed in three ways. First, a sale's points were awarded when the
+sale row was written — for an M-Pesa sale that is the moment the customer's
+phone is merely *asked*, so a payment that was declined, or that timed out
+with the provider unreachable, left points on a sale the customer never paid
+for. Second, every ledger entry also wrote a second balance,
+`customers.loyalty_points`: two columns claiming to be the same number, one
+of which any client could have patched, and neither of which an auditor would
+have to trust because the other existed. Third, `DELETE /customers/{id}/`
+removed the row outright, orphaning the customer half of every sale they had
+ever made — the sales history stopped being able to say who bought what.
+
+**Decision.**
+
+- **Points are awarded when the sale is fully paid, never earlier.** The
+  check is the payment ledger's own (`outstanding_for`: the sum over
+  COMPLETED legs, PENDING counting as unpaid). A cash sale is fully paid the
+  moment its cash leg exists, so it earns in the sale-creation transaction,
+  right after `complete_cash_payment` — the creation signal fires before the
+  payment row exists and therefore cannot award it. An M-Pesa sale earns the
+  moment its payment is COMPLETED: on the callback path and on the provider
+  query that recovers a lost callback, both of which settle a payment to
+  COMPLETED. A split sale earns when its last leg lands. A payment that
+  fails or times out completes no sale, so it earns nothing — and there is
+  no reversal of points to find, because none were ever given. The award is
+  idempotent per sale (the ledger's unique org+action+reference), so the
+  creation path and the completion path can both call the same check and the
+  points land exactly once.
+- **The ledger is the single source of truth for the balance.** The dual
+  write is gone; `customers.loyalty_points` is dropped by migration after a
+  data step carries every existing balance into its loyalty account with one
+  `ADJUST` entry that names the source. No points are destroyed, and the
+  balance a customer sees (`points_balance`, read from the account) is the
+  one `apply_ledger` maintains transactionally with a `balance_after` on
+  every entry.
+- **A customer is archived, not deleted.** `DELETE` sets `deleted_at`
+  (audited as `customer.archived`); the default manager hides the row, so
+  list, retrieve and phone search all answer 404 from then on, and the
+  org+phone unique constraint is conditional on liveness so the number is
+  free for the next holder — the same pattern the supplier directory uses.
+  Past sales keep pointing at the row, so the history still says who bought
+  what. Restore is a support action (admin), not an API.
+- **The UUID re-key is deferred.** Phase 4's notes scheduled a UUID primary
+  key for this table alongside the ledger. Re-keying means rewriting
+  `sales.customer_id` (an integer→uuid cast with a per-customer mapping on
+  live data) and changing the customer API shape, for a benefit — offline
+  identity generation — that only the multi-tenant phase needs. The table
+  keeps its integer key until that phase, with the ledger and soft deletion
+  in place first.
+
+**Consequences.** A points balance is now exactly as explainable as any other
+money in the system: every point traces to a ledger entry, and a point can
+never exist without a completed payment behind it. The costs are accepted and
+named: the award now runs in the callback and provider-query paths, so a
+broken loyalty module would surface there (it cannot corrupt a payment —
+the award is added after the payment is settled and the ledger's own
+transaction rolls back with its own failures); the `deleted_at` filter means
+archived customers are invisible to code that forgets to use `all_objects`,
+which is the intended behaviour and must be remembered when writing
+backfill; and the carried-over balances appear as single `ADJUST` entries
+without a sale behind them, which is honest — they predate the ledger.

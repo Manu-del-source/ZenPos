@@ -404,6 +404,13 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             payment = complete_cash_payment(
                 sale=sale, amount=computed_total, received_by=sale.cashier
             )
+            # Cash is completed money: the sale is fully paid the moment this
+            # leg exists, so this is where a cash sale earns its points. The
+            # creation signal could not award yet — the payment did not exist
+            # when the sale row was written.
+            from modules.loyalty.services import award_sale_points_if_paid
+
+            award_sale_points_if_paid(sale, actor=sale.cashier)
             record_audit(
                 action="payment.completed",
                 entity_type="payment",
