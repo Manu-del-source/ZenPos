@@ -64,6 +64,7 @@ def _ensure_system_roles_seeded() -> None:
         ("0008_purchases_receive_permission", "grant_purchases_receive"),
         ("0009_returns_request_permission", "grant"),
         ("0011_till_cash_permissions", "grant_till_cash_permissions"),
+        ("0012_expense_permissions", "grant_expense_permissions"),
     )
     for module_name, function_name in seed_steps:
         module = importlib.import_module(f"modules.accounts.migrations.{module_name}")
