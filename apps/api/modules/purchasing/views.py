@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets
@@ -6,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK as HTTP_OK
 from rest_framework.status import HTTP_400_BAD_REQUEST as HTTP_BAD_REQUEST
 
+from modules.catalog.models import Product
 from modules.core.audit import record_audit, snapshot
 from modules.core.mixins import OrganizationScopedMixin
 from modules.inventory.models import InventoryMovement
@@ -17,6 +20,7 @@ from .serializers import (
     PurchaseOrderSerializer,
     SupplierSerializer,
 )
+from .services import update_product_cost_from_receipt
 
 
 class SupplierViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
@@ -633,8 +637,15 @@ class GoodsReceivedNoteViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
                     )
                 po_line.quantity_received += line.quantity_received
                 po_line.save(update_fields=["quantity_received", "updated_at"])
+
+                # Lock the product and read the on-hand before this receipt;
+                # the lock is held to the end of the transaction, so the cost
+                # basis computed below cannot interleave with another receipt
+                # for the same product.
+                product = Product.objects.select_for_update().get(pk=line.product_id)
+                on_hand = Decimal(product.stock_level)
                 apply_stock_movement(
-                    product=line.product,
+                    product=product,
                     quantity=line.quantity_received,
                     movement_type=InventoryMovement.MovementType.PURCHASE_RECEIPT,
                     organization=grn.organization,
@@ -644,6 +655,16 @@ class GoodsReceivedNoteViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
                     actor=request.user,
                     unit_cost=line.unit_cost,
                     notes=f"GRN {grn.number} / {order.number}",
+                    request=request,
+                )
+                update_product_cost_from_receipt(
+                    product=product,
+                    on_hand=on_hand,
+                    received_quantity=line.quantity_received,
+                    unit_cost=line.unit_cost,
+                    grn=grn,
+                    order=order,
+                    actor=request.user,
                     request=request,
                 )
 

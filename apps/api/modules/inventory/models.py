@@ -289,6 +289,95 @@ class StockTransfer(SoftDeleteModel):
         return self.status in self.EDITABLE_STATUSES
 
 
+class StockCount(BaseModel):
+    """A physical count of stock at one branch.
+
+    A count is an event, not a workflow: it is posted atomically, and the
+    rows it writes (this header, its lines, the correcting movements) appear
+    together or not at all. There is no draft state because nothing
+    physically arrives between typing a count and posting it — unlike a
+    goods received note.
+
+    The header carries no totals: every fact is on the lines, where the book
+    quantity at the moment of the count is snapshotted next to what was
+    physically there. The ledger movements reference this row, so a later
+    question about any stock balance can be traced to the count that moved
+    it.
+    """
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        related_name="stock_counts",
+        on_delete=models.CASCADE,
+    )
+    branch = models.ForeignKey(
+        "branches.Branch",
+        related_name="stock_counts",
+        on_delete=models.PROTECT,
+    )
+    number = models.CharField(max_length=32, db_index=True)
+    counted_at = models.DateTimeField()
+    counted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        related_name="stock_counts_counted",
+        on_delete=models.SET_NULL,
+    )
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "number"], name="uniq_stock_count_org_number"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["organization", "created_at"], name="idx_scount_org_created"),
+            models.Index(fields=["branch", "created_at"], name="idx_scount_branch_created"),
+        ]
+
+    def __str__(self):
+        return self.number
+
+
+class StockCountLine(BaseModel):
+    """One product on a stock count, with the book it was counted against.
+
+    ``book_quantity`` is the branch balance at the moment of the count and
+    ``counted_quantity`` the physical result; ``variance`` is the correction
+    that was posted as a ``STOCK_COUNT`` movement (zero when the shelf
+    agreed with the books — the line is still kept, because the count
+    happening is itself a fact).
+    """
+
+    stock_count = models.ForeignKey(
+        StockCount,
+        related_name="lines",
+        on_delete=models.CASCADE,
+    )
+    product = models.ForeignKey(
+        "catalog.Product",
+        related_name="stock_count_lines",
+        on_delete=models.PROTECT,
+    )
+    book_quantity = models.DecimalField(**QTY)
+    counted_quantity = models.DecimalField(**QTY)
+    variance = models.DecimalField(**QTY)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["stock_count", "product"], name="uniq_stock_count_line_product"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.stock_count_id}: {self.product_id} ({self.variance})"
+
+
 class StockTransferLine(BaseModel):
     """One product on a stock transfer."""
 

@@ -673,3 +673,69 @@ trigger is a business decision (per-sale flag, or manual/backfill only),
 and the URS transmission client awaits verified official documentation.
 Both slots are exactly where this ADR leaves them: the adapter for
 transmission, the domain service for the trigger.
+
+## ADR-0020 — A count posts its own correction, and a receipt moves the cost basis
+
+**Status:** Accepted
+
+**Context.** Phase 7, inventory and purchasing. The audit found the
+purchasing-to-inventory loop already closed: goods received notes post
+atomically against live outstanding quantities, stock transfers move
+inventory exactly twice (dispatch, receipt), and every change lands in the
+append-only movement ledger with before/after balances. Two loops were
+still open. First, the ledger's ``STOCK_COUNT`` movement type existed but
+no workflow could write one: there was no way to check a physical count
+against the books and post the difference, so shrinkage at a branch had
+nowhere to land except an unattributable manual adjustment. Second, the
+catalogue cost column — the one sale lines snapshot into
+``SaleItem.unit_cost`` and the P&L's COGS sums — was set by a human and
+never updated: the actual prices paid on every goods received note sat on
+the GRN lines and the ledger, and nothing carried them into the cost basis,
+so every report described the cost the shop *thinks* it has.
+
+**Decision.** Close both loops with one write each, in the module that owns
+the fact.
+
+- **A stock count is an event, posted atomically.** ``POST
+  /api/v2/stock-counts/`` takes a branch and a shelf (product, counted
+  quantity per line). The service locks the counted products in
+  primary-key order (fixed lock order — two concurrent counts of the same
+  branch may take the shelf in any order), snapshots each product's branch
+  book, and posts the variance as a ``STOCK_COUNT`` movement that
+  references the count row. A zero variance still records its line: the
+  count happening is a fact even when the shelf agreed with the books.
+  There is no draft state because nothing physically arrives between
+  typing a count and posting it — unlike a goods received note.
+- **The count is read-only afterwards.** No update, no delete, no admin
+  writes: correcting the correction is a new count. The header, its lines
+  (book, counted, variance) and the movements appear together or not at
+  all, so any later question about a branch balance can be traced to the
+  count that moved it.
+- **Posting a receipt moves the cost basis to the weighted average.** In
+  the GRN post transaction, with the product row already locked, the
+  catalogue cost column becomes
+  ``(on-hand x old cost + received x receipt cost) / new on-hand`` — the
+  standard retail cost basis. Two no-ops are deliberate: a zero-cost
+  receipt (a donation, a free sample) moves stock but defines no price to
+  average, and a receipt at exactly the current cost would otherwise churn
+  the column and the audit log about nothing. History is untouched: the GRN
+  lines keep the real receipt costs, the ledger keeps per-movement costs,
+  and only future sale snapshots see the new basis. The change is audited
+  as ``product.cost_updated`` with the reason naming the GRN and the order.
+- **Authorization follows the existing halves.** A count needs
+  ``inventory.adjust`` (what an adjustment already costs), listing needs
+  ``inventory.view``, and a branch-posted user may only count branches they
+  are posted to — head office sees and may count every branch, exactly as
+  the movement ledger scopes.
+
+**Consequences.** Shrinkage, found stock and counting errors now land in
+the ledger with a named count behind them instead of an anonymous
+adjustment, and COGS plus stock valuation track what was actually paid
+from the first receipt onwards. The costs are accepted and named: the cost
+basis is a running average, so it lags a sudden price jump by one receipt,
+and it is org-wide on the catalogue column, not per branch — the branch
+balances are quantities, and a shop that buys at different prices per
+branch prices the blend, which is how a blended shop prices its goods.
+Weighted average is a policy: a shop that runs standard cost can stop
+accepting the update by ignoring ``product.cost_updated`` and maintaining
+the column itself, without touching the ledger.

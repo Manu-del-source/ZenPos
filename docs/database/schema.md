@@ -95,12 +95,23 @@ inventory_movements    id, branch_id, product_id, delta, quantity_after,
 stock_transfers        id, from_branch_id, to_branch_id, status, requested_by,
                        approved_by, created_at, completed_at
 stock_transfer_items   id, transfer_id, product_id, quantity
+stock_counts           id, organization_id, branch_id, number, counted_at,
+                       counted_by, notes, created_at   (UNIQUE organization_id, number)
+stock_count_lines      id, stock_count_id, product_id, book_quantity,
+                       counted_quantity, variance
 ```
 
 `inventory_movements` is the append-only ledger and the source of truth for stock
 history. `branch_inventory.quantity` is the current snapshot and must always
 equal the sum of movements for that product and branch — a reconciliation check
 should assert this in CI.
+
+A posted stock count writes one `STOCK_COUNT` movement per product whose shelf
+did not agree with the book, each referencing the count row; zero-variance
+products record a line but no movement. A posted goods received note also moves
+the catalogue `cost_price` to the weighted average of the on-hand stock and the
+receipt (never for zero-cost receipts, never when it would not change) — the
+column sale-line cost snapshots and the P&L's COGS read from (ADR-0020).
 
 ### Purchasing
 

@@ -3,12 +3,20 @@ from decimal import Decimal
 from django.db import transaction
 from rest_framework import serializers
 
+from modules.branches.models import Branch
 from modules.catalog.models import Product
 from modules.core.audit import record_audit, snapshot
 from modules.core.serializers import OrganizationScopedSerializerMixin
 
-from .models import InventoryMovement, StockAdjustment, StockTransfer, StockTransferLine
-from .services import ADJUSTMENT_TO_MOVEMENT, apply_stock_movement
+from .models import (
+    InventoryMovement,
+    StockAdjustment,
+    StockCount,
+    StockCountLine,
+    StockTransfer,
+    StockTransferLine,
+)
+from .services import ADJUSTMENT_TO_MOVEMENT, apply_stock_movement, post_stock_count
 
 
 class StockAdjustmentSerializer(
@@ -281,3 +289,128 @@ class StockTransferSerializer(
                 ]
             )
         return instance
+
+
+class StockCountLineSerializer(serializers.ModelSerializer):
+    """A count line as the back office reads it.
+
+    ``variance_cost`` is the variance valued at the product's *current* cost
+    column: a convenience for sizing the hit (or windfall), not a second
+    source of cost truth — the ledger keeps the per-movement costs.
+    """
+
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    variance_cost = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StockCountLine
+        fields = (
+            "id",
+            "product",
+            "product_name",
+            "book_quantity",
+            "counted_quantity",
+            "variance",
+            "variance_cost",
+        )
+        read_only_fields = fields
+
+    def get_variance_cost(self, obj):
+        if obj.product is None or obj.variance == 0:
+            return Decimal("0.00")
+        return (obj.variance * obj.product.cost_price).quantize(Decimal("0.01"))
+
+
+class StockCountReadSerializer(serializers.ModelSerializer):
+    """The posted count: header plus every line, read-only.
+
+    There is no update or delete anywhere in this module — a count is a fact
+    with a correction attached, and correcting the correction is a new count.
+    """
+
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    counted_by_name = serializers.SerializerMethodField()
+    lines = StockCountLineSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = StockCount
+        fields = (
+            "id",
+            "number",
+            "branch",
+            "branch_name",
+            "counted_at",
+            "counted_by",
+            "counted_by_name",
+            "notes",
+            "lines",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def get_counted_by_name(self, obj):
+        return obj.counted_by.get_username() if obj.counted_by_id else ""
+
+
+class StockCountItemSerializer(serializers.Serializer):
+    """One line of the count payload: what the shelf physically held."""
+
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    counted_quantity = serializers.DecimalField(
+        max_digits=12, decimal_places=3, min_value=Decimal("0")
+    )
+
+
+class StockCountWriteSerializer(OrganizationScopedSerializerMixin, serializers.Serializer):
+    """The count as the floor staff sends it: a branch and the shelf.
+
+    No header fields are client-shaped. The organization comes from the
+    branch (which is tenant-scoped and validated), the number is generated,
+    the book quantities are read from the ledger, and the counted-by is the
+    signed-in user — a client cannot claim a count for someone else.
+    """
+
+    organization_bound_fields = ("branch",)
+
+    branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all())
+    counts = StockCountItemSerializer(many=True, allow_empty=False)
+    notes = serializers.CharField(required=False, allow_blank=True, default="", max_length=1000)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        organization_id = getattr(self.request_user, "organization_id", None)
+        if organization_id is not None and not getattr(
+            self.request_user, "is_superuser", False
+        ):
+            for item in attrs["counts"]:
+                if item["product"].organization_id != organization_id:
+                    raise serializers.ValidationError(
+                        {"counts": "That record belongs to a different organization."}
+                    )
+        seen = set()
+        for item in attrs["counts"]:
+            if item["product"].pk in seen:
+                raise serializers.ValidationError(
+                    {"counts": "The same product appears more than once in one count."}
+                )
+            seen.add(item["product"].pk)
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        branch = validated_data["branch"]
+        return post_stock_count(
+            organization=branch.organization,
+            branch=branch,
+            counts=[
+                (item["product"], item["counted_quantity"])
+                for item in validated_data["counts"]
+            ],
+            actor=getattr(request, "user", None),
+            request=request,
+            notes=validated_data.get("notes", ""),
+        )
+
+    def to_representation(self, instance):
+        """The posted count speaks in the read shape: lines, not payload."""
+        return StockCountReadSerializer(instance, context=self.context).data

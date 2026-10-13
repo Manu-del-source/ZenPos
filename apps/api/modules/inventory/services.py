@@ -13,12 +13,13 @@ cannot both sell the last unit.
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from modules.catalog.models import Product
 from modules.core.audit import record_audit
 
-from .models import BranchStock, InventoryMovement, StockAdjustment
+from .models import BranchStock, InventoryMovement, StockAdjustment, StockCount, StockCountLine
 
 ADJUSTMENT_TO_MOVEMENT = {
     StockAdjustment.AdjustmentType.RESTOCK: InventoryMovement.MovementType.PURCHASE_RECEIPT,
@@ -143,6 +144,106 @@ def apply_stock_movement(
         },
     )
     return movement
+
+
+def _next_count_number(organization) -> str:
+    last = (
+        StockCount.objects.filter(organization=organization)
+        .order_by("-number")
+        .values_list("number", flat=True)
+        .first()
+    )
+    if last is None or not last.startswith("SC-"):
+        return "SC-000001"
+    return f"SC-{int(last[3:]) + 1:06d}"
+
+
+def post_stock_count(
+    *,
+    organization,
+    branch,
+    counts,
+    actor=None,
+    request=None,
+    notes: str = "",
+) -> StockCount:
+    """Post a physical stock count at one branch.
+
+    ``counts`` is an iterable of ``(product, counted_quantity)``. Each
+    product's variance against the branch book is posted as a
+    ``STOCK_COUNT`` movement; a zero variance still records its line,
+    because the count happening is itself a fact even when the shelf
+    agreed with the books.
+
+    The products are locked in primary-key order before any movement is
+    written: two concurrent counts of the same branch may take the same
+    shelf in different orders, and a fixed lock order is what keeps that
+    from deadlocking. While the product lock is held, no other workflow can
+    move that product's stock, so the book quantity snapshotted on the line
+    is exactly the balance the correcting movement adjusts.
+    """
+    pairs = sorted(
+        ((product, _as_decimal(counted)) for product, counted in counts),
+        key=lambda p: p[0].pk,
+    )
+    for _product, counted in pairs:
+        if counted < 0:
+            raise ValidationError({"counts": "A counted quantity cannot be negative."})
+
+    with transaction.atomic():
+        count = StockCount.objects.create(
+            organization=organization,
+            branch=branch,
+            number=_next_count_number(organization),
+            counted_at=timezone.now(),
+            counted_by=actor if getattr(actor, "is_authenticated", False) else None,
+            notes=notes or "",
+        )
+        corrected = 0
+        for product, counted in pairs:
+            product = Product.objects.select_for_update().get(pk=product.pk)
+            book = branch_on_hand(product, branch)
+            variance = counted - book
+            if variance != 0:
+                apply_stock_movement(
+                    product=product,
+                    quantity=variance,
+                    movement_type=InventoryMovement.MovementType.STOCK_COUNT,
+                    organization=organization,
+                    branch=branch,
+                    reference_type="stock_count",
+                    reference_id=count.pk,
+                    actor=actor,
+                    notes=(
+                        f"Stock count {count.number} at {branch.name}: "
+                        f"counted {counted}, book {book}"
+                    ),
+                    request=request,
+                )
+                corrected += 1
+            StockCountLine.objects.create(
+                stock_count=count,
+                product=product,
+                book_quantity=book,
+                counted_quantity=counted,
+                variance=variance,
+            )
+
+        record_audit(
+            action="inventory.stock_counted",
+            entity_type="stock_count",
+            entity_id=count.pk,
+            actor=actor,
+            request=request,
+            branch=branch,
+            after={
+                "number": count.number,
+                "branch": branch.name,
+                "lines": len(pairs),
+                "corrected": corrected,
+            },
+        )
+    return count
 
 
 def branch_on_hand(product, branch) -> Decimal:

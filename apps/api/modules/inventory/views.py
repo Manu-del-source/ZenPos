@@ -10,10 +10,12 @@ from rest_framework.status import HTTP_400_BAD_REQUEST as HTTP_BAD_REQUEST
 from modules.core.audit import record_audit, snapshot
 from modules.core.mixins import BranchScopedMixin, OrganizationScopedMixin
 
-from .models import InventoryMovement, StockAdjustment, StockTransfer
+from .models import InventoryMovement, StockAdjustment, StockCount, StockTransfer
 from .serializers import (
     InventoryMovementSerializer,
     StockAdjustmentSerializer,
+    StockCountReadSerializer,
+    StockCountWriteSerializer,
     StockTransferSerializer,
 )
 from .services import apply_stock_movement
@@ -521,3 +523,44 @@ class StockTransferViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
             )
         transfer.refresh_from_db()
         return Response(self.get_serializer(transfer).data)
+
+
+class StockCountViewSet(
+    BranchScopedMixin,
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Physical stock counts per branch.
+
+    Creation is the only write: a count posts its correcting movements
+    atomically (service layer), and afterwards the row is history. Listing is
+    narrowed to the branches the caller is posted to, exactly like the
+    movement ledger, and a count may only be posted at a branch the caller
+    may actually work in — head office sees every branch, a posted cashier
+    sees their own.
+    """
+
+    queryset = (
+        StockCount.objects.select_related("branch", "counted_by", "organization")
+        .prefetch_related("lines__product")
+        .all()
+    )
+    serializer_class = StockCountReadSerializer
+    branch_field = "branch"
+
+    required_permissions = ("inventory.view",)
+    required_permissions_by_action = {
+        "create": ("inventory.adjust",),
+    }
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return StockCountWriteSerializer
+        return StockCountReadSerializer
+
+    def perform_create(self, serializer):
+        branch = serializer.validated_data["branch"]
+        self.assert_branch_access(branch.pk)
+        serializer.save()
