@@ -600,3 +600,76 @@ the queue's snapshot keeps the price the customer actually paid so the
 difference is explainable, not hidden. The queue is per device (a factory
 reset loses it), which is the same honesty as the existing M-Pesa draft:
 the record lives on the till, and the till is where the money is.
+
+## ADR-0019 — eTIMS invoices are real documents that transmit nothing, until an adapter that can
+
+**Status:** Accepted
+
+**Context.** Phase 6, KRA eTIMS. Kenyan retail POS systems must eventually
+issue Electronic Tax Invoices through KRA's eTIMS system, and the audit
+found the groundwork already in place: `SaleItem` carries per-line tax
+snapshots "so the eTIMS adapter has what it needs", `build_receipt_context`
+groups tax per rate — the shape eTIMS wants — and the schema had explicitly
+deferred `etims_invoices` to "its phase", with sales talking to eTIMS only
+through an adapter. What was absent was the module itself: no invoice
+record, no lifecycle, no boundary between "the sale happened" and "the
+compliance document for that sale exists". The constraint that shaped the
+design: this deployment has no verified access to KRA's URS endpoints, and
+inventing an endpoint, a UIN, or a compliance claim would be worse than
+shipping nothing.
+
+**Decision.** Record the document; transmit nothing.
+
+- **An invoice is a document, not an action.** `EtimsInvoice` snapshots one
+  sale — lines, per-rate tax, totals — from the persisted sale rows through
+  `build_receipt_context`, the same source the receipt prints, so an
+  invoice and its printed receipt can never disagree. Money values are
+  strings in the snapshot: the document prints what was rung, and a later
+  price or rate change rewrites nothing (pinned by
+  `test_snapshot_survives_catalogue_change`).
+- **One invoice per sale, forever.** The unique `(sale)` constraint and the
+  idempotent `issue_invoice_for_sale` mean a retried trigger or a backfill
+  run twice cannot produce a second document for one sale. Issuance is the
+  domain's act, atomic with its `etims.invoice_issued` audit row.
+- **The lifecycle mirrors the sale's void.** ISSUED → CANCELLED is the only
+  transition. `void_sale` calls `cancel_invoice_for_sale` in the same change
+  that moves the cash: a voided sale must not leave an ISSUED invoice
+  describing money the shop no longer holds, and the row — not a deletion —
+  carries the correction, with the reason. Rows are never deleted or
+  rewritten; the admin refuses add, change and delete for the same reason
+  it refuses them for expenses.
+- **The UIN is KRA's, and this system never invents one.** `uin` is blank by
+  design: a verified transmission adapter writes the KRA-assigned number
+  onto the row, and until that adapter exists every invoice honestly says
+  `""`. No endpoint is guessed, no payload is fabricated, and nothing in
+  the module claims an invoice has reached the tax authority.
+- **The adapter is the seam, and it is tested against a fake.**
+  `EtimsAdapter` (issue/cancel, one construction site like the payment
+  providers) exists with exactly one implementation,
+  `LocalRecordingAdapter`, which transmits nothing. The contract a future
+  URS adapter must honour — it receives the row, it may stamp the UIN, it
+  never changes the status the domain owns — is pinned by
+  `TestAdapterSeam`, so transmission lands without touching the sales or
+  invoice layers.
+- **The API is read-only and scoped through the sale.** A list/retrieve
+  viewset under `sales.view` (no new permission code), scoped
+  `sale__organization` / `sale__branch` exactly as the payments viewset is:
+  a caller cannot read another shop's invoices through this table when the
+  sales endpoint would refuse them. No client endpoint can create, edit or
+  delete a compliance document.
+- **KRA identity lives on the device, not the organization.** `EtimsDevice`
+  carries the organization's KRA PIN and the KRA-assigned device number and
+  API key, both blank until a human confirms the registration with the
+  authority. The key is a credential: excluded from admin listings and
+  search.
+
+**Consequences.** The whole invoice lifecycle — issue, cancel, reconcile,
+void — is real, audited and tested before a single byte is transmitted, and
+a shop can run the document (backfill today) while the transmission
+question is being answered properly. The costs are named: invoices carry no
+UIN and no "transmitted" flag, so this deployment makes **no compliance
+claim to KRA**; auto-issuance on sale completion is not wired yet — the
+trigger is a business decision (per-sale flag, or manual/backfill only),
+and the URS transmission client awaits verified official documentation.
+Both slots are exactly where this ADR leaves them: the adapter for
+transmission, the domain service for the trigger.

@@ -186,9 +186,28 @@ webhook_events   id, provider, external_id (unique per provider), payload,
 `webhook_events` with a unique `(provider, external_id)` is what stops a
 redelivered M-Pesa callback from paying a sale twice.
 
+### eTIMS invoices (phase 6)
+
+```
+etims_devices    id, organization_id, name, kda_pin, device_number, api_key,
+                 is_active, created_at, updated_at   (unique organization_id, name)
+etims_invoices   id, sale_id (unique, PROTECT), device_id (nullable, PROTECT),
+                 status (ISSUED|CANCELLED), uin, issued_at, cancelled_at,
+                 cancellation_reason, line_items (JSON), tax_breakdown (JSON),
+                 subtotal, tax_amount, total_amount, currency,
+                 created_at, updated_at
+```
+
+One invoice per sale, written by the domain at issue and corrected only by
+cancellation: `void_sale` cancels the sale's invoice in the same change the
+cash leaves the drawer. `line_items` and `tax_breakdown` are string snapshots
+from the persisted sale rows — the same source the receipt prints — so a
+later catalogue change rewrites the document no more than it rewrites the
+receipt. `uin` is assigned by KRA, never by this system: a verified
+transmission adapter writes it, and until one exists the field is blank and
+the deployment claims nothing has been transmitted (ADR-0019).
+
 ## Deferred
 
-`mpesa_transactions`, `notifications`, `ecommerce_orders` and `etims_invoices`
-are designed during their phases rather than up front. The sales domain will
-interact with eTIMS only through an adapter, so compliance never leaks into the
-sales engine.
+`mpesa_transactions`, `notifications` and `ecommerce_orders` are designed
+during their phases rather than up front.

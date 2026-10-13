@@ -54,7 +54,8 @@ catalog         products, categories, brands, units, barcodes, price history
 inventory       branch stock, inventory movements, transfers, adjustments
 purchasing      suppliers, purchase orders, goods receipts
 sales           sales, sale items, returns, refunds  (the sales engine)
-payments        payment abstraction + cash/card/mpesa/etims adapters
+payments        payment abstraction + cash/card/mpesa adapters
+etims           eTIMS invoice records + the KRA adapter seam
 loyalty         customers, loyalty ledger
 reporting       read-only aggregates and reports
 sync            idempotency keys, sync events
@@ -65,7 +66,10 @@ append-only cash movements — see ADR-0014), `expenses` (categories and
 append-only expenses with reversals — see ADR-0015), `accounts`, `catalog`,
 `inventory` (ledger, branch stock, transfers, adjustments), `purchasing`
 (suppliers, purchase orders, goods received notes), `customers`, `sales`
-(including returns/refunds), `payments`, `loyalty` (rule, account, ledger)
+(including returns/refunds), `payments`, `etims` (eTIMS invoice records:
+one document per sale, ISSUED → CANCELLED, built from the same source as the
+receipt; the transmission adapter seam records locally today and claims
+nothing has been sent — see ADR-0019), `loyalty` (rule, account, ledger)
 and `reporting` (operational analytics plus the finance statements: profit &
 loss, cash reconciliation, product margins). `sync` is not created yet; a
 package appears with the phase that first needs it.

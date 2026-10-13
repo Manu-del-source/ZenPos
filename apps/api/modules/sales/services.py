@@ -280,6 +280,19 @@ def void_sale(*, sale, actor, reason: str = "", request=None) -> Sale:
         actor=actor,
         request=request,
     )
+
+    # The compliance document must agree with the money: a voided sale must
+    # not leave an ISSUED invoice describing money the shop no longer holds.
+    # Imported here — the etims module sits below sales in the dependency
+    # order, and the import direction rule is worth keeping honest.
+    from modules.etims.services import cancel_invoice_for_sale
+
+    cancel_invoice_for_sale(
+        sale=sale,
+        reason=reason or "Sale voided",
+        actor=actor,
+        request=request,
+    )
     return sale
 
 

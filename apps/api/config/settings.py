@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "modules.payments",
     "modules.loyalty",
     "modules.reporting",
+    "modules.etims",
 ]
 
 MIDDLEWARE = [
