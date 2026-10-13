@@ -473,3 +473,64 @@ because conversion is exactly the silent-rewrite shape the ledgers were
 built to refuse. `Payment.amount` remains authoritative per leg and
 `outstanding_for` the only place the remainder is computed, so reports and
 the register cannot disagree about how much is still owed.
+
+## ADR-0017 — A stuck M-Pesa request is settled by asking, never by waiting
+
+**Status:** Accepted
+
+**Context.** Phase 4 audited the M-Pesa flow end to end. The trust layers of
+the callback were already sound (ADR-0012: secret URL segment, request-id
+match against an attempt we issued, amount match against what we asked,
+redelivery de-duplication by the ``webhook_events`` constraint) and were
+left alone. Three integrity gaps remained. First, a PENDING payment was
+settled only when the POS polled its detail — a register whose network
+dropped and whose cashier walked away left the payment PENDING and its
+stock reserved *forever*, because nothing else ever asked. Second, the
+attempt ledger — the rows that exist precisely so reconciliation can answer
+what was asked of the provider and what happened — kept saying PENDING on
+payments that had long since settled. Third, the customer's number was
+addressed to Safaricom in the 0-form the till typed, while the STK Push
+reference and Safaricom's own sample payload send the 254 form.
+
+**Decision.**
+
+- **One settle path, two callers.** ``settle_pending_mpesa`` asks the
+  provider for the truth about an old PENDING STK payment. The provider is
+  the authority: its query settles what it knows, and a "not settled yet"
+  answer leaves the payment PENDING — a timeout is never forced over the
+  provider's own word, because a late success callback must still be able
+  to land. The hard timeout applies only when the provider cannot be asked
+  at all: no credentials, no attempt carrying a request id to query (an
+  initiation that crashed before it reached Safaricom), or a query that
+  blew up. Then the payment is FAILED, the stock reservation is released
+  and a ``payment.timed_out`` audit row is written, in one transaction
+  around a locked re-read so a concurrent callback's COMPLETED can never
+  be clobbered. The POS poll and a new ``reap_stale_mpesa`` management
+  command both call this path, so a payment gets the same decision no
+  matter who is asking.
+- **The sweep is a command, not a thread.** ``reap_stale_mpesa`` walks
+  every PENDING M-Pesa payment old enough to be worth asking about
+  (``STK_RECONCILE_AFTER``) and settles each through the shared path. It is
+  idempotent, safe to overlap, has a ``--dry-run``, and is run on a
+  schedule in production — no new background machinery in the process.
+- **The attempt row carries the final outcome.** Every path that settles a
+  PENDING payment (the callback, the provider query, the void that
+  abandons it) mirrors the payment's settled status onto the attempt that
+  decided it. An attempt that says PENDING on a settled payment is exactly
+  the row reconciliation cannot trust, so it cannot exist.
+- **Number formatting happens once, at the provider boundary.**
+  ``daraja_phone`` renders the subscriber number in the 254 form; the
+  till keeps its 0-form, every layer in between sees the number untouched,
+  and the attempt payload records exactly what was sent to Safaricom.
+
+**Consequences.** An abandoned sale can no longer hold stock indefinitely:
+the worst case is now "ten minutes of held stock, then a released
+reservation with an audit row that says why". The attempt ledger becomes a
+trustworthy record of provider exchanges, which is what the phase-6 eTIMS
+and any future card adapter will inherit through the same interface. The
+timeout's meaning is unchanged for the till — it still fires only when the
+provider cannot be asked — but the sweep makes the till's absence
+consequential to no one. The cost is one cron entry in the deployment
+documentation and a slightly wider ``settle_pending_mpesa`` contract;
+both are cheaper than a reconciliation meeting where the attempt says
+PENDING and the money has been in for a week.

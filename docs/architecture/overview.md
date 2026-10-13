@@ -110,6 +110,11 @@ single undifferentiated app. The split happens in phase 6.
   an explicit amount, M-Pesa legs always charge the remainder, and
   "paid" means the completed legs sum to the total. The drawer ledger records
   every cash leg in the sale's own transaction.
+- **Stuck M-Pesa money is settled by asking, never by waiting.** A PENDING
+  payment is reconciled against the provider both when the POS polls and when
+  the `reap_stale_mpesa` sweep runs — the same path, the same decision
+  (ADR-0017). The timeout fires only when the provider cannot be asked, and
+  the attempt row always carries the final outcome of its exchange.
 
 ## Configuration
 

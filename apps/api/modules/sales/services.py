@@ -229,9 +229,16 @@ def void_sale(*, sale, actor, reason: str = "", request=None) -> Sale:
         ),
         Decimal("0"),
     )
-    payments.filter(status=Payment.Status.PENDING).update(
-        status=Payment.Status.FAILED, updated_at=timezone.now()
-    )
+    from modules.payments.services import sync_attempt_outcome
+
+    pending = list(payments.filter(status=Payment.Status.PENDING))
+    if pending:
+        Payment.objects.filter(pk__in=[payment.pk for payment in pending]).update(
+            status=Payment.Status.FAILED, updated_at=timezone.now()
+        )
+        for payment in pending:
+            payment.status = Payment.Status.FAILED
+            sync_attempt_outcome(payment)
     payments.filter(status=Payment.Status.COMPLETED).update(
         status=Payment.Status.REFUNDED, updated_at=timezone.now()
     )

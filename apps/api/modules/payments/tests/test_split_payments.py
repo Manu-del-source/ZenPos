@@ -39,14 +39,6 @@ def client_for():
     return _client_for
 
 
-@pytest.fixture
-def open_session(cashier, till):
-    """A shift already open at the till, so drawer movements have a home."""
-    return open_cash_session(
-        till=till, actor=cashier, opening_cash=Decimal("1000.00"), request=None
-    )
-
-
 def create_split_sale(cashier, product, till, *, quantity=2, branch=None):
     """A SPLIT sale through the real serializer, so its money is computed."""
     from modules.sales.serializers import SaleSerializer
@@ -65,13 +57,13 @@ def create_split_sale(cashier, product, till, *, quantity=2, branch=None):
     return serializer.save(cashier=cashier)
 
 
-def create_mpesa_sale(cashier, product, till, *, branch=None):
+def create_mpesa_sale(cashier, product, till, *, quantity=1, branch=None):
     """A non-split M-Pesa sale, for the single-payment contract tests."""
     from modules.sales.serializers import SaleSerializer
 
     payload = {
         "payment_method": "MPESA",
-        "items": [{"product": product.id, "quantity": 1}],
+        "items": [{"product": product.id, "quantity": quantity}],
     }
     if branch is not None:
         payload["branch"] = str(branch.pk)
@@ -81,23 +73,6 @@ def create_mpesa_sale(cashier, product, till, *, branch=None):
     )
     serializer.is_valid(raise_exception=True)
     return serializer.save(cashier=cashier)
-
-
-@pytest.fixture
-def stub_provider():
-    """A provider whose initiation always succeeds; callbacks are injectable."""
-    with mock.patch("modules.payments.views.get_payment_provider") as getter:
-        provider = mock.Mock()
-        provider.provider_name = "MPESA"
-        provider.initiate.return_value = StkInitiation(
-            checkout_request_id="ws_SPLIT_OK",
-            merchant_request_id="mr-split",
-            provider_amount=Decimal("1"),
-            request_payload={"Amount": 1},
-            response_payload={"CheckoutRequestID": "ws_SPLIT_OK"},
-        )
-        getter.return_value = provider
-        yield provider
 
 
 def mpesa_callback(amount, receipt="QK-SPLIT-1"):
@@ -233,7 +208,9 @@ class TestSplitCashLegs:
         sale = create_mpesa_sale(cashier, product, till, branch=branch)  # 100.00
         with mock.patch(
             "modules.payments.views.get_payment_provider"
-        ) as getter:
+        ) as getter, mock.patch(
+            "modules.payments.services.get_payment_provider", getter
+        ):
             provider = mock.Mock()
             provider.provider_name = "MPESA"
             provider.initiate.side_effect = PaymentGatewayError("Safaricom declined")
@@ -374,7 +351,11 @@ class TestSplitPartialPaymentGuard:
         item = sale.items.first()
         stock_before = item.product.stock_level
 
-        with mock.patch("modules.payments.views.get_payment_provider") as getter:
+        with mock.patch(
+            "modules.payments.views.get_payment_provider"
+        ) as getter, mock.patch(
+            "modules.payments.services.get_payment_provider", getter
+        ):
             provider = mock.Mock()
             provider.provider_name = "MPESA"
             provider.initiate.side_effect = PaymentGatewayError("Safaricom declined")

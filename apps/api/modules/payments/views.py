@@ -15,15 +15,14 @@ from .base import PaymentCallbackError, PaymentGatewayError
 from .models import Payment
 from .serializers import InitiatePaymentSerializer, PaymentSerializer
 from .services import (
-    STK_HARD_TIMEOUT,
     STK_RECONCILE_AFTER,
     assert_no_pending_stk,
     get_payment_provider,
     handle_mpesa_callback,
     initiate_payment,
     outstanding_for,
-    reconcile_pending_payment,
     release_mpesa_stock_reservation,
+    settle_pending_mpesa,
 )
 
 
@@ -102,41 +101,16 @@ class PaymentViewSet(
     def _reconcile(self, payment):
         """Ask the provider, then fall back to a bounded timeout.
 
-        The provider is the authority. Only when it cannot be asked at all —
-        credentials absent, network down — does the hard timeout apply, and
-        that path releases the reservation so an abandoned sale cannot hold
-        stock forever. Neither path can mark a payment COMPLETED; that remains
-        the callback's job, so a forged response here buys nothing.
+        Delegates to ``settle_pending_mpesa``, shared with the
+        ``reap_stale_mpesa`` command: the provider is the authority, and only
+        when it cannot be asked at all does the hard timeout apply, releasing
+        the reservation so an abandoned sale cannot hold stock forever.
+        Neither path can mark a payment COMPLETED; that remains the callback's
+        job, so a forged response here buys nothing.
         """
-        try:
-            provider = get_payment_provider()
-        except ValueError:
-            provider = None
-
-        if provider is not None:
-            try:
-                return reconcile_pending_payment(payment=payment, provider=provider, request=None)
-            except Exception:
-                # A status poll must never 500 because a provider misbehaved;
-                # the timeout below is the safety net.
-                pass
-
-        if payment.created_at <= timezone.now() - STK_HARD_TIMEOUT:
-            payment.status = Payment.Status.FAILED
-            payment.save(update_fields=["status", "updated_at"])
-            release_mpesa_stock_reservation(sale=payment.sale, request=self.request)
-            record_audit(
-                action="payment.timed_out",
-                entity_type="payment",
-                entity_id=payment.pk,
-                actor=self.request.user,
-                request=self.request,
-                before={"status": Payment.Status.PENDING},
-                after={"status": payment.status},
-            )
-            payment.refresh_from_db()
-
-        return payment
+        return settle_pending_mpesa(
+            payment=payment, actor=self.request.user, request=self.request
+        )
 
 
     def create(self, request, *args, **kwargs):
