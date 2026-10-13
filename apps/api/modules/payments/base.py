@@ -1,9 +1,10 @@
 """The payment provider interface (ADR-0012).
 
 Every payment adapter implements ``PaymentProvider``. The sales domain records
-*that* a payment succeeded — never *how* — so M-Pesa, card and (in phase 8)
-eTIMS adapters slot in behind this interface without the sales domain ever
-learning a provider's vocabulary.
+*that* a payment succeeded — never *how* — so M-Pesa and card adapters slot in
+behind this interface without the sales domain ever learning a provider's
+vocabulary. (eTIMS is not a payment provider: the invoice for a sale is a
+document with its own adapter seam in ``modules.etims`` — ADR-0019.)
 
 Adapters raise, they do not return error codes:
 

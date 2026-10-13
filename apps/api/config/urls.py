@@ -10,6 +10,7 @@ from . import views
 api_v2_patterns = [
     path("", include("modules.accounts.urls")),
     path("", include("modules.branches.urls")),
+    path("", include("modules.expenses.urls")),
     path("", include("modules.catalog.urls")),
     path("", include("modules.customers.urls")),
     path("", include("modules.inventory.urls")),
@@ -18,6 +19,7 @@ api_v2_patterns = [
     path("", include("modules.payments.urls")),
     path("", include("modules.loyalty.urls")),
     path("", include("modules.reporting.urls")),
+    path("", include("modules.etims.urls")),
     path("", include("modules.sales.urls")),
 ]
 

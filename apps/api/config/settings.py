@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "modules.core",
     "modules.organizations",
     "modules.branches",
+    "modules.expenses",
     "modules.accounts",
     "modules.catalog",
     "modules.inventory",
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
     "modules.payments",
     "modules.loyalty",
     "modules.reporting",
+    "modules.etims",
 ]
 
 MIDDLEWARE = [

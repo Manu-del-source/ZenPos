@@ -132,6 +132,46 @@ class TestSaleIdempotency:
         assert second.status_code == 400  # foreign product, not a foreign sale
         assert Sale.objects.count() == 1
 
+    def test_a_replayed_sale_is_not_revalidated_against_changed_stock(
+        self, authenticated_client, product
+    ):
+        """The offline queue's one promise, proved on the server.
+
+        A sale queued on a till while offline can be replayed an hour later,
+        after other tills have sold the same product. The replay must return
+        the original sale — the same stock movement, the same money — and
+        must NOT re-run stock validation, which would 400 on a now-empty
+        shelf and strand cash that was already handed over.
+        """
+        from modules.inventory.models import InventoryMovement
+
+        first = authenticated_client.post(
+            SALES_URL, sale_payload(product, quantity=2, client_reference="offline-1"),
+            format="json",
+        )
+        assert first.status_code == 201
+        sale_id = first.data["id"]
+        movements = lambda: InventoryMovement.objects.filter(  # noqa: E731
+            reference_type="sale", reference_id=sale_id
+        ).count()
+        assert movements() == 1
+
+        # Sell the rest of the shelf away so a fresh validation would fail.
+        product.refresh_from_db()
+        product.stock_level = 0
+        product.save(update_fields=["stock_level"])
+
+        replay = authenticated_client.post(
+            SALES_URL, sale_payload(product, quantity=2, client_reference="offline-1"),
+            format="json",
+        )
+
+        assert replay.status_code == 200, replay.data
+        assert replay.data["id"] == sale_id
+        assert Sale.objects.filter(pk=sale_id).count() == 1
+        # The replay re-ran no stock movement: the shelf moved once, total.
+        assert movements() == 1
+
 
 @pytest.mark.django_db
 class TestSaleBranchAttribution:

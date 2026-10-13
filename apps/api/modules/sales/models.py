@@ -48,6 +48,27 @@ class Sale(models.Model):
         on_delete=models.PROTECT,
         help_text="Where the sale was rung up. Null only for pre-branch rows.",
     )
+    # The register this sale was rung on, and the shift running it. Both are
+    # nullable: clients that predate till support keep working, and a till with
+    # no open session still sells — the session is simply not stamped. When a
+    # session is stamped, cash flows through the drawer are recorded as
+    # movements on it, which is what makes shift reconciliation add up.
+    till = models.ForeignKey(
+        "branches.Till",
+        null=True,
+        blank=True,
+        related_name="sales",
+        on_delete=models.PROTECT,
+        help_text="The register the sale was rung on, if the client named one.",
+    )
+    cash_session = models.ForeignKey(
+        "branches.CashSession",
+        null=True,
+        blank=True,
+        related_name="sales",
+        on_delete=models.PROTECT,
+        help_text="The open session at the till when the sale was created, if any.",
+    )
     client_reference = models.CharField(
         max_length=64,
         blank=True,

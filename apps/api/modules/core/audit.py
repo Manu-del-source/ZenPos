@@ -20,6 +20,26 @@ from .models import AuditLog
 # they never belong in a before/after snapshot.
 NON_STATE_FIELDS = frozenset({"id", "created_at", "updated_at"})
 
+# Field names that hold a secret. These never belong in an audit row, which
+# tenant staff can read with ``audit.view`` — a password hash or an API key
+# in the log is a credential leak dressed up as an audit trail. The filter is
+# unconditional: an explicit field list does not override it, because the
+# day someone writes ``snapshot(user)`` with a model-wide field list is the
+# day the password hash must not reach the log.
+SENSITIVE_FIELDS = frozenset(
+    {
+        "password",
+        "api_key",
+        "secret",
+        "passkey",
+        "consumer_secret",
+        "callback_secret",
+        "token",
+        "access_token",
+        "refresh_token",
+    }
+)
+
 
 def snapshot(instance, fields=None) -> dict | None:
     """Build a shallow, JSON-safe snapshot of an instance.
@@ -31,7 +51,10 @@ def snapshot(instance, fields=None) -> dict | None:
 
     Never point this at a user model without an explicit field list: the
     password hash is a concrete column and must not be copied into an
-    auditable store.
+    auditable store. (The ``SENSITIVE_FIELDS`` filter above makes that
+    specific mistake harmless — sensitive names are dropped even from an
+    explicit list — but the explicit list remains the right habit for
+    anything a tenant staff member should not read about a user.)
     """
     if instance is None:
         return None
@@ -41,6 +64,7 @@ def snapshot(instance, fields=None) -> dict | None:
         if fields is not None
         else [f.name for f in instance._meta.concrete_fields if f.name not in NON_STATE_FIELDS]
     )
+    field_names = [name for name in field_names if name not in SENSITIVE_FIELDS]
 
     data = {}
     for name in field_names:

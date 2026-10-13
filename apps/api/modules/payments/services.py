@@ -15,6 +15,7 @@ Two rules from ADR-0012 shape this file:
   is what the ``webhook_events`` unique constraint provides.
 """
 
+import logging
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
@@ -25,6 +26,8 @@ from modules.sales.services import restore_sale_stock
 
 from .base import PaymentCallbackError, PaymentGatewayError, PaymentProvider
 from .models import Payment, PaymentAttempt, WebhookEvent
+
+logger = logging.getLogger(__name__)
 
 #: A second STK push is refused while one is in flight, so a double-tap at the
 #: till cannot bill the customer twice. Ported from the legacy Node service,
@@ -53,7 +56,16 @@ def release_mpesa_stock_reservation(*, sale, actor=None, request=None) -> int:
     A thin, well-named entry point onto the shared ledger restore, which is
     idempotent by construction: calling it twice restores nothing the second
     time.
+
+    The one refusal: a sale with settled money. If any leg is COMPLETED, the
+    shop is holding cash against these goods, and a silent release would let
+    them be sold again against a partial payment. A partially-paid sale is
+    corrected by a deliberate void, which refunds the settled legs and
+    restores the stock in one audited move (``void_sale`` restores directly
+    and is never blocked by this guard).
     """
+    if Payment.objects.filter(sale=sale, status=Payment.Status.COMPLETED).exists():
+        return 0
     return restore_sale_stock(
         sale=sale,
         actor=actor,
@@ -83,6 +95,23 @@ def get_payment_provider():
         environment=settings.MPESA_ENV,
         callback_secret=settings.MPESA_CALLBACK_SECRET,
     )
+
+
+def outstanding_for(sale) -> Decimal:
+    """How much of the sale is still unpaid, from the payment ledger.
+
+    A sale can be settled in legs (a split: cash now, M-Pesa for the rest),
+    so "is this sale paid" is a sum over its COMPLETED payments, never a flag.
+    PENDING legs count as unpaid: the money is not in yet.
+    """
+    from django.db.models import Sum
+
+    paid = (
+        sale.payments.filter(status=Payment.Status.COMPLETED)
+        .aggregate(total=Sum("amount"))["total"]
+        or Decimal("0")
+    )
+    return sale.total_amount - paid
 
 
 def complete_cash_payment(*, sale, amount, received_by) -> Payment:
@@ -212,6 +241,21 @@ def expected_provider_amount(payment) -> Decimal:
     return payment.amount
 
 
+def sync_attempt_outcome(payment) -> None:
+    """Mirror a payment's settled status onto the attempt that decided it.
+
+    The attempt ledger exists so reconciliation can answer what was asked of
+    the provider and what happened; an attempt that still says PENDING on a
+    settled payment is exactly the row reconciliation cannot trust. Called
+    from every path that settles a PENDING payment: the callback, the
+    provider query and the void that abandons it.
+    """
+    attempt = _attempt_for(payment)
+    if attempt is not None and attempt.status != payment.status:
+        attempt.status = payment.status
+        attempt.save(update_fields=["status"])
+
+
 def _record_webhook_event(*, provider_name: str, external_id: str, payload) -> bool:
     """Store the callback, answering ``False`` if it was already stored.
 
@@ -335,6 +379,14 @@ def handle_mpesa_callback(*, provider: PaymentProvider, payload, request=None) -
             audit_action = "payment.amount_mismatch" if mismatch else "payment.failed"
 
         _mark_processed(provider.provider_name, callback.external_id)
+        sync_attempt_outcome(payment)
+
+        if payment.status == Payment.Status.COMPLETED:
+            # Points follow the money: the sale is fully paid by this leg,
+            # whatever other legs there are. Idempotent per sale.
+            from modules.loyalty.services import award_sale_points_if_paid
+
+            award_sale_points_if_paid(payment.sale, request=request)
 
         record_audit(
             action=audit_action,
@@ -427,6 +479,16 @@ def reconcile_pending_payment(*, payment, provider, request=None) -> Payment:
             release_mpesa_stock_reservation(sale=payment.sale, request=request)
             audit_action = "payment.failed"
 
+        sync_attempt_outcome(payment)
+
+        if payment.status == Payment.Status.COMPLETED:
+            # A lost callback that the provider's query recovers is a payment
+            # that really happened: points follow it, exactly as on the
+            # callback path (same idempotent check).
+            from modules.loyalty.services import award_sale_points_if_paid
+
+            award_sale_points_if_paid(payment.sale, request=request)
+
         record_audit(
             action=audit_action,
             entity_type="payment",
@@ -440,5 +502,68 @@ def reconcile_pending_payment(*, payment, provider, request=None) -> Payment:
                 "result": str(result.get("ResultDesc", ""))[:255],
             },
         )
+    return payment
+
+
+def settle_pending_mpesa(*, payment, actor=None, request=None) -> Payment:
+    """Ask the provider what happened to a stale PENDING STK payment.
+
+    Shared by the POS poll (``PaymentViewSet._reconcile``) and the
+    ``reap_stale_mpesa`` command, so a payment gets the same decision no
+    matter who is asking. The provider is the authority: its query settles
+    what it knows, and a "not settled yet" answer leaves the payment PENDING
+    - a timeout is never forced over the provider's own word. The hard
+    timeout applies only when the provider cannot be asked at all
+    (credentials absent, no attempt carrying a request id to query, network
+    down): the payment is FAILED, the stock reservation is released and the
+    audit row says why, all in one transaction. Neither path can mark a
+    payment COMPLETED on a poll's say-so; that stays the callback's job, and
+    the query's inside ``reconcile_pending_payment``.
+    """
+    try:
+        provider = get_payment_provider()
+    except ValueError:
+        provider = None
+
+    if provider is not None and _attempt_for(payment) is not None:
+        try:
+            payment = reconcile_pending_payment(payment=payment, provider=provider, request=request)
+            if payment.status != Payment.Status.PENDING:
+                return payment
+            # Reachable and asked: the provider still has the request in
+            # flight. Trust its word — a later poll or sweep asks again.
+            return payment
+        except Exception:
+            # A status poll must never crash its caller (a poll must not 500,
+            # a sweep must not die mid-run); the timeout below is the safety
+            # net.
+            logger.exception("M-Pesa status poll failed for payment %s", payment.pk)
+
+    # Everything from here is "the provider could not be asked": no
+    # credentials, no attempt carrying a request id to query (an initiation
+    # that crashed before it reached Safaricom), or a query that blew up.
+
+    if payment.created_at <= timezone.now() - STK_HARD_TIMEOUT:
+        with transaction.atomic():
+            # Re-read under lock: a callback may have settled the payment
+            # between the caller's SELECT and now, and COMPLETED must never
+            # be clobbered by a timeout.
+            payment = Payment.objects.select_for_update().get(pk=payment.pk)
+            if payment.status != Payment.Status.PENDING:
+                return payment
+            payment.status = Payment.Status.FAILED
+            payment.save(update_fields=["status", "updated_at"])
+            sync_attempt_outcome(payment)
+            release_mpesa_stock_reservation(sale=payment.sale, request=request)
+            record_audit(
+                action="payment.timed_out",
+                entity_type="payment",
+                entity_id=payment.pk,
+                actor=actor,
+                request=request,
+                before={"status": Payment.Status.PENDING},
+                after={"status": payment.status},
+            )
+            payment.refresh_from_db()
     return payment
 

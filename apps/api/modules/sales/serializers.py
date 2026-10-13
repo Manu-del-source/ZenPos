@@ -4,7 +4,8 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
-from modules.branches.models import Branch
+from modules.branches.models import Branch, CashMovement, CashSession, Till
+from modules.branches.services import record_cash_movement
 from modules.catalog.models import Product
 from modules.core.audit import record_audit
 from modules.core.serializers import OrganizationScopedSerializerMixin
@@ -98,7 +99,7 @@ class SaleItemSerializer(OrganizationScopedSerializerMixin, serializers.ModelSer
 
 
 class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSerializer):
-    organization_bound_fields = ("customer",)
+    organization_bound_fields = ("customer", "till")
 
     items = SaleItemSerializer(many=True)
     payments = PaymentSerializer(many=True, read_only=True)
@@ -116,6 +117,11 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
     branch = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(), required=False, allow_null=True
     )
+    till = serializers.PrimaryKeyRelatedField(
+        queryset=Till.objects.all(), required=False, allow_null=True,
+        help_text="Optional: the register this sale is rung on. The session open at "
+        "that till, if any, is stamped by the server.",
+    )
 
     class Meta:
         model = Sale
@@ -128,6 +134,8 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             "organization",
             "branch",
             "branch_name",
+            "till",
+            "cash_session",
             "customer",
             "customer_name",
             "total_amount",
@@ -147,6 +155,7 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             "sale_number",
             "cashier",
             "organization",
+            "cash_session",
             "total_amount",
             "tax_amount",
             "discount_amount",
@@ -157,9 +166,13 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         )
 
     def validate_payment_method(self, value):
-        if value not in {Sale.PaymentMethod.CASH, Sale.PaymentMethod.MPESA}:
+        if value not in {
+            Sale.PaymentMethod.CASH,
+            Sale.PaymentMethod.MPESA,
+            Sale.PaymentMethod.SPLIT,
+        }:
             raise serializers.ValidationError(
-                "Only CASH and MPESA are currently supported at the POS."
+                "Only CASH, MPESA and SPLIT are supported at the POS."
             )
         return value
 
@@ -196,6 +209,51 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
                 "You are not posted to that branch, so you cannot sell from it."
             )
         return branch
+
+    def validate_till(self, till):
+        """A register the caller may actually work: same tenant, posted branch."""
+        if till is None:
+            return None
+        user = self.request_user
+        if user is None or not getattr(user, "is_authenticated", False):
+            return till
+
+        if getattr(user, "is_superuser", False):
+            return till
+
+        organization_id = getattr(user, "organization_id", None)
+        if till.organization_id != organization_id:
+            raise serializers.ValidationError(
+                "That till belongs to a different organization."
+            )
+
+        allowed = set(user.branch_access.values_list("branch_id", flat=True))
+        if allowed and till.branch_id not in allowed:
+            raise serializers.ValidationError(
+                "You are not posted to that till's branch, so you cannot sell from it."
+            )
+        return till
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        till = attrs.get("till")
+        branch = attrs.get("branch")
+        if till is not None and branch is not None and till.branch_id != branch.pk:
+            raise serializers.ValidationError(
+                {"till": "That till is at a different branch than the one you selected."}
+            )
+        return attrs
+
+    def _open_session_for_till(self, till):
+        """The session open at this till, locked so a same-instant close cannot
+        race: the sale either lands in the session before it is counted or it
+        misses and belongs to the next shift. At most one row can match, by
+        the till's partial unique constraint."""
+        return (
+            CashSession.objects.select_for_update()
+            .filter(till_id=till.pk, status=CashSession.Status.OPEN)
+            .first()
+        )
 
     def _resolve_branch(self, cashier):
         """Where this sale happened.
@@ -290,6 +348,15 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         branch = self._resolve_branch(cashier)
         reference = validated_data.pop("client_reference", "")
 
+        # A named register is the authority on where the sale happened and
+        # which shift owns its cash. The session is resolved server-side — the
+        # client cannot claim a session it does not have open at that till.
+        till = validated_data.pop("till", None)
+        cash_session = None
+        if till is not None:
+            branch = till.branch
+            cash_session = self._open_session_for_till(till)
+
         # Idempotency, decided by the client's reference rather than by
         # anything the client claims about the sale: a POS retry after a
         # dropped connection must not become a second sale with a second stock
@@ -307,6 +374,8 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             **validated_data,
             "organization_id": cashier.organization_id,
             "branch": branch,
+            "till": till,
+            "cash_session": cash_session,
         }
 
         try:
@@ -335,6 +404,13 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
             payment = complete_cash_payment(
                 sale=sale, amount=computed_total, received_by=sale.cashier
             )
+            # Cash is completed money: the sale is fully paid the moment this
+            # leg exists, so this is where a cash sale earns its points. The
+            # creation signal could not award yet — the payment did not exist
+            # when the sale row was written.
+            from modules.loyalty.services import award_sale_points_if_paid
+
+            award_sale_points_if_paid(sale, actor=sale.cashier)
             record_audit(
                 action="payment.completed",
                 entity_type="payment",
@@ -348,6 +424,20 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
                     "status": payment.status,
                 },
             )
+            if cash_session is not None:
+                # Cash in the drawer. Shift reconciliation only holds if the
+                # drawer's ledger recorded it; M-Pesa never touches the drawer
+                # and gets no movement here.
+                record_cash_movement(
+                    session=cash_session,
+                    movement_type=CashMovement.Type.CASH_IN,
+                    source=CashMovement.Source.SALE,
+                    amount=computed_total,
+                    reason=f"Sale {sale.sale_number}",
+                    reference=sale.sale_number,
+                    actor=sale.cashier,
+                    request=self.context.get("request"),
+                )
 
         for line in lines:
             line.pop("quantity")

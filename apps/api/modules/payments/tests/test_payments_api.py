@@ -55,8 +55,17 @@ def create_sale(cashier, product, *, sale_number="SALE-1", quantity=2):
 
 @pytest.fixture
 def stub_provider():
-    """A provider whose initiate always succeeds and callbacks are injectable."""
-    with mock.patch("modules.payments.views.get_payment_provider") as getter:
+    """A provider whose initiate always succeeds and callbacks are injectable.
+
+    Patched in both namespaces the module is imported from: the views (init,
+    callback) and the services (settle/reap), so no test path can reach the
+    real provider construction.
+    """
+    with mock.patch(
+        "modules.payments.views.get_payment_provider"
+    ) as getter, mock.patch(
+        "modules.payments.services.get_payment_provider", getter
+    ):
         provider = mock.Mock()
         provider.provider_name = "MPESA"
         provider.initiate.return_value = StkInitiation(

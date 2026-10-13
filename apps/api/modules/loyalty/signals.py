@@ -16,14 +16,13 @@ def award_points_on_sale(sender, instance, created, **kwargs):
         return
     if instance.status != Sale.Status.COMPLETED:
         return
-    if instance.payment_method == Sale.PaymentMethod.MPESA:
-        # Points wait until the payment completes; the payment service will
-        # not call us, so we still award on create for cash and for M-Pesa
-        # only once COMPLETED payments exist. Cash sales are completed here.
-        pass
-    from .services import award_sale_points
+    # Points follow the money. A cash sale is fully paid at creation and
+    # earns here; a sale with unsettled legs (M-Pesa not yet confirmed, a
+    # split still owing) earns nothing until the payments module calls the
+    # same check when the last leg completes.
+    from .services import award_sale_points_if_paid
 
-    award_sale_points(instance, actor=instance.cashier)
+    award_sale_points_if_paid(instance, actor=instance.cashier)
 
 
 @receiver(post_save, sender=SaleReturn)

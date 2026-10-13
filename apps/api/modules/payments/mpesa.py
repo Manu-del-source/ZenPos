@@ -46,6 +46,21 @@ def _redact(payload: dict) -> dict:
     return {key: (REDACTED if key in REDACTED_KEYS else value) for key, value in payload.items()}
 
 
+def daraja_phone(phone: str) -> str:
+    """A subscriber number in the 254 form the Daraja sample sends.
+
+    The till validates ``0(1|7)xxxxxxxx`` at the API boundary, but the
+    STK Push reference (and Safaricom's own sample payload) address the
+    customer as ``2547...``. Normalising here, at the provider boundary,
+    keeps every layer between the till and Safaricom free of number
+    rewrites — the attempt payload records exactly what was sent.
+    """
+    digits = phone.strip()
+    if digits.startswith("0"):
+        return "254" + digits[1:]
+    return digits
+
+
 def mpesa_callback_url(base_callback_url: str, callback_secret: str) -> str:
     """The full callback URL, with the secret path segment embedded.
 
@@ -187,9 +202,9 @@ class MpesaProvider(PaymentProvider):
             "Timestamp": timestamp,
             "TransactionType": "CustomerPayBillOnline",
             "Amount": int(provider_amount),
-            "PartyA": phone,
+            "PartyA": daraja_phone(phone),
             "PartyB": self.shortcode,
-            "PhoneNumber": phone,
+            "PhoneNumber": daraja_phone(phone),
             "CallBackURL": self.callback_url,
             "AccountReference": f"SALE-{payment.sale_id}",
             "TransactionDesc": "ZenPOS payment",

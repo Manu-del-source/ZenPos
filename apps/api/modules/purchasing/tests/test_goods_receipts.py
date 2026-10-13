@@ -73,19 +73,28 @@ def approved_order(db, organization, branch, supplier, inventory_manager, produc
     return order
 
 
-def _line_payload(order, quantity="10"):
+def _line_payload(order, quantity="10", unit_cost=None):
     po_line = order.lines.first()
+    line = {
+        "purchase_order_line": str(po_line.pk),
+        "quantity_received": quantity,
+    }
+    if unit_cost is not None:
+        line["unit_cost"] = unit_cost
     return {
         "purchase_order": str(order.pk),
         "delivery_note": "DN-1",
         "received_date": "2026-10-08",
-        "lines": [
-            {
-                "purchase_order_line": str(po_line.pk),
-                "quantity_received": quantity,
-            }
-        ],
+        "lines": [line],
     }
+
+
+def _post(inventory_client, payload):
+    created = inventory_client.post(GRN_URL, payload, format="json")
+    assert created.status_code == 201, created.data
+    posted = inventory_client.post(f"{GRN_URL}{created.data['id']}/post/")
+    assert posted.status_code == 200, posted.data
+    return GoodsReceivedNote.objects.get(pk=created.data["id"])
 
 
 class TestGoodsReceiptCreate:
@@ -265,7 +274,6 @@ class TestGoodsReceiptPost:
 
     def test_post_requires_receive_permission(self, api_client, cashier, approved_order):
         # Build a draft as the inventory manager, then a cashier tries to post.
-        from modules.accounts.models import UserBranchAccess
         from modules.accounts.models import User as Staff
 
         manager = Staff.objects.get(username="inventory1")
@@ -325,3 +333,111 @@ class TestGoodsReceiptPost:
         assert response.status_code == 200, response.data
         assert response.data["status"] == GoodsReceivedNote.Status.DRAFT
         assert Decimal(response.data["lines"][0]["quantity_received"]) == Decimal("10")
+
+
+class TestCostBasis:
+    """Posting a receipt moves the catalogue cost column to the weighted
+    average of what was on hand and what was just paid — the column that
+    sale-line cost snapshots and the P&L's COGS read from."""
+
+    def test_receipt_at_new_cost_moves_the_basis(
+        self, inventory_client, approved_order, product
+    ):
+        """50 on hand at 80.00, receive 10 at 100.00 -> (50x80 + 10x100) / 60."""
+        _post(inventory_client, _line_payload(approved_order, "10", unit_cost="100.00"))
+
+        product.refresh_from_db()
+        assert product.stock_level == 60
+        assert product.cost_price == Decimal("83.33")
+
+        row = AuditLog.objects.get(action="product.cost_updated")
+        assert row.before == {"cost_price": "80.00"}
+        assert row.after["cost_price"] == "83.33"
+        assert "PO-000001" in row.after["reason"]
+
+    def test_receipt_at_the_current_cost_churns_nothing(
+        self, inventory_client, approved_order, product
+    ):
+        """The existing receipts all pay the catalog cost: the column and the
+        audit log must stay quiet, or every post would explain nothing."""
+        _post(inventory_client, _line_payload(approved_order, "4"))
+
+        product.refresh_from_db()
+        assert product.stock_level == 54
+        assert product.cost_price == Decimal("80.00")
+        assert not AuditLog.objects.filter(action="product.cost_updated").exists()
+
+    def test_zero_cost_receipt_moves_stock_not_basis(
+        self, inventory_client, approved_order, product
+    ):
+        """A donation or free sample has no price to average in: diluting the
+        real cost basis with zeros would understate every future COGS line."""
+        _post(inventory_client, _line_payload(approved_order, "5", unit_cost="0.00"))
+
+        product.refresh_from_db()
+        assert product.stock_level == 55
+        assert product.cost_price == Decimal("80.00")
+        assert not AuditLog.objects.filter(action="product.cost_updated").exists()
+
+    def test_first_receipt_defines_the_basis(
+        self, organization, branch, supplier, inventory_client, inventory_manager
+    ):
+        """Nothing on hand: a stale cost column is a guess, and the receipt
+        replaces it outright."""
+        from modules.catalog.models import Product
+
+        product = Product.objects.create(
+            organization=organization,
+            name="Honey 250g",
+            sku="HONEY-250",
+            price="300.00",
+            cost_price="0.00",
+            stock_level=0,
+        )
+        order = PurchaseOrder.objects.create(
+            organization=organization,
+            branch=branch,
+            supplier=supplier,
+            created_by=inventory_manager,
+            status=PurchaseOrder.Status.APPROVED,
+            number="PO-COSTFIRST",
+        )
+        order.lines.create(product=product, quantity=5, unit_cost="120.00")
+
+        _post(inventory_client, _line_payload(order, "5"))
+
+        product.refresh_from_db()
+        assert product.stock_level == 5
+        assert product.cost_price == Decimal("120.00")
+
+    def test_second_receipt_averages_against_the_updated_basis(
+        self,
+        inventory_client,
+        approved_order,
+        product,
+        organization,
+        branch,
+        supplier,
+        inventory_manager,
+    ):
+        """The basis is a running average: the second receipt blends against
+        the cost the first receipt left behind, not the original column."""
+        _post(inventory_client, _line_payload(approved_order, "10", unit_cost="100.00"))
+        product.refresh_from_db()
+        assert product.cost_price == Decimal("83.33")
+
+        second = PurchaseOrder.objects.create(
+            organization=organization,
+            branch=branch,
+            supplier=supplier,
+            created_by=inventory_manager,
+            status=PurchaseOrder.Status.APPROVED,
+            number="PO-COSTSECOND",
+        )
+        second.lines.create(product=product, quantity=10, unit_cost="110.00")
+        _post(inventory_client, _line_payload(second, "10"))
+
+        product.refresh_from_db()
+        assert product.stock_level == 70
+        # (60 x 83.33 + 10 x 110.00) / 70
+        assert product.cost_price == Decimal("87.14")

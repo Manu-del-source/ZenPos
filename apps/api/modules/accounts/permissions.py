@@ -28,6 +28,8 @@ an open endpoint.
 from django.db.models import Q
 from rest_framework.permissions import BasePermission
 
+from modules.organizations.models import Organization
+
 from .models import Permission, RolePermission, UserRole
 
 
@@ -80,6 +82,18 @@ def user_has_permission(user, code, branch_id=None):
     ).exists()
 
 
+def tenant_is_active(user) -> bool:
+    """Whether the user's organization is still accepting business.
+
+    Platform accounts belong to no organization, and the switch only exists to
+    stop a tenant — never the platform itself — so they always pass.
+    """
+    organization_id = getattr(user, "organization_id", None)
+    if organization_id is None:
+        return True
+    return Organization.objects.filter(pk=organization_id, is_active=True).exists()
+
+
 def required_permissions(view):
     """The permission codes a view demands for the action being performed."""
     action = getattr(view, "action", None)
@@ -103,6 +117,17 @@ class HasPermission(BasePermission):
     def has_permission(self, request, view):
         user = request.user
         if not getattr(user, "is_authenticated", False):
+            return False
+
+        # A deactivated account stops working the moment the flag flips: a
+        # held access token is a key, not a person, and the refresh path is
+        # separately refused in the token views.
+        if not getattr(user, "is_active", False):
+            return False
+
+        # A suspended tenant stops working for every one of its users, for
+        # the same reason.
+        if not tenant_is_active(user):
             return False
 
         # Branch scope is not resolved here: at this point the view does not yet

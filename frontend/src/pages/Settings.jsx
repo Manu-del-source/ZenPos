@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, LogOut, Plus, ShieldCheck, Store, UserRound, X } from 'lucide-react';
+import { Building2, Gift, LogOut, Pencil, Plus, ShieldCheck, Store, UserRound, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { apiError, logout } from '../services/api';
 
@@ -8,11 +8,16 @@ export default function Settings() {
   try { user = JSON.parse(localStorage.getItem('user') || '{}'); } catch { /* ignore */ }
   const organization = user?.organization_name || user?.organization?.name || 'ZenPOS Store';
   const canManage = user?.is_superuser || (Array.isArray(user?.permissions) && user.permissions.includes('branches.manage'));
+  const canManageLoyalty = user?.is_superuser || (Array.isArray(user?.permissions) && user.permissions.includes('loyalty.manage'));
 
   const [branches, setBranches] = useState([]);
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [org, setOrg] = useState(null);
+  const [orgDraft, setOrgDraft] = useState(null);
+  const [loyaltyRule, setLoyaltyRule] = useState(undefined);
+  const [loyaltyDraft, setLoyaltyDraft] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -25,9 +30,72 @@ export default function Settings() {
       const { data } = await api.get('/users/', { params: { page_size: 100 } });
       setUsers(Array.isArray(data) ? data : data.results || []);
     } catch { /* view-only users may 403 */ }
+    // A tenant reads its own organization back from the API (one row); a
+    // superuser sees every organization, where the profile belongs to the
+    // platform surface instead, so the card stays read-only for them.
+    if (!user.is_superuser) {
+      try {
+        const { data } = await api.get('/organizations/', { params: { page_size: 1 } });
+        const rows = Array.isArray(data) ? data : data.results || [];
+        setOrg(rows[0] || null);
+      } catch { /* the card falls back to the profile copy */ }
+    }
+    if (canManageLoyalty) {
+      try {
+        const { data } = await api.get('/loyalty-rules/', { params: { page_size: 1 } });
+        const rows = Array.isArray(data) ? data : data.results || [];
+        setLoyaltyRule(rows[0] || null);
+      } catch { setLoyaltyRule(null); }
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const saveOrg = async (event) => {
+    event.preventDefault();
+    if (!org || !orgDraft.name.trim()) return toast.error('The organization needs a name.');
+    setSaving(true);
+    try {
+      await api.patch(`/organizations/${org.id}/`, {
+        name: orgDraft.name.trim(),
+        currency: orgDraft.currency.trim().toUpperCase(),
+        timezone: orgDraft.timezone.trim(),
+      });
+      toast.success('Organization updated');
+      setOrgDraft(null);
+      await load();
+    } catch (err) {
+      toast.error(apiError(err, 'Could not save the organization'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveLoyaltyRule = async (event) => {
+    event.preventDefault();
+    const amount = Number(loyaltyDraft.amount);
+    const points = Number(loyaltyDraft.points);
+    if (!Number.isFinite(amount) || amount <= 0) return toast.error('Enter a KES amount above zero per point.');
+    if (!Number.isInteger(points) || points <= 0) return toast.error('Enter a whole number of points.');
+    setSaving(true);
+    try {
+      if (loyaltyRule?.id) {
+        await api.patch(`/loyalty-rules/${loyaltyRule.id}/`, {
+          amount: loyaltyDraft.amount, points, is_active: loyaltyDraft.is_active,
+        });
+        toast.success('Loyalty rule updated');
+      } else {
+        await api.post('/loyalty-rules/', { amount: loyaltyDraft.amount, points });
+        toast.success('Loyalty program enabled');
+      }
+      setLoyaltyDraft(null);
+      await load();
+    } catch (err) {
+      toast.error(apiError(err, 'Could not save the loyalty rule'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const saveBranch = async (event) => {
     event.preventDefault();
@@ -67,13 +135,39 @@ export default function Settings() {
         <section className="panel">
           <div className="panel-header">
             <div><h2 className="panel-title">Workspace</h2><p className="panel-subtitle">Current organization context</p></div>
-            <Building2 size={18} className="text-blue-400" />
+            {!user.is_superuser && org && (
+              <button
+                className="btn-secondary !px-3 !py-1.5 !text-xs"
+                onClick={() => (orgDraft ? setOrgDraft(null) : setOrgDraft({ name: org.name, currency: org.currency || 'KES', timezone: org.timezone || 'Africa/Nairobi' }))}
+              >
+                <Pencil size={13} className="mr-1 inline" />{orgDraft ? 'Cancel' : 'Edit'}
+              </button>
+            )}
           </div>
-          <div className="space-y-4 p-5">
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs uppercase tracking-wider text-slate-500">Organization</p><p className="mt-1 font-semibold text-white">{organization}</p></div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs uppercase tracking-wider text-slate-500">Currency</p><p className="mt-1 font-semibold text-white">KES — Kenyan Shilling</p></div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs uppercase tracking-wider text-slate-500">Timezone</p><p className="mt-1 font-semibold text-white">Africa/Nairobi</p></div>
-          </div>
+          {orgDraft ? (
+            <form onSubmit={saveOrg} className="space-y-4 p-5">
+              <label className="block">
+                <span className="text-xs uppercase tracking-wider text-slate-500">Organization</span>
+                <input className="input mt-1" value={orgDraft.name} onChange={(e) => setOrgDraft({ ...orgDraft, name: e.target.value })} />
+              </label>
+              <label className="block">
+                <span className="text-xs uppercase tracking-wider text-slate-500">Currency (ISO 4217)</span>
+                <input className="input mt-1" maxLength={3} value={orgDraft.currency} onChange={(e) => setOrgDraft({ ...orgDraft, currency: e.target.value })} />
+              </label>
+              <label className="block">
+                <span className="text-xs uppercase tracking-wider text-slate-500">Timezone</span>
+                <input className="input mt-1" value={orgDraft.timezone} onChange={(e) => setOrgDraft({ ...orgDraft, timezone: e.target.value })} />
+              </label>
+              <button type="submit" className="btn-primary w-full" disabled={saving}><Building2 size={16} />{saving ? 'Saving…' : 'Save organization'}</button>
+            </form>
+          ) : (
+            <div className="space-y-4 p-5">
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs uppercase tracking-wider text-slate-500">Organization</p><p className="mt-1 font-semibold text-white">{org?.name || organization}</p></div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs uppercase tracking-wider text-slate-500">Currency</p><p className="mt-1 font-semibold text-white">{org?.currency || 'KES'} — set on the profile</p></div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs uppercase tracking-wider text-slate-500">Timezone</p><p className="mt-1 font-semibold text-white">{org?.timezone || 'Africa/Nairobi'}</p></div>
+              {user.is_superuser && <p className="px-1 text-[11px] text-slate-600">Platform superusers manage organizations from the Super Admin console.</p>}
+            </div>
+          )}
         </section>
         <section className="panel">
           <div className="panel-header">
@@ -96,6 +190,67 @@ export default function Settings() {
           </div>
         </section>
       </div>
+
+      {canManageLoyalty && (
+        <section className="panel mt-5">
+          <div className="panel-header">
+            <div>
+              <h2 className="panel-title">Loyalty program</h2>
+              <p className="panel-subtitle">Paid sales earn their customers points automatically under this rule</p>
+            </div>
+            {loyaltyRule ? (
+              <button
+                className="btn-secondary !py-2"
+                onClick={() => (loyaltyDraft ? setLoyaltyDraft(null) : setLoyaltyDraft({ amount: String(loyaltyRule.amount), points: String(loyaltyRule.points), is_active: loyaltyRule.is_active !== false }))}
+              >
+                <Pencil size={15} /> {loyaltyDraft ? 'Cancel' : 'Edit rule'}
+              </button>
+            ) : (
+              <button
+                className="btn-primary !py-2"
+                onClick={() => setLoyaltyDraft({ amount: '', points: '', is_active: true })}
+                disabled={loyaltyDraft !== null}
+              >
+                <Gift size={15} /> Enable loyalty
+              </button>
+            )}
+          </div>
+          {loyaltyDraft ? (
+            <form onSubmit={saveLoyaltyRule} className="grid gap-4 p-5 md:grid-cols-3">
+              <label className="block">
+                <span className="text-xs uppercase tracking-wider text-slate-500">KES per earning step</span>
+                <input className="input mt-1" inputMode="decimal" step="any" min="0" placeholder="100" value={loyaltyDraft.amount} onChange={(e) => setLoyaltyDraft({ ...loyaltyDraft, amount: e.target.value })} />
+                <span className="mt-1 block text-[11px] text-slate-600">For every KES amount of paid sales, the customer earns the points below.</span>
+              </label>
+              <label className="block">
+                <span className="text-xs uppercase tracking-wider text-slate-500">Points earned per step</span>
+                <input className="input mt-1" inputMode="numeric" type="number" min="1" step="1" placeholder="1" value={loyaltyDraft.points} onChange={(e) => setLoyaltyDraft({ ...loyaltyDraft, points: e.target.value })} />
+              </label>
+              {loyaltyRule?.id && (
+                <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-300">
+                  <input type="checkbox" className="h-4 w-4" checked={loyaltyDraft.is_active} onChange={(e) => setLoyaltyDraft({ ...loyaltyDraft, is_active: e.target.checked })} />
+                  Rule active (new sales keep earning)
+                </label>
+              )}
+              <div className="md:col-span-3">
+                <button type="submit" className="btn-primary" disabled={saving}><Gift size={16} />{saving ? 'Saving…' : loyaltyRule ? 'Save rule' : 'Enable program'}</button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4 p-5">
+              <div className="flex flex-wrap gap-4">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs uppercase tracking-wider text-slate-500">Rate</p><p className="mt-1 font-semibold text-white">{loyaltyRule ? `KES ${loyaltyRule.amount} → ${loyaltyRule.points} point${Number(loyaltyRule.points) === 1 ? '' : 's'}` : 'Not enabled'}</p></div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4"><p className="text-xs uppercase tracking-wider text-slate-500">Status</p><p className="mt-1 font-semibold text-white">{loyaltyRule ? (loyaltyRule.is_active === false ? 'Paused' : 'Active') : '—'}</p></div>
+              </div>
+              <p className="px-1 text-xs leading-5 text-slate-500">
+                Earnings post to each customer's loyalty ledger when a sale is paid; balances
+                can only be raised by that ledger, never keyed in by hand. Points adjust
+                manually from the Customers page.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="panel mt-5">
         <div className="panel-header">

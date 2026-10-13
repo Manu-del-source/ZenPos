@@ -14,7 +14,7 @@ the status table before assuming an entity is real.
 | `organizations`, `branches` | built |
 | `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_branch_access` | built |
 | `categories`, `brands`, `units`, `tax_rates`, `products`, `product_barcodes`, `price_history` | built |
-| `customers` | partial — organization-scoped in phase 4; UUID key, soft deletion and the loyalty ledger arrive in phase 9 |
+| `customers` | organization-scoped (phase 4), soft-deleted and on the loyalty ledger (phase 8); the UUID key is deferred to the multi-tenant phase |
 | `sales`, `sale_items` | **still the pre-rebuild single-branch tables** — no `branch_id`, no `till_id`, no `payments`. Phase 6 replaces them. Phase 5 added the server-captured money columns: `sale_items.unit_cost` and the per-line tax snapshot (`tax_amount`, `tax_rate_name`, `tax_rate_percent`) |
 | `stock_adjustments` | interim: stock still lives in a `products.stock_level` column and movement history is an adjustment, not a ledger. Phase 7 replaces it |
 | everything else below | planned, not built |
@@ -95,12 +95,23 @@ inventory_movements    id, branch_id, product_id, delta, quantity_after,
 stock_transfers        id, from_branch_id, to_branch_id, status, requested_by,
                        approved_by, created_at, completed_at
 stock_transfer_items   id, transfer_id, product_id, quantity
+stock_counts           id, organization_id, branch_id, number, counted_at,
+                       counted_by, notes, created_at   (UNIQUE organization_id, number)
+stock_count_lines      id, stock_count_id, product_id, book_quantity,
+                       counted_quantity, variance
 ```
 
 `inventory_movements` is the append-only ledger and the source of truth for stock
 history. `branch_inventory.quantity` is the current snapshot and must always
 equal the sum of movements for that product and branch — a reconciliation check
 should assert this in CI.
+
+A posted stock count writes one `STOCK_COUNT` movement per product whose shelf
+did not agree with the book, each referencing the count row; zero-variance
+products record a line but no movement. A posted goods received note also moves
+the catalogue `cost_price` to the weighted average of the on-hand stock and the
+receipt (never for zero-cost receipts, never when it would not change) — the
+column sale-line cost snapshots and the P&L's COGS read from (ADR-0020).
 
 ### Purchasing
 
@@ -154,22 +165,39 @@ cash_movements     id, cash_session_id, type (SALE|REFUND|WITHDRAWAL|ADDITION|
 ### Customers and loyalty
 
 ```
-customers            id, organization_id, name, phone, email, is_active, deleted_at
-customer_loyalty     id, customer_id, points_balance, tier, updated_at
-loyalty_transactions id, customer_id, sale_id, type (EARN|REDEEM|EXPIRE|ADJUST),
-                     points, balance_after, reason, actor_id, created_at
+customers            id, organization_id, name, phone, created_at, deleted_at
+                     (unique organization_id + phone among LIVE rows)
+loyalty_rule         id, organization_id (unique), amount, points, is_active,
+                     created_at, updated_at
+loyalty_account      id, organization_id, customer_id (unique), points_balance,
+                     created_at, updated_at
+loyalty_ledger       id, organization_id, account_id, customer_id, branch_id
+                     (nullable), points (signed), action (EARN|REDEEM|ADJUST|
+                     REVERSAL|EXPIRE), reference_type, reference_id, notes,
+                     actor_id (nullable), balance_after, created_at, updated_at
+                     (unique organization_id + action + reference_type +
+                     reference_id when reference_id != "")
 ```
-
-Balances are derived from the ledger. Directly assigning a balance is pzenposbited
-because it destroys the ability to explain why a customer has the points they do.
 
 Phase 4 gave `customers` its `organization_id` and moved phone uniqueness from
 globally unique to unique per organization, because a customer list is a phone
-book of real people and one shop's staff must not read another shop's. The
-integer key and single `created_at` are also deliberate for now: phase 9 rebuilds
-the table with a UUID key, soft deletion and the loyalty ledger, and changing the
-primary key before then would drag `sales.customer_id` and the API shape along
-with it for no benefit.
+book of real people and one shop's staff must not read another shop's.
+
+Phase 8 completed the rebuild the phase-4 notes had scheduled, with one deferral
+(ADR-0021). The mutable `customers.loyalty_points` column is gone: the balance
+is `loyalty_account.points_balance`, maintained transactionally by the ledger
+(`balance_after` on every entry, idempotent per sale), and existing balances were
+carried over into accounts with an explanatory `ADJUST` entry before the column
+was dropped — no points destroyed, and what was once a balance any client
+could patch is now a balance where every change is explainable. The unique
+org+phone constraint is conditional on the row being live, so `DELETE`
+archives a customer (`deleted_at`) instead of deleting them: the directory,
+retrieve and phone search all answer 404 from then on and the number is free
+for reuse, while every sale they ever made keeps pointing at the row.
+
+The integer key is deliberate for now: re-keying `customers` to UUIDs rewrites
+`sales.customer_id` and the customer API shape, which pays off only with the
+multi-tenant phase's offline identity work, not before.
 
 ### Platform
 
@@ -186,9 +214,49 @@ webhook_events   id, provider, external_id (unique per provider), payload,
 `webhook_events` with a unique `(provider, external_id)` is what stops a
 redelivered M-Pesa callback from paying a sale twice.
 
+The two lifecycle switches are enforced at every boundary (ADR-0022):
+`organizations.is_active` and `users.is_active` are checked in
+`HasPermission` (every API call, so a held token dies when the flag flips),
+in the login serializer (no new tokens for a suspended tenant) and in the
+refresh view (no extended sessions — the token views sit outside the
+permission layer by design, so this one is checked there). `is_active` is
+not tenant-writable through the profile endpoint; only the platform surface
+flips it:
+
+```
+POST /api/v2/platform/organizations/            onboard: organization + first
+                                                branch + first ADMIN, one
+                                                audited transaction
+POST /api/v2/platform/organizations/{id}/suspend/   organization.suspended
+POST /api/v2/platform/organizations/{id}/activate/  organization.activated
+```
+
+The platform routes are superuser-only via a dedicated check, outside the
+tenant role vocabulary: a tenant admin with every tenant permission is a 403
+there, and another tenant's organization is a 404.
+
+### eTIMS invoices (phase 6)
+
+```
+etims_devices    id, organization_id, name, kda_pin, device_number, api_key,
+                 is_active, created_at, updated_at   (unique organization_id, name)
+etims_invoices   id, sale_id (unique, PROTECT), device_id (nullable, PROTECT),
+                 status (ISSUED|CANCELLED), uin, issued_at, cancelled_at,
+                 cancellation_reason, line_items (JSON), tax_breakdown (JSON),
+                 subtotal, tax_amount, total_amount, currency,
+                 created_at, updated_at
+```
+
+One invoice per sale, written by the domain at issue and corrected only by
+cancellation: `void_sale` cancels the sale's invoice in the same change the
+cash leaves the drawer. `line_items` and `tax_breakdown` are string snapshots
+from the persisted sale rows — the same source the receipt prints — so a
+later catalogue change rewrites the document no more than it rewrites the
+receipt. `uin` is assigned by KRA, never by this system: a verified
+transmission adapter writes it, and until one exists the field is blank and
+the deployment claims nothing has been transmitted (ADR-0019).
+
 ## Deferred
 
-`mpesa_transactions`, `notifications`, `ecommerce_orders` and `etims_invoices`
-are designed during their phases rather than up front. The sales domain will
-interact with eTIMS only through an adapter, so compliance never leaks into the
-sales engine.
+`mpesa_transactions`, `notifications` and `ecommerce_orders` are designed
+during their phases rather than up front.

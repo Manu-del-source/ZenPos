@@ -40,12 +40,12 @@ class TestLoyalty:
         sale = _sell(authenticated_client, product, customer, 2)
         # 2 x 100 = 200 KES → 2 points at 1 / 100
         customer.refresh_from_db()
-        assert customer.loyalty_points == 2
+        assert customer.points_balance == 2
         assert LoyaltyLedger.objects.filter(action="EARN").count() == 1
 
         award_sale_points(Sale.objects.get(pk=sale["id"]))
         customer.refresh_from_db()
-        assert customer.loyalty_points == 2
+        assert customer.points_balance == 2
         assert LoyaltyLedger.objects.filter(action="EARN").count() == 1
 
     def test_return_reverses_points(
@@ -60,7 +60,7 @@ class TestLoyalty:
         )
         supervisor_client.post(f"{RETURNS_URL}{requested.data['id']}/complete/")
         customer.refresh_from_db()
-        assert customer.loyalty_points == 0
+        assert customer.points_balance == 0
         assert LoyaltyLedger.objects.filter(action="REVERSAL").count() == 1
 
         reverse_sale_points(Sale.objects.get(pk=sale["id"]))
@@ -69,7 +69,7 @@ class TestLoyalty:
     def test_redeem_cannot_go_negative(
         self, manager_client, customer, loyalty_rule
     ):
-        from modules.loyalty.services import apply_ledger, get_or_create_account
+        from modules.loyalty.services import get_or_create_account
 
         account = get_or_create_account(customer)
         response = manager_client.post(
@@ -79,4 +79,4 @@ class TestLoyalty:
         )
         assert response.status_code == 400
         customer.refresh_from_db()
-        assert customer.loyalty_points == 0
+        assert customer.points_balance == 0

@@ -8,6 +8,13 @@ const devApiTarget = process.env.VITE_DEV_API_TARGET || 'http://127.0.0.1:8000';
 
 export default defineConfig({
   plugins: [react()],
+  // The pure modules (the offline queue and friends) are tested with vitest
+  // in a plain node environment: no DOM, no network — the storage is
+  // injected, which is the whole point of keeping them browser-free.
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
   server: {
     host: '0.0.0.0',
     allowedHosts: true,

@@ -54,17 +54,25 @@ catalog         products, categories, brands, units, barcodes, price history
 inventory       branch stock, inventory movements, transfers, adjustments
 purchasing      suppliers, purchase orders, goods receipts
 sales           sales, sale items, returns, refunds  (the sales engine)
-payments        payment abstraction + cash/card/mpesa/etims adapters
+payments        payment abstraction + cash/card/mpesa adapters
+etims           eTIMS invoice records + the KRA adapter seam
 loyalty         customers, loyalty ledger
 reporting       read-only aggregates and reports
 sync            idempotency keys, sync events
 ```
 
-Implemented: `organizations`, `branches`, `accounts`, `catalog`, `inventory`
-(ledger, branch stock, transfers, adjustments), `purchasing` (suppliers, purchase
-orders, goods received notes), `customers`, `sales` (including returns/refunds),
-`payments`, `loyalty` (rule, account, ledger) and `reporting`. `sync` is not
-created yet; a package appears with the phase that first needs it.
+Implemented: `organizations`, `branches` (branches, tills, cash sessions and
+append-only cash movements — see ADR-0014), `expenses` (categories and
+append-only expenses with reversals — see ADR-0015), `accounts`, `catalog`,
+`inventory` (ledger, branch stock, transfers, adjustments), `purchasing`
+(suppliers, purchase orders, goods received notes), `customers`, `sales`
+(including returns/refunds), `payments`, `etims` (eTIMS invoice records:
+one document per sale, ISSUED → CANCELLED, built from the same source as the
+receipt; the transmission adapter seam records locally today and claims
+nothing has been sent — see ADR-0019), `loyalty` (rule, account, ledger)
+and `reporting` (operational analytics plus the finance statements: profit &
+loss, cash reconciliation, product margins). `sync` is not created yet; a
+package appears with the phase that first needs it.
 
 The package is `modules/` rather than `apps/` because the repository root
 already contains a directory named `apps/`. A nested `apps/api/apps/` package
@@ -84,6 +92,15 @@ bundle weight. They share code through `packages/`, not by being one app.
 `apps/web` currently still hosts the POS pages because the previous SPA was a
 single undifferentiated app. The split happens in phase 6.
 
+### Offline capture (POS)
+
+A cash sale rung while the connection is down is queued on the till's device
+(`frontend/src/lib/offlineQueue.js`, a pure, unit-tested state machine) and
+replayed through the normal `POST /sales/` endpoint with the same
+`client_reference` — so a replay either books the sale or de-duplicates to
+the one the dropped request already made (ADR-0018). M-Pesa is never queued:
+an STK push is live money on a phone screen, and the till says so.
+
 ## Core boundaries
 
 - **Money is computed server-side.** Clients submit line items and quantities;
@@ -101,6 +118,16 @@ single undifferentiated app. The split happens in phase 6.
 - **Payments sit behind an interface.** The sales domain records *that* a payment
   succeeded; the provider adapter knows *how*. This keeps M-Pesa and eTIMS out
   of the sales domain.
+- **A sale is paid when its legs add up.** Split sales are declared `SPLIT` at
+  creation and settled through `Payment` legs (ADR-0016): cash legs may carry
+  an explicit amount, M-Pesa legs always charge the remainder, and
+  "paid" means the completed legs sum to the total. The drawer ledger records
+  every cash leg in the sale's own transaction.
+- **Stuck M-Pesa money is settled by asking, never by waiting.** A PENDING
+  payment is reconciled against the provider both when the POS polls and when
+  the `reap_stale_mpesa` sweep runs — the same path, the same decision
+  (ADR-0017). The timeout fires only when the provider cannot be asked, and
+  the attempt row always carries the final outcome of its exchange.
 
 ## Configuration
 

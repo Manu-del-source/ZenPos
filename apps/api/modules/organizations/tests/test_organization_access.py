@@ -78,7 +78,7 @@ class TestOrganizationSettings:
         assert organization.slug == "zenpos-demo-store"
 
     def test_organizations_cannot_be_created_through_the_api(self, admin_client):
-        """Creating a tenant is a platform-operator action, done in the admin."""
+        """Creating a tenant is a platform-operator action on the platform surface."""
         response = admin_client.post(
             ORGANIZATIONS_URL,
             {"name": "Shadow Shop", "slug": "shadow-shop"},
