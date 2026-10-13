@@ -923,3 +923,87 @@ with a fail-closed filter and tests. The cost is one unconditional filter
 in the audit helper and an explicit list of accepted limitations that
 future phases must not silently erase; a phase that removes one of them
 removes the mitigation and must say so in an ADR.
+## ADR-0024 — Phase 11 completed the client against the existing API surface, and did not invent one
+
+**Status:** Accepted
+
+**Context.** Phase 11 (UI/UX) closed the gap between the API the platform
+already ships and the screens the client had. Four surfaces were missing
+entirely: the stock-take workflow (the phase-7 deferral — the endpoint, the
+correction semantics and the tests all existed; there was no page), the
+platform operations on the Super Admin screen (phase 9 shipped onboarding
+and suspend/activate; the console was read-only and pointed at Django admin
+instead), the organization profile and the loyalty rule in Settings (both
+endpoints existed with `settings.manage` / `loyalty.manage` enforcement;
+the page showed hardcoded currency and timezone strings and had no loyalty
+section at all), and any eTIMS surface (the invoice ledger endpoint existed;
+no page read it).
+
+**Decision.** Every new screen was built strictly against endpoints that
+already exist and are already covered by the backend test suite:
+
+- `frontend/src/pages/StockCounts.jsx` — list posted counts (branch-scoped
+  by the API) with expandable lines showing book vs counted vs variance and
+  the variance value; a new-count form that searches the catalogue
+  (`?search=`), collects counted quantities and posts exactly
+  `POST /stock-counts/ {branch, counts:[{product, counted_quantity}],
+  notes}`. The "New count" button is shown only to holders of
+  `inventory.adjust`; the list to holders of `inventory.view`.
+- `frontend/src/pages/SuperAdmin.jsx` — the platform surface: a
+  "New organization" form posting the flat onboarding payload
+  (`POST /platform/organizations/`, field-level 400s rendered inline) and
+  per-organization suspend/activate buttons
+  (`POST /platform/organizations/{id}/suspend|activate/`) with a
+  confirmation on suspend, since the act cuts the whole tenant out at login,
+  refresh and every API call.
+- `frontend/src/pages/Settings.jsx` — the organization card now reads the
+  profile back from `GET /organizations/` (one row for a tenant; superusers
+  stay on the platform surface) and edits name/currency/timezone through
+  `PATCH /organizations/{id}/`; a new loyalty panel shows the rule
+  (`GET /loyalty-rules/`) and creates or edits it, gated on
+  `loyalty.manage`. The old card displayed hardcoded "KES — Kenyan Shilling"
+  and "Africa/Nairobi" regardless of the profile; that is gone.
+- `frontend/src/pages/Etims.jsx` — a read-only ledger of the eTIMS documents
+  (`GET /etims/invoices/`): sale, branch, UIN, status, total, issued time,
+  and on expansion the frozen line items and tax breakdown, plus the
+  cancellation reason where present. The page states what it is: the ledger
+  the domain writes, not a control.
+
+**What was deliberately not built.** No client endpoint that creates or
+cancels an eTIMS invoice. The invoice viewset says so on purpose ("writing
+happens through the domain … nowhere else") and the phase-6 position stands:
+issuance is a domain write (idempotent service call, exercised in tests and
+in the void path), and a manual issue surface would be inventing an
+endpoint and a compliance workflow before it has been verified against
+official KRA documentation. If the business decides the till or a back
+office needs to issue documents on demand, that is a backend ADR first —
+with a named permission, a named audit action and tests — and the UI comes
+after it.
+
+**Verification.** The backend was not modified in this phase, so the 556-test
+suite stands as of `b1e4a06`. Frontend: `vitest` 18/18, `vite build` clean.
+Beyond that, the live path was exercised against a scratch PostgreSQL with
+seeded demo data (seed script kept in `/tmp`, never committed): cash sales
+posted with the POS wire shape; a stock count posted by a manager with the
+exact UI payload returned the expected book/counted/variance rows (a −1
+count at KES 170 cost reported −170) and a cashier's identical attempt got
+the 403 the hidden button predicts; the loyalty rule and the organization
+profile were patched and restored through the endpoints the page calls;
+`GET /platform/organizations/` does not exist and was never called — the
+console reads the tenant `/organizations/` list, which returns every
+organization to a superuser by explicit design; suspend cut a tenant out at
+the API (403) and at login (401, "This organization is suspended.") and
+activate restored it; a tenant admin's attempt to suspend an organization
+got 403 "Platform staff only."; the onboarding form's 400 shape
+(`{"field": "message"}`) matches the form's inline error renderer. The
+eTIMS ledger page reads the same documents the domain service issues,
+including a cancelled one with its reason.
+
+**Consequences.** Every screen that exists now has a server-side enforcer
+it was written against, and every action a screen offers is one the API
+already tests; hiding a control remains a convenience, never a control.
+The eTIMS console is honest about being a ledger: it shows the documents,
+their frozen content and their history, and it refuses to pretend the shop
+can choose what a tax document says. The open question — whether a manual
+issue path is a business requirement at all — is recorded here so phase 12
+answers it as a decision, not a discovery.
