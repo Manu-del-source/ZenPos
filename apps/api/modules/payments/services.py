@@ -53,7 +53,16 @@ def release_mpesa_stock_reservation(*, sale, actor=None, request=None) -> int:
     A thin, well-named entry point onto the shared ledger restore, which is
     idempotent by construction: calling it twice restores nothing the second
     time.
+
+    The one refusal: a sale with settled money. If any leg is COMPLETED, the
+    shop is holding cash against these goods, and a silent release would let
+    them be sold again against a partial payment. A partially-paid sale is
+    corrected by a deliberate void, which refunds the settled legs and
+    restores the stock in one audited move (``void_sale`` restores directly
+    and is never blocked by this guard).
     """
+    if Payment.objects.filter(sale=sale, status=Payment.Status.COMPLETED).exists():
+        return 0
     return restore_sale_stock(
         sale=sale,
         actor=actor,
@@ -83,6 +92,23 @@ def get_payment_provider():
         environment=settings.MPESA_ENV,
         callback_secret=settings.MPESA_CALLBACK_SECRET,
     )
+
+
+def outstanding_for(sale) -> Decimal:
+    """How much of the sale is still unpaid, from the payment ledger.
+
+    A sale can be settled in legs (a split: cash now, M-Pesa for the rest),
+    so "is this sale paid" is a sum over its COMPLETED payments, never a flag.
+    PENDING legs count as unpaid: the money is not in yet.
+    """
+    from django.db.models import Sum
+
+    paid = (
+        sale.payments.filter(status=Payment.Status.COMPLETED)
+        .aggregate(total=Sum("amount"))["total"]
+        or Decimal("0")
+    )
+    return sale.total_amount - paid
 
 
 def complete_cash_payment(*, sale, amount, received_by) -> Payment:

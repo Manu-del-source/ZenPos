@@ -105,6 +105,11 @@ single undifferentiated app. The split happens in phase 6.
 - **Payments sit behind an interface.** The sales domain records *that* a payment
   succeeded; the provider adapter knows *how*. This keeps M-Pesa and eTIMS out
   of the sales domain.
+- **A sale is paid when its legs add up.** Split sales are declared `SPLIT` at
+  creation and settled through `Payment` legs (ADR-0016): cash legs may carry
+  an explicit amount, M-Pesa legs always charge the remainder, and
+  "paid" means the completed legs sum to the total. The drawer ledger records
+  every cash leg in the sale's own transaction.
 
 ## Configuration
 

@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -7,7 +8,8 @@ from rest_framework.throttling import AnonRateThrottle
 
 from modules.core.audit import record_audit
 from modules.core.mixins import BranchScopedMixin
-from modules.sales.services import reserve_sale_stock
+from modules.sales.models import Sale
+from modules.sales.services import record_sale_cash_in, reserve_sale_stock
 
 from .base import PaymentCallbackError, PaymentGatewayError
 from .models import Payment
@@ -19,6 +21,7 @@ from .services import (
     get_payment_provider,
     handle_mpesa_callback,
     initiate_payment,
+    outstanding_for,
     reconcile_pending_payment,
     release_mpesa_stock_reservation,
 )
@@ -151,6 +154,28 @@ class PaymentViewSet(
         headers = self.get_success_headers(response_serializer.data)
         return Response(response_serializer.data, status=201, headers=headers)
 
+    def _assert_leg_affordable(self, sale, validated_data):
+        """The leg re-check under the sale lock, where the authority lives.
+
+        ``serializer.save`` has not run yet, so the leg amount is recomputed
+        exactly as ``InitiatePaymentSerializer.create`` computes it: an
+        explicit cash figure if given, otherwise the outstanding balance. Two
+        concurrent legs serialize on the sale row, and only the first one
+        that fits is written; the loser gets a 400, not an overpayment.
+        """
+        outstanding = outstanding_for(sale)
+        if outstanding <= 0:
+            raise ValidationError({"sale": "This sale is already fully paid."})
+        leg_amount = validated_data.get("amount") or outstanding
+        if leg_amount > outstanding:
+            raise ValidationError(
+                {
+                    "amount": (
+                        f"That amount exceeds the outstanding balance of {outstanding}."
+                    )
+                }
+            )
+
     def perform_create(self, serializer):
         """Create the payment, then start the provider exchange.
 
@@ -170,7 +195,10 @@ class PaymentViewSet(
                 # A retry after a failed attempt must hold the stock again
                 # before the customer is asked for money a second time.
                 reserve_sale_stock(sale=sale, actor=self.request.user, request=self.request)
-                payment = serializer.save()
+                with transaction.atomic():
+                    locked_sale = Sale.objects.select_for_update().get(pk=sale.pk)
+                    self._assert_leg_affordable(locked_sale, serializer.validated_data)
+                    payment = serializer.save()
                 initiate_payment(
                     payment=payment,
                     phone=serializer.validated_data["phone"],
@@ -184,11 +212,22 @@ class PaymentViewSet(
                 raise ValidationError({"detail": str(exc)}) from exc
             action = "payment.initiated"
         else:
-            # Cash handed over at the till is completed money.
-            payment = serializer.save(
-                status=Payment.Status.COMPLETED,
-                received_by=self.request.user,
-            )
+            # Cash handed over at the till is completed money — and completed
+            # cash is drawer cash, from whichever endpoint recorded it.
+            sale = serializer.validated_data["sale"]
+            with transaction.atomic():
+                locked_sale = Sale.objects.select_for_update().get(pk=sale.pk)
+                self._assert_leg_affordable(locked_sale, serializer.validated_data)
+                payment = serializer.save(
+                    status=Payment.Status.COMPLETED,
+                    received_by=self.request.user,
+                )
+                record_sale_cash_in(
+                    sale=locked_sale,
+                    amount=payment.amount,
+                    actor=self.request.user,
+                    request=self.request,
+                )
             action = "payment.completed"
 
         record_audit(

@@ -166,9 +166,13 @@ class SaleSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeriali
         )
 
     def validate_payment_method(self, value):
-        if value not in {Sale.PaymentMethod.CASH, Sale.PaymentMethod.MPESA}:
+        if value not in {
+            Sale.PaymentMethod.CASH,
+            Sale.PaymentMethod.MPESA,
+            Sale.PaymentMethod.SPLIT,
+        }:
             raise serializers.ValidationError(
-                "Only CASH and MPESA are currently supported at the POS."
+                "Only CASH, MPESA and SPLIT are supported at the POS."
             )
         return value
 

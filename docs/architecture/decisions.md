@@ -409,3 +409,67 @@ a number is true. Payment timestamps date M-Pesa money by attempt time
 a `completed_at` on payments is deferred until it is actually needed.
 Frontend statements UI remains the phase-11 surface; the API is complete and
 isolated behind `reports.view` (cashiers do not hold it).
+
+## ADR-0016 — A sale is paid when its legs add up: split payments settle in legs
+
+**Status:** Accepted
+
+**Context.** The register blocked the split the counter actually sees: a
+customer hands over part cash and pays the rest by M-Pesa. `Sale` declares a
+single `payment_method`, and the serializer refused `SPLIT` outright, so the
+till had no way to record such a sale without lying in one of its fields.
+The payment rows were already the money ledger — ADR-0015's cash-position
+statement reads exactly those rows — but nothing had decided what "the sale
+is paid" means when the answer is "two different methods at different
+times". Phase 3, checkout hardening, takes that decision.
+
+**Decision.** Split is declared at sale time, and settled in legs:
+
+- `payment_method=SPLIT` is a first-class value at sale creation. The
+  register says up front how the customer is paying; a sale is not started
+  as CASH and reclassified later.
+- Each leg is a `Payment` on the sale, created through the existing
+  `initiate` endpoint. A **cash leg may carry an explicit amount**
+  (positive, never above what is outstanding); an **M-Pesa leg is always
+  charged the remaining outstanding** — the till does not trust a client
+  (or a tired cashier's thumb on the keypad) to say how much to pull from
+  someone's wallet.
+- **"Paid" is a sum, not a flag.** `outstanding_for(sale)` — total minus
+  the COMPLETED payments — is the single source. PENDING counts as unpaid
+  (the money is not in yet) and FAILED counts as nothing, which is what
+  keeps the existing retry/cash-fallback path working: a failed STK push
+  leaves the sale payable by another leg.
+- **The sale lock is the authority.** The view re-reads the sale under
+  `select_for_update` inside the transaction that inserts the payment row
+  and re-checks the leg against the outstanding *inside* that lock.
+  Serializer validation is the friendly fast path (kind errors, no
+  round-trips in the common case); the lock is what makes two concurrent
+  legs on the same sale resolve to exactly one success. The M-Pesa STK
+  attempt itself stays outside the transaction — it is a long external
+  call, and the attempt row with its gateway reference is what the
+  callback later verifies against (ADR-0012).
+- **Every cash leg moves the drawer, inside the same transaction.**
+  `record_sale_cash_in` (ADR-0014) is called for each cash leg of a split
+  sale exactly as for a plain cash sale; M-Pesa legs never touch the
+  drawer. The cash-position statement therefore needs no split-awareness
+  — it was already reading the ledger.
+- **A partially-paid sale cannot be silently unwound.** Once any leg is
+  COMPLETED, stock has partly left the shelf for a customer who has partly
+  paid, so `release_mpesa_stock_reservation` refuses to restore it: the
+  correction is a **void**, which fails in-flight legs, marks every
+  completed leg REFUNDED (money rows stay explainable), refunds the cash
+  legs out of the drawer as CASH_OUT, and restores stock directly.
+  Non-split sales keep their single-LIVE-payment contract unchanged.
+
+**Consequences.** The sale total is the only amount a till can settle
+against, in any combination of legs, and the drawer ledger captures every
+cash leg the moment it is taken, so end-of-shift reconciliation works for
+split sales without a special case. Two registers (or one fast cashier)
+racing to take the last leg of a sale cannot both succeed — one gets a
+400. The cost is rigidity where the till has none: SPLIT must be chosen
+when the sale is typed, so a sale started as CASH that turns out to need
+an M-Pesa leg is voided and re-cut rather than converted — accepted,
+because conversion is exactly the silent-rewrite shape the ledgers were
+built to refuse. `Payment.amount` remains authoritative per leg and
+`outstanding_for` the only place the remainder is computed, so reports and
+the register cannot disagree about how much is still owed.

@@ -276,6 +276,41 @@ def void_sale(*, sale, actor, reason: str = "", request=None) -> Sale:
     return sale
 
 
+def record_sale_cash_in(*, sale, amount, actor, request=None) -> None:
+    """Record cash entering the drawer against a sale, if the shift is open.
+
+    The mirror of ``_record_session_cash_out`` for money in. Every completed
+    cash payment on a sale must land in the drawer's ledger, from whichever
+    endpoint it was recorded — a sale created as a cash sale or a cash leg of
+    a split settled at the payments endpoint — or the shift reconciles short
+    by exactly that leg. A sale with no open session (no till, or the shift
+    already closed) records nothing: the cashier enters it manually, the same
+    way a late refund is handled.
+    """
+    if amount is None or amount <= 0:
+        return
+
+    from modules.branches.models import CashMovement, CashSession
+    from modules.branches.services import record_cash_movement
+
+    session = CashSession.objects.filter(
+        pk=sale.cash_session_id, status=CashSession.Status.OPEN
+    ).first()
+    if session is None:
+        return
+
+    record_cash_movement(
+        session=session,
+        movement_type=CashMovement.Type.CASH_IN,
+        source=CashMovement.Source.SALE,
+        amount=amount,
+        reason=f"Sale {sale.sale_number}",
+        reference=sale.sale_number,
+        actor=actor,
+        request=request,
+    )
+
+
 def _record_session_cash_out(sale, *, amount, reason, reference, actor, request=None) -> None:
     """Record cash leaving the drawer for a refund, on the sale's session.
 
