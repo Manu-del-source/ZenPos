@@ -208,6 +208,8 @@ def void_sale(*, sale, actor, reason: str = "", request=None) -> Sale:
     Voiding an already-voided sale is a no-op that returns the same row: the
     ledger restore below and the status check both make that safe.
     """
+    from decimal import Decimal
+
     from modules.payments.models import Payment
 
     sale = Sale.objects.select_for_update().get(pk=sale.pk)
@@ -215,6 +217,18 @@ def void_sale(*, sale, actor, reason: str = "", request=None) -> Sale:
         return sale
 
     payments = Payment.objects.filter(sale=sale)
+    # Cash refunds leave the drawer, so remember how much before the rows are
+    # marked REFUNDED — the session's ledger records it below, if that shift
+    # is still open.
+    cash_refunded = sum(
+        (
+            payment.amount
+            for payment in payments.filter(
+                method=Payment.Method.CASH, status=Payment.Status.COMPLETED
+            )
+        ),
+        Decimal("0"),
+    )
     payments.filter(status=Payment.Status.PENDING).update(
         status=Payment.Status.FAILED, updated_at=timezone.now()
     )
@@ -250,13 +264,53 @@ def void_sale(*, sale, actor, reason: str = "", request=None) -> Sale:
             "total_amount": str(sale.total_amount),
         },
     )
+
+    _record_session_cash_out(
+        sale,
+        amount=cash_refunded,
+        reason=f"Void of sale {sale.sale_number}",
+        reference=sale.sale_number,
+        actor=actor,
+        request=request,
+    )
     return sale
+
+
+def _record_session_cash_out(sale, *, amount, reason, reference, actor, request=None) -> None:
+    """Record cash leaving the drawer for a refund, on the sale's session.
+
+    Only when that shift is still open: a refund handled after the session
+    closed belongs to whatever shift is handling it — that cashier records it
+    manually. A closed drawer's totals are never rewritten, so this is a
+    no-op rather than an error for a closed session.
+    """
+    if amount is None or amount <= 0:
+        return
+
+    from modules.branches.models import CashMovement, CashSession
+    from modules.branches.services import record_cash_movement
+
+    session = CashSession.objects.filter(
+        pk=sale.cash_session_id, status=CashSession.Status.OPEN
+    ).first()
+    if session is None:
+        return
+
+    record_cash_movement(
+        session=session,
+        movement_type=CashMovement.Type.CASH_OUT,
+        source=CashMovement.Source.REFUND,
+        amount=amount,
+        reason=reason,
+        reference=reference,
+        actor=actor,
+        request=request,
+    )
 
 
 @transaction.atomic
 def complete_return(*, sale_return, actor, request=None):
     """Authorize the money and the shelf for one return, exactly once."""
-    from decimal import Decimal
 
     from modules.inventory.models import InventoryMovement, StockAdjustment
     from modules.inventory.services import apply_stock_movement
@@ -376,6 +430,19 @@ def complete_return(*, sale_return, actor, request=None):
             received_by=actor,
             provider_reference=f"refund:{sale_return.number}",
         )
+
+        # A cash refund hands money back through the drawer, so the session's
+        # ledger records it like any other outflow. M-Pesa refunds go back
+        # through the provider and never touch the drawer.
+        if method == Payment.Method.CASH:
+            _record_session_cash_out(
+                sale,
+                amount=sale_return.refund_amount,
+                reason=f"Return {sale_return.number}",
+                reference=sale_return.number,
+                actor=actor,
+                request=request,
+            )
 
     now = timezone.now()
     sale_return.status = SaleReturn.Status.COMPLETED

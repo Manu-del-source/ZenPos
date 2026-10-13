@@ -15,7 +15,7 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from modules.accounts.models import Role, User, UserBranchAccess, UserRole
-from modules.branches.models import Branch
+from modules.branches.models import Branch, Till
 from modules.catalog.models import Product, ProductBarcode
 from modules.customers.models import Customer
 from modules.organizations.models import Organization
@@ -33,6 +33,52 @@ def clear_throttle_cache():
     cache.clear()
     yield
     cache.clear()
+
+
+def _ensure_system_roles_seeded() -> None:
+    """Re-run the RBAC data migrations if a transactional-test flush took them.
+
+    A ``transaction=True`` test runs without a rolling-back transaction, and
+    pytest-django flushes the database after it — TRUNCATEing the
+    migration-seeded roles and permissions along with the test data. The next
+    fixture that grants a role by name would then fail. Re-running the same
+    data-migration functions that seeded the schema keeps fixtures
+    position-independent; when the rows already exist this is one ``exists()``
+    query and nothing is written.
+    """
+    from modules.accounts.models import Role
+
+    if Role.objects.filter(organization__isnull=True, is_system=True).exists():
+        return
+
+    import importlib
+
+    from django.apps import apps as django_apps
+
+    seed_steps = (
+        ("0003_seed_rbac", "seed_rbac"),
+        ("0004_branches_view_permission", "grant_branch_view"),
+        ("0005_audit_view_permission", "grant_audit_view"),
+        ("0006_purchases_view_permission", "grant_purchases_view"),
+        ("0007_purchases_approve_permission", "grant_purchases_approve"),
+        ("0008_purchases_receive_permission", "grant_purchases_receive"),
+        ("0009_returns_request_permission", "grant"),
+        ("0011_till_cash_permissions", "grant_till_cash_permissions"),
+    )
+    for module_name, function_name in seed_steps:
+        module = importlib.import_module(f"modules.accounts.migrations.{module_name}")
+        getattr(module, function_name)(django_apps, None)
+
+
+def system_role(name):
+    """A seeded system role by name, re-seeding after a flush if necessary.
+
+    Fixtures grant roles by name rather than hand-building them, so the role
+    must always exist — even in a test position that follows a
+    ``transaction=True`` test's flush.
+    """
+    _ensure_system_roles_seeded()
+    return Role.objects.get(name=name, organization__isnull=True)
 
 
 @pytest.fixture
@@ -81,6 +127,11 @@ def other_branch(db, organization):
 
 
 @pytest.fixture
+def till(db, organization, branch):
+    return Till.objects.create(organization=organization, branch=branch, name="Till 1")
+
+
+@pytest.fixture
 def foreign_branch(db, other_organization):
     """Same code as ``branch``, different organization: codes are per tenant."""
     return Branch.objects.create(organization=other_organization, name="Mombasa", code="BR-001")
@@ -103,8 +154,8 @@ def make_user(db, organization):
             **extra,
         )
         if role is not None:
-            system_role = Role.objects.get(name=role, organization__isnull=True)
-            UserRole.objects.create(user=user, role=system_role)
+            granted_role = system_role(role)
+            UserRole.objects.create(user=user, role=granted_role)
         return user
 
     return _make_user
@@ -191,13 +242,13 @@ def rival_user(db, other_organization):
     Used to build rows that genuinely belong to another tenant, so a scoping
     test has something real to hide.
     """
-    role = Role.objects.get(name="MANAGER", organization__isnull=True)
+    manager_role = system_role("MANAGER")
     user = User.objects.create_user(
         username="rival-manager",
         password=TEST_PASSWORD,
         organization=other_organization,
     )
-    UserRole.objects.create(user=user, role=role)
+    UserRole.objects.create(user=user, role=manager_role)
     return user
 
 

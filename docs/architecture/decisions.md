@@ -314,3 +314,49 @@ the phase-12 hardening pass rather than pre-built. Before/after snapshots are
 shallow, serializer-level diffs for now; deep diffing is also phase 12. Reads
 require the `audit.view` permission code, seeded by migration so the code
 vocabulary and the check for it ship together (ADR-0008).
+
+## ADR-0014 — The till drawer changes only through cash movements
+
+**Status:** Accepted
+
+**Context.** Till and cash-session management (tills, open/close, drops and
+payouts, reconciliation) is a prerequisite for phase-2 financial reporting
+(cashier shift reconciliation, cash-versus-M-Pesa reconciliation) and had no
+implementation. The design question was where "expected cash in the drawer"
+comes from at close time. Computing it live from the `Sale`/`Payment` tables
+at close would force the `branches` module to read `sales`/`payments`,
+inverting the module dependency direction (branches is below both), and would
+recompute a figure that should be a ledger sum instead of a query.
+
+**Decision.** The drawer is a ledger. `modules.branches` owns `Till`,
+`CashSession` and append-only `CashMovement`. Every cash event writes a
+movement inside its own transaction: a completed cash sale writes a
+`CASH_IN` (source `SALE`) on the session open at its till; a cash void or cash
+return refund writes a `CASH_OUT` (source `REFUND`) *if that session is still
+open* — a refund handled after close belongs to the shift handling it and is
+recorded manually; manual handling (drops, payouts) writes `CASH_DROP` /
+`CASH_OUT` (source `MANUAL`) and requires a reason and an actor. At close the
+server computes `expected_cash = opening_cash + signed sum of movements` and
+compares it with the physical count the closer supplies; the client can never
+supply the expected figure. A session is open until closed exactly once
+(partial unique constraint: one OPEN session per till), closed sessions refuse
+movements and re-closes, and a *new* session may start at the same till.
+`Sale` gains nullable `till`/`cash_session` columns; both are resolved
+server-side (the session by locking the till's open session row, so a
+same-instant close serializes cleanly) and a sale without one keeps working,
+preserving existing clients. M-Pesa payments never touch the drawer and write
+no movement. Permissions: `tills.manage`, `cash.open`, `cash.close`,
+`cash.adjust` (supervisory — cashiers do not hold it by default),
+`cash.review` (supervisors and accountants), seeded by migration alongside the
+existing role vocabulary.
+
+**Consequences.** Reconciliation is a ledger sum: fast, explainable, and
+auditable line by line (`source` splits sales, refunds and manual handling),
+with no cross-module reads. A cash sale whose session was closed in the same
+instant is attributed to the next shift by construction rather than by a
+race. The cost is that the sales/void/return flows must keep writing their
+movements — covered by tests in `modules/branches/tests/test_cash_sessions.py`,
+including the void-refund and M-Pesa cases. Frontend till UI (session picker
+at the POS, shift-reconciliation screen) is the follow-on slice; the API is
+complete and usable without it, and `till` on sale creation is optional so no
+existing client changes.

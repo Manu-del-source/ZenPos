@@ -60,7 +60,8 @@ reporting       read-only aggregates and reports
 sync            idempotency keys, sync events
 ```
 
-Implemented: `organizations`, `branches`, `accounts`, `catalog`, `inventory`
+Implemented: `organizations`, `branches` (branches, tills, cash sessions and
+append-only cash movements — see ADR-0014), `accounts`, `catalog`, `inventory`
 (ledger, branch stock, transfers, adjustments), `purchasing` (suppliers, purchase
 orders, goods received notes), `customers`, `sales` (including returns/refunds),
 `payments`, `loyalty` (rule, account, ledger) and `reporting`. `sync` is not
