@@ -534,3 +534,69 @@ consequential to no one. The cost is one cron entry in the deployment
 documentation and a slightly wider ``settle_pending_mpesa`` contract;
 both are cheaper than a reconciliation meeting where the attempt says
 PENDING and the money has been in for a week.
+
+## ADR-0018 — A cash sale rung offline is queued on the till and replayed under its own reference
+
+**Status:** Accepted
+
+**Context.** Phase 5, offline sync. The audit found the hard part already
+done and tested: `Sale.client_reference` is a POS-supplied idempotency key
+under a unique `(organization, client_reference)` constraint, the serializer
+returns the first sale with a `200` (a new one with a `201`), and a raced
+retry is answered by the winner's row. What was missing was entirely on the
+till side: `useOfflineSync` was a documented no-op, and a cashier whose
+connection dropped mid-checkout could not record a cash sale at all — even
+though the money was already in the drawer. The question was not *how to
+make the retry safe* (the server had decided it); it was *what the till
+should do with a sale it cannot send*.
+
+**Decision.** Cash is queued; M-Pesa is not.
+
+- **Cash only.** A cash sale is a promise the till can keep without a
+  network: the money is in the drawer, and the record can wait. An M-Pesa
+  STK push is live money on a customer's phone, and "replay it later" would
+  be a different charge at a different moment, so the till refuses M-Pesa
+  while offline and says so plainly.
+- **The queue is a pure, unit-tested state machine.** `offlineQueue.js` owns
+  the rules — FIFO, one entry per client reference, network failures retry
+  with a cap, server rejections park for a human, a corrupted store is
+  quarantined rather than dropped — over plain objects with injected
+  storage, so the whole lifecycle is tested without a browser. The React
+  hook owns only the network, the online/offline events, and the state the
+  banner renders.
+- **Replay is the ordinary `POST /sales/` under the same `client_reference`.**
+  There is no special "sync" endpoint and no second path to keep correct.
+  The two scary cases both collapse to the safe one: the request never
+  reached the server, so the replay books it; or it did reach the server and
+  only the answer was lost, so the replay de-duplicates to the sale that
+  already exists. Either way there is exactly one sale for the money taken,
+  and the guarantee comes from the server's unique constraint, not from the
+  queue's care.
+- **The server stays the authority, even for a stale replay.** A replay that
+  lands an hour later is *not* re-validated against the shelf as it is now:
+  the reference lookup short-circuits before stock validation, so a sale the
+  till already made is returned as-is even if the stock has since sold out.
+  Re-running validation would 400 on an empty shelf and strand cash that
+  was already handed over. (This is pinned by
+  `test_a_replayed_sale_is_not_revalidated_against_changed_stock`.)
+- **A server "no" parks for a person, not a retry.** If the replay gets an
+  HTTP error — the product was delisted, the branch moved, the reference
+  collided — the entry is marked a conflict and left for a human with the
+  server's own words. No loop can make that stock come back, and the money
+  has already been taken, so the right move is to surface it, not to spin.
+- **The queue is a liability, stored on the device.** It lives in
+  `localStorage` (not `sessionStorage`), because the cash has left the
+  customer's hands and a tab closing must not lose the record. A store that
+  cannot be read is copied to its own quarantine key and the till warns that
+  a supervisor should look before taking more cash.
+
+**Consequences.** A till with a dead connection can keep trading cash and
+lose no record; a dropped response can never become a double charge; and a
+sale the server refuses stays visible with the reason it was refused. The
+costs are accepted and named: a queued sale is *booked at sync time*, so a
+sale rung across midnight lands in the next day's books, and if the
+catalogue price changed while offline the replay books the current price —
+the queue's snapshot keeps the price the customer actually paid so the
+difference is explainable, not hidden. The queue is per device (a factory
+reset loses it), which is the same honesty as the existing M-Pesa draft:
+the record lives on the till, and the till is where the money is.

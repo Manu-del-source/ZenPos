@@ -88,6 +88,15 @@ bundle weight. They share code through `packages/`, not by being one app.
 `apps/web` currently still hosts the POS pages because the previous SPA was a
 single undifferentiated app. The split happens in phase 6.
 
+### Offline capture (POS)
+
+A cash sale rung while the connection is down is queued on the till's device
+(`frontend/src/lib/offlineQueue.js`, a pure, unit-tested state machine) and
+replayed through the normal `POST /sales/` endpoint with the same
+`client_reference` — so a replay either books the sale or de-duplicates to
+the one the dropped request already made (ADR-0018). M-Pesa is never queued:
+an STK push is live money on a phone screen, and the till says so.
+
 ## Core boundaries
 
 - **Money is computed server-side.** Clients submit line items and quantities;

@@ -248,7 +248,9 @@ const AppLayout = ({ token, user, handleLogout }) => {
 
 function App() {
   const [auth, setAuth] = useState(readAuth);
-  useOfflineSync(auth.token);
+  // Reads its own token (localStorage, per request) so a queue can sync from
+  // any page after a re-login, not just the one the hook was mounted on.
+  useOfflineSync();
 
   // `localStorage` is not reactive, and Login writes to it before navigating.
   // Without re-reading it here (on the event Login fires, or on a change from

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, Barcode, CheckCircle2, ChevronLeft, CreditCard, Minus, Package,
-  Plus, Printer, RefreshCw, Search, Smartphone, Trash2, UserRound, Wallet, X,
+  AlertTriangle, Barcode, CheckCircle2, ChevronLeft, CloudOff, CreditCard, Minus,
+  Package, Plus, Printer, RefreshCw, Search, Smartphone, Trash2, UserRound, Wallet, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { apiError } from '../services/api';
+import useOfflineSync from '../hooks/useOfflineSync';
 import { usePOSStore } from '../store/posStore';
 
 const money = (value) => Number(value || 0).toLocaleString('en-KE', {
@@ -103,6 +104,79 @@ const Shortcuts = ({ open, onClose }) => {
   );
 };
 
+/**
+ * The till's offline status strip.
+ *
+ * It shows, in order of urgency: a queue that could not be read (a human
+ * must look at the device), sales the server refused (money already taken —
+ * the cashier decides), sales still waiting on a connection, the offline
+ * state itself, and the sales most recently recovered so the cashier can
+ * see that the queue really did drain.
+ */
+const OfflineBanner = ({ online, queued, conflicts, history, corruptWarning, onRetry, busy }) => {
+  const anything = corruptWarning || conflicts.length > 0 || queued.length > 0 || !online || history.length > 0;
+  if (!anything) return null;
+  const queuedTotal = queued.reduce((sum, entry) => sum + Number(entry.snapshot?.total || 0), 0);
+  return (
+    <div className="mb-4 space-y-2" role="status" aria-live="polite">
+      {corruptWarning && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-900/60 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            The offline queue on this till could not be read, so it has been set aside for review.
+            Do not take further cash sales until a supervisor has checked this device.
+          </span>
+        </div>
+      )}
+      {conflicts.map((entry) => (
+        <div key={entry.clientReference} className="flex items-start justify-between gap-3 rounded-xl border border-red-900/60 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+            <span>
+              A queued sale of <b>KES {money(entry.snapshot?.total || 0)}</b> was not recorded:{' '}
+              {entry.conflict?.message || 'unknown error'}
+            </span>
+          </div>
+          <button
+            className="btn-secondary shrink-0 !px-3 !py-1 text-xs"
+            onClick={() => onRetry(entry.clientReference)}
+            disabled={busy || !online}
+          >
+            Retry
+          </button>
+        </div>
+      ))}
+      {queued.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-900/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <CloudOff size={16} className="mt-0.5 shrink-0" />
+          <span>
+            {queued.length} queued sale{queued.length === 1 ? '' : 's'} (KES {money(queuedTotal)}) waiting
+            to be recorded{online ? ' — syncing now…' : ' until the connection returns'}.
+          </span>
+        </div>
+      )}
+      {!online && (
+        <div className="flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-3 text-sm text-slate-300">
+          <CloudOff size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Offline. Cash sales are saved on this till and record automatically when the connection
+            returns; M-Pesa is unavailable until it is back.
+          </span>
+        </div>
+      )}
+      {history.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-900/50 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Recorded from the offline queue:{' '}
+            {history.slice(-5).map((record) => record.saleNumber || record.clientReference.slice(0, 8)).join(', ')}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function POS() {
   const cart = usePOSStore((state) => state.cart);
   const addToCart = usePOSStore((state) => state.addToCart);
@@ -113,6 +187,16 @@ export default function POS() {
   const getTotal = usePOSStore((state) => state.getTotal);
   const getCount = usePOSStore((state) => state.getCount);
   const getQuantityFor = usePOSStore((state) => state.getQuantityFor);
+
+  const {
+    online,
+    queued,
+    conflicts,
+    history,
+    corruptWarning,
+    enqueue,
+    retryConflict,
+  } = useOfflineSync();
 
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -377,6 +461,48 @@ export default function POS() {
     return data;
   };
 
+  /**
+   * The sale could not reach the server — offline, or the answer was lost.
+   * The cash is already in the drawer, so the basket goes on the offline
+   * queue under the SAME client reference: if the request did reach the
+   * server, the replay de-duplicates to that sale; if it did not, the
+   * replay books it. Either way, one sale for the money taken.
+   */
+  const queueOfflineSale = () => {
+    const reference = clientRef.current;
+    enqueue({
+      clientReference: reference,
+      payload: {
+        client_reference: reference,
+        payment_method: 'CASH',
+        customer: customerId || null,
+        branch: branchId || null,
+        items: cart.map((item) => ({ product: item.id, quantity: item.quantity })),
+      },
+      snapshot: {
+        total,
+        lines: cart.map((item) => ({
+          product: item.id,
+          name: item.name,
+          price: Number(item.price || 0),
+          quantity: item.quantity,
+        })),
+        method: 'CASH',
+        cashReceived: cash,
+        change,
+      },
+      branch: branchId || null,
+      queuedAt: Date.now(),
+    });
+    writeDraft(null);
+    clientRef.current = null;
+    saleRef.current = null;
+    setOutcome({ status: 'queued', total, method: 'CASH', cashReceived: cash, change, reference });
+    setStep('done');
+    clearCart();
+    setStatusMessage('');
+  };
+
   const payCash = async () => {
     if (!cart.length || cash < total || busy) return;
     if (outcome?.paymentId && outcome?.status !== 'paid') {
@@ -404,6 +530,12 @@ export default function POS() {
       setStatusMessage('');
       await loadProducts(searchTerm);
     } catch (error) {
+      if (!error?.response) {
+        // No answer from the server at all: queue it, and if the connection
+        // is back try to sync immediately (the outage may have been a blip).
+        queueOfflineSale();
+        return;
+      }
       setStatusMessage('');
       toast.error(apiError(error, 'The cash sale could not be recorded.'));
     } finally {
@@ -459,6 +591,13 @@ export default function POS() {
   };
 
   const payMpesa = async () => {
+    if (!navigator.onLine) {
+      // An STK push is live money on a phone screen: it cannot be queued and
+      // replayed later, because the replay would be a different charge at a
+      // different moment. Cash, on the other hand, queues safely.
+      toast.error('M-Pesa needs a live connection. Take cash instead — it will be recorded when the connection returns.');
+      return;
+    }
     const normalized = phone.replace(/\s+/g, '');
     if (!cart.length && !saleRef.current && !outcome?.saleId) return;
     if (!/^0(1|7)\d{8}$/.test(normalized)) {
@@ -475,7 +614,9 @@ export default function POS() {
       await sendStkPush(saleId);
     } catch (error) {
       setStatusMessage('');
-      const message = apiError(error, 'The M-Pesa request could not be started.');
+      const message = !error?.response
+        ? 'The connection dropped, and M-Pesa cannot be queued. When it returns, retry — if the sale was created it is picked up, not repeated.'
+        : apiError(error, 'The M-Pesa request could not be started.');
       const existing = await recoverPendingPayment(saleRef.current || saleId);
       if (existing) {
         // The push did reach the server: adopt it and keep watching rather
@@ -638,6 +779,49 @@ export default function POS() {
 
   // --- screens -----------------------------------------------------------
   if (step === 'done' && outcome) {
+    if (outcome.status === 'queued') {
+      return (
+        <div className="page-shell !max-w-3xl">
+          <Shortcuts open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+          <OfflineBanner
+            online={online}
+            queued={queued}
+            conflicts={conflicts}
+            history={history}
+            corruptWarning={corruptWarning}
+            onRetry={retryConflict}
+            busy={busy}
+          />
+          <section className="panel mt-6 overflow-hidden">
+            <div className="border-b border-amber-900/40 bg-amber-500/10 px-6 py-5 text-center">
+              <CloudOff className="mx-auto mb-2 text-amber-400" size={34} />
+              <h1 className="text-xl font-black text-white">Saved on this till</h1>
+              <p className="mt-2 text-sm text-amber-200/80">
+                The connection dropped before the sale could be recorded. The money is safe: the
+                sale is queued on this till and will be recorded automatically — under reference{' '}
+                <span className="font-mono">{String(outcome.reference || '').slice(0, 8)}</span> —
+                when the connection returns.
+              </p>
+            </div>
+            <dl className="grid gap-4 p-6 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                <dt className="text-xs uppercase tracking-wider text-slate-500">Total</dt>
+                <dd className="mt-1 text-2xl font-black text-white">KES {money(outcome.total)}</dd>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                <dt className="text-xs uppercase tracking-wider text-slate-500">Change due</dt>
+                <dd className="mt-1 text-2xl font-black text-white">KES {money(outcome.change ?? 0)}</dd>
+              </div>
+            </dl>
+            <div className="flex flex-col gap-3 border-t border-slate-800 p-6 sm:flex-row">
+              <button className="btn-primary flex-1" onClick={resetSale}>
+                New sale <kbd className="kbd kbd--dark">Enter</kbd>
+              </button>
+            </div>
+          </section>
+        </div>
+      );
+    }
     return (
       <div className="page-shell !max-w-3xl">
         <Shortcuts open={showShortcuts} onClose={() => setShowShortcuts(false)} />
@@ -680,6 +864,15 @@ export default function POS() {
     return (
       <div className="page-shell !max-w-5xl">
         <Shortcuts open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+        <OfflineBanner
+          online={online}
+          queued={queued}
+          conflicts={conflicts}
+          history={history}
+          corruptWarning={corruptWarning}
+          onRetry={retryConflict}
+          busy={busy}
+        />
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <div className="eyebrow">Step 2 of 4 — Review sale</div>
@@ -754,6 +947,15 @@ export default function POS() {
     return (
       <div className="page-shell !max-w-3xl">
         <Shortcuts open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+        <OfflineBanner
+          online={online}
+          queued={queued}
+          conflicts={conflicts}
+          history={history}
+          corruptWarning={corruptWarning}
+          onRetry={retryConflict}
+          busy={busy}
+        />
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <div className="eyebrow">Step 3 of 4 — Payment</div>
@@ -895,6 +1097,16 @@ export default function POS() {
   return (
     <div className="page-shell !max-w-none">
       <Shortcuts open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+
+      <OfflineBanner
+        online={online}
+        queued={queued}
+        conflicts={conflicts}
+        history={history}
+        corruptWarning={corruptWarning}
+        onRetry={retryConflict}
+        busy={busy}
+      />
 
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
