@@ -807,3 +807,62 @@ archived customers are invisible to code that forgets to use `all_objects`,
 which is the intended behaviour and must be remembered when writing
 backfill; and the carried-over balances appear as single `ADJUST` entries
 without a sale behind them, which is honest — they predate the ledger.
+
+---
+
+## ADR-0022 — The tenant switch is enforced, and opening or closing a tenant is a platform act
+
+**Status:** Accepted
+
+**Context.** The multi-tenant building blocks existed — the `organization`
+column on every row, `OrganizationScopedMixin` as the tenant boundary,
+platform superusers who see all tenants — but two of the switches they imply
+did nothing. `Organization.is_active` was a column the admin displayed and no
+code read: a "suspended" tenant logged in, refreshed tokens and sold goods as
+usual. `User.is_active` was one half dead: a deactivated account could not
+log in again (Django's `authenticate()` checks it), but the token it already
+held kept working, and the token views sit outside the project's permission
+layer by design (`TokenViewBase` disables authentication and permissions:
+login is anonymous, refresh carries its credentials in the body), so a
+deactivated user could extend their own session forever. And opening a tenant
+was a Django-admin keyboard exercise with no API path, no onboarding shape
+and no audit row saying who opened the shop.
+
+**Decision.**
+
+- **Both switches are enforced at all three boundaries.** A suspended
+  organization and a deactivated user are refused at login (no new tokens),
+  at refresh (no extended sessions — checked in `RefreshView`, the one token
+  view that can be reached without an Authorization header) and on every API
+  call: `HasPermission`, the project-wide default, denies requests from a
+  deactivated user or a user of an inactive organization, so a held access
+  token dies the moment the flag flips. Flipping the switch back restores
+  access. The platform itself belongs to no organization, so the tenant
+  switch never touches it; the user switch still does.
+- **`is_active` is not tenant-writable.** The organization profile
+  serializer no longer accepts it, so a shop's own administrator cannot
+  suspend itself (and be locked out with no way back) or re-open itself.
+  The switch lives only on the platform surface.
+- **Opening and closing a tenant are platform-API actions, superuser-only.**
+  `POST /api/v2/platform/organizations/` onboards a tenant as one audited
+  fact — organization, first branch, first administrator (the seeded system
+  `ADMIN` role) — all in one transaction, so a validation failure leaves no
+  half-open tenant. `POST .../suspend/` and `.../activate/` flip the switch
+  with `organization.suspended` / `organization.activated` audit rows.
+  Access is a dedicated `IsPlatformStaff` check on the platform routes, not
+  the tenant role vocabulary: a tenant administrator holding every tenant
+  permission is a 403 there, and a rival's rows are a 404.
+
+**Consequences.** Suspension and deactivation are now operational actions
+with an immediate effect and an audit trail behind them, and a new shop is
+one request away from a working login rather than a support ticket. The
+costs are accepted and named: every request from a tenant user pays one
+indexed organization lookup for the suspension check, the refresh pre-check
+parses the token twice (once here, once in the refresh itself), and the
+platform surface is deliberately thin — there is still no per-tenant
+statistics endpoint or cross-tenant bulk action, because neither has a
+caller yet, and a platform API grows by demand, not by aspiration. The
+tenancy isolation audit that preceded this change found no unscoped
+viewset: everything is mixin-scoped, or manually scoped with a named
+reason and a cross-tenant test (the reporting aggregates are the manual
+case), so the platform surface adds a door without finding a hole.

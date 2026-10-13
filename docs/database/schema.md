@@ -214,6 +214,27 @@ webhook_events   id, provider, external_id (unique per provider), payload,
 `webhook_events` with a unique `(provider, external_id)` is what stops a
 redelivered M-Pesa callback from paying a sale twice.
 
+The two lifecycle switches are enforced at every boundary (ADR-0022):
+`organizations.is_active` and `users.is_active` are checked in
+`HasPermission` (every API call, so a held token dies when the flag flips),
+in the login serializer (no new tokens for a suspended tenant) and in the
+refresh view (no extended sessions — the token views sit outside the
+permission layer by design, so this one is checked there). `is_active` is
+not tenant-writable through the profile endpoint; only the platform surface
+flips it:
+
+```
+POST /api/v2/platform/organizations/            onboard: organization + first
+                                                branch + first ADMIN, one
+                                                audited transaction
+POST /api/v2/platform/organizations/{id}/suspend/   organization.suspended
+POST /api/v2/platform/organizations/{id}/activate/  organization.activated
+```
+
+The platform routes are superuser-only via a dedicated check, outside the
+tenant role vocabulary: a tenant admin with every tenant permission is a 403
+there, and another tenant's organization is a 404.
+
 ### eTIMS invoices (phase 6)
 
 ```

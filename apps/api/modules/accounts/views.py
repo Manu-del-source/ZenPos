@@ -6,6 +6,8 @@ from rest_framework.exceptions import MethodNotAllowed, PermissionDenied, Valida
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -15,7 +17,9 @@ from modules.core.mixins import OrganizationScopedMixin
 from modules.core.models import AuditLog
 
 from .models import Employee, Permission, Role, User, UserBranchAccess, UserRole
+from .permissions import tenant_is_active
 from .serializers import (
+    AuditedTokenObtainPairSerializer,
     AuditLogSerializer,
     BranchAccessAssignmentSerializer,
     EmployeeSerializer,
@@ -51,12 +55,53 @@ class RefreshRateThrottle(AnonRateThrottle):
     scope = "refresh"
 
 
+class TenantAwareTokenObtainPairSerializer(AuditedTokenObtainPairSerializer):
+    """Login that stops at the tenant boundary.
+
+    Extends the audited serializer (settings names it as the platform's
+    ``TOKEN_OBTAIN_SERIALIZER``), so ``auth.login`` rows keep being written.
+    A suspended organization's staff cannot mint tokens. The failure says so
+    instead of "wrong password", which would send them chasing a ghost while
+    the real cause sits one table away.
+    """
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        if self.user is not None and not tenant_is_active(self.user):
+            raise AuthenticationFailed("This organization is suspended.")
+        return data
+
+
 class LoginView(TokenObtainPairView):
     throttle_classes = [LoginRateThrottle]
+    serializer_class = TenantAwareTokenObtainPairSerializer
 
 
 class RefreshView(TokenRefreshView):
+    """Refresh, minus the right to extend a session that is over.
+
+    The token views opt out of the project's permission layer by design
+    (``TokenViewBase``: login is anonymous, refresh carries its credentials
+    in the body), so the deactivation and suspension checks that
+    ``HasPermission`` applies to every other request have to happen here.
+    Otherwise an account whose access was taken back could keep extending its
+    own session forever.
+    """
+
     throttle_classes = [RefreshRateThrottle]
+
+    def post(self, request, *args, **kwargs):
+        refresh = request.data.get("refresh")
+        if refresh:
+            try:
+                user_id = RefreshToken(refresh).payload.get(api_settings.USER_ID_CLAIM)
+            except TokenError:
+                # An unreadable token is refused by super with the proper 401.
+                user_id = None
+            user = User.objects.filter(pk=user_id).first() if user_id else None
+            if user is not None and (not user.is_active or not tenant_is_active(user)):
+                raise AuthenticationFailed("Your account is no longer active.")
+        return super().post(request, *args, **kwargs)
 
 
 class LogoutView(APIView):
