@@ -28,15 +28,21 @@ const Login = () => {
     setSubmitting(true);
 
     try {
-      // FastAPI exposes POST /api/login and returns { token, user }.
-      const { data } = await api.post('/login', { username: username.trim(), password });
-      if (!data?.token || !data?.user) {
-        throw new Error('The server response did not include a valid login session.');
+      // Django REST Framework Simple JWT returns access and refresh tokens.
+      const { data } = await api.post('/auth/login/', { username: username.trim(), password });
+      if (!data?.access || !data?.refresh) {
+        throw new Error('The server response did not include valid access and refresh tokens.');
       }
 
-      localStorage.setItem('token', data.token);
-      localStorage.removeItem('refreshToken');
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // Keep the existing storage keys so the rest of the app's auth guards
+      // and request interceptor continue to use the same session contract.
+      localStorage.setItem('token', data.access);
+      localStorage.setItem('refreshToken', data.refresh);
+
+      // Django exposes the authoritative roles, permissions and branch data
+      // separately; do not invent a user object from the token response.
+      const profile = await api.get('/auth/me/');
+      localStorage.setItem('user', JSON.stringify(profile.data));
 
       window.dispatchEvent(new Event('zenpos:auth'));
       navigate('/pos');
