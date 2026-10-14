@@ -2,8 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://zenpos-ef02.onrender.com/api/:path*"
+      "source": "/api/v2/:path*",
+      "destination": "https://zenpos-ef02.onrender.com/api/v2/:path*"
     },
     {
       "source": "/(.*)",
