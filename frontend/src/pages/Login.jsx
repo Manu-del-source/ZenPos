@@ -19,36 +19,31 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
 
     try {
-      const { data } = await api.post('/auth/login/', { username, password });
-
-      // Authentication succeeded. Store the JWT before doing anything else.
-      localStorage.setItem('token', data.access);
-      localStorage.setItem('refreshToken', data.refresh);
-
-      // Profile loading is useful but must never turn a successful credential
-      // exchange into an "Authentication failed" message.
-      try {
-        const me = await api.get('/auth/me/');
-        localStorage.setItem('user', JSON.stringify(me.data));
-      } catch (profileError) {
-        console.warn('Authenticated, but /auth/me/ could not be loaded:', profileError);
-        localStorage.setItem('user', JSON.stringify({ username }));
+      // FastAPI exposes POST /api/login and returns { token, user }.
+      const { data } = await api.post('/login', { username: username.trim(), password });
+      if (!data?.token || !data?.user) {
+        throw new Error('The server response did not include a valid login session.');
       }
 
-      // The app shell reads the session from localStorage on this event; it is
-      // what makes the navigation to the workspace render as signed in.
+      localStorage.setItem('token', data.token);
+      localStorage.removeItem('refreshToken');
+      localStorage.setItem('user', JSON.stringify(data.user));
+
       window.dispatchEvent(new Event('zenpos:auth'));
       navigate('/pos');
     } catch (err) {
-      // Only the actual token request reaches this branch.
-      setError(apiError(err, 'Authentication failed'));
+      setError(apiError(err, err?.message || 'Authentication failed'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -115,7 +110,9 @@ const Login = () => {
                     value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
                 </div>
               </div>
-              <button type="submit" className="login-submit">Sign in</button>
+              <button type="submit" className="login-submit" disabled={submitting}>
+                {submitting ? 'Signing in…' : 'Sign in'}
+              </button>
             </form>
             <div className="login-hint">
               <ShieldCheck size={16} /> Use the staff account provided by your administrator. Ask them if you need access.
