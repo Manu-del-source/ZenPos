@@ -1,11 +1,11 @@
 import axios from 'axios';
 
 /**
- * ZenPOS FastAPI backend is exposed under /api on the same origin by
- * frontend/api/[...path].js. VITE_API_BASE_URL remains available for local
- * development or an explicitly configured API origin.
+ * Django REST API is versioned under /api/v2. In production, Vercel forwards
+ * same-origin /api requests to the Render backend. VITE_API_BASE_URL remains
+ * available for local development or an explicitly configured API origin.
  */
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v2').replace(/\/$/, '');
 
 export const SESSION_KEYS = ['token', 'refreshToken', 'user'];
 
@@ -32,8 +32,9 @@ export const endSession = () => {
 };
 
 export const logout = async () => {
+  const refresh = localStorage.getItem('refreshToken');
   try {
-    await api.post('/logout');
+    await api.post('/auth/logout/', refresh ? { refresh } : {});
   } catch (error) {
     if (![401, 403, 404, 405].includes(error?.response?.status)) {
       console.warn('Server-side logout failed; clearing the local session anyway.');
