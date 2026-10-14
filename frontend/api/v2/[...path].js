@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const suffix = path.map((part) => encodeURIComponent(String(part))).join("/");
   const queryIndex = req.url.indexOf("?");
   const query = queryIndex >= 0 ? req.url.slice(queryIndex) : "";
-  const target = `${BACKEND_ORIGIN}/api/v2/${suffix}/${query}`;
+  const target = `${BACKEND_ORIGIN}/api/v2/${suffix}${query}`;
 
   const headers = {};
   for (const name of ["accept", "authorization", "content-type", "cookie", "user-agent"]) {
