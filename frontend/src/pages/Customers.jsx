@@ -99,7 +99,7 @@ export default function Customers() {
       </div>
 
       <div className="panel mt-6">
-        <div className="panel-header">
+        <div className="panel-header flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="panel-title">Customer directory</h2>
             <p className="panel-subtitle">{customers.length} customer{customers.length === 1 ? '' : 's'} registered</p>
