@@ -1,5 +1,5 @@
 /* ZenPOS landing — product-first commercial homepage. */
-.landing-page { --lp-ink:#101c18; --lp-muted:#64736c; --lp-line:#dfe6df; --lp-paper:#f7f9f6; --lp-green:#176b49; --lp-green-2:#0d5136; --lp-pale:#e7f1ea; background:#fff; color:var(--lp-ink); }
+.landing-page { --lp-ink:#171715; --lp-muted:#5e5c56; --lp-line:#d9d5cb; --lp-paper:#f7f4ed; --lp-green:#ff5938; --lp-green-2:#e94a2b; --lp-pale:#eee9de; background:#f7f4ed; color:var(--lp-ink); }
 .landing-page .site-header { background:rgb(255 255 255 / 94%); border-bottom-color:#e8ede8; }
 .landing-page .site-header-inner { width:min(1240px,calc(100% - 56px)); }
 .landing-page .zenpos-brand-mark { background:var(--lp-green); box-shadow:none; border-radius:8px; transform:none; }
