@@ -214,6 +214,7 @@ export default function POS() {
   const [statusMessage, setStatusMessage] = useState('');
   const [outcome, setOutcome] = useState(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const searchRef = useRef(null);
   const clientRef = useRef(null);
@@ -392,6 +393,7 @@ export default function POS() {
       }
     }
     addToCart(product, quantity);
+    setCartOpen(true);
   }, [addToCart, getQuantityFor]);
 
   const changeQuantity = (item, delta) => {
@@ -445,6 +447,7 @@ export default function POS() {
   const openReview = () => {
     if (!cart.length) return;
     if (!clientRef.current) clientRef.current = newClientReference();
+    setCartOpen(false);
     setStep('review');
   };
 
@@ -722,6 +725,7 @@ export default function POS() {
       }
       if (event.key === 'Escape') {
         if (showShortcuts) { setShowShortcuts(false); return; }
+        if (cartOpen) { setCartOpen(false); return; }
         if (isTypingTarget(event.target) && step === 'sale') { setSearchTerm(''); return; }
         if (step === 'review') { setStep('sale'); return; }
         if (step === 'payment') {
@@ -758,7 +762,7 @@ export default function POS() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, cart.length, method, outcome, showShortcuts, cash, total, busy, phone]);
+  }, [step, cart.length, method, outcome, showShortcuts, cartOpen, cash, total, busy, phone]);
 
   useEffect(() => {
     if (step === 'sale') searchRef.current?.focus();
@@ -1132,7 +1136,7 @@ export default function POS() {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid gap-5">
         <section className="panel flex min-h-[620px] flex-col overflow-hidden">
           <div className="border-b border-slate-800 p-4">
             <div className="relative">
@@ -1206,17 +1210,26 @@ export default function POS() {
           </div>
         </section>
 
-        <aside className="panel flex min-h-[620px] flex-col overflow-hidden">
+        {cartOpen && cart.length > 0 && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-3 sm:p-6"
+            role="presentation"
+            onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false); }}
+          >
+            <section className="panel flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="pos-cart-title">
           <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
             <div>
-              <h2 className="font-bold text-white">Current sale</h2>
+              <h2 id="pos-cart-title" className="font-bold text-white">Added to cart</h2>
               <p className="text-xs text-slate-500">{lineCount} item{lineCount === 1 ? '' : 's'}</p>
             </div>
-            {cart.length > 0 && (
-              <button className="text-xs font-semibold text-red-400 hover:text-red-300" onClick={clearCart}>
-                Clear
+            <div className="flex items-center gap-2">
+              <button className="text-xs font-semibold text-red-400 hover:text-red-300" onClick={() => { clearCart(); setCartOpen(false); }}>
+                Clear cart
               </button>
-            )}
+              <button className="btn-secondary !px-3 !py-2" onClick={() => setCartOpen(false)} aria-label="Close cart">
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -1295,7 +1308,9 @@ export default function POS() {
               <CreditCard size={18} /> Take payment <kbd className="kbd kbd--dark">F8</kbd>
             </button>
           </div>
-        </aside>
+            </section>
+          </div>
+        )}
       </div>
     </div>
   );
