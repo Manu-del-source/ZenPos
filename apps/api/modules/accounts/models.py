@@ -39,6 +39,15 @@ class User(BaseModel, AbstractUser):
     impossible to run before any organization has been created.
     """
 
+    # Stable external identity key. Nullable so existing Django-only accounts remain valid.
+    # It is populated only by the verified migration/linking flow, never by a client payload.
+    clerk_user_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+    )
     organization = models.ForeignKey(
         "organizations.Organization",
         null=True,
