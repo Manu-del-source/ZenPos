@@ -101,14 +101,15 @@ function Landing() {
               </ul>
             </div>
             <div className="lp-hero-art" aria-hidden="true">
-              <div className="lp-art-ring lp-art-ring-outer" />
-              <div className="lp-art-ring lp-art-ring-inner" />
-              <div className="lp-art-core"><span>Z</span></div>
-              <div className="lp-art-node lp-art-node-sales"><ShoppingCart size={21} /><span>Sales</span></div>
-              <div className="lp-art-node lp-art-node-stock"><Package size={21} /><span>Stock</span></div>
-              <div className="lp-art-node lp-art-node-payments"><CreditCard size={21} /><span>Payments</span></div>
-              <div className="lp-art-node lp-art-node-reports"><BarChart3 size={21} /><span>Reports</span></div>
-              <div className="lp-art-caption"><span className="lp-art-caption-mark"><ShieldCheck size={16} /></span><span><b>One connected workspace</b><small>Designed for day-to-day retail work</small></span></div>
+              <div className="lp-hero-panel">
+                <div className="lp-hero-panel-top"><span className="lp-panel-mark">Z</span><span>ZENPOS / RETAIL SYSTEM</span><span className="lp-panel-index">01—03</span></div>
+                <div className="lp-hero-panel-main">
+                  <span className="lp-panel-overline">THE DAILY BUSINESS,</span>
+                  <strong>IN<br /><em>GOOD</em><br />ORDER.</strong>
+                </div>
+                <div className="lp-hero-panel-bottom"><span>SELL WITH CLARITY</span><span className="lp-panel-rule" /><span>KENYA</span></div>
+                <div className="lp-panel-side-label">POINT OF SALE · STOCK · REPORTS</div>
+              </div>
             </div>
           </div>
           <div className="lp-hero-bottom"><span>MADE FOR RETAIL OPERATIONS</span><span className="lp-hero-bottom-line" /><span>KENYA</span></div>
