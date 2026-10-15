@@ -606,3 +606,29 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-capability-card { transition: none; }
 }
+
+
+/* Hero typography refinement: confident, readable, and less oversized. */
+.lp-hero h1 {
+  max-width: 650px;
+  font-size: clamp(44px, 5.1vw, 68px);
+  line-height: .99;
+  letter-spacing: -.065em;
+}
+.lp-eyebrow {
+  font-size: 10px;
+  letter-spacing: .075em;
+}
+.lp-hero-description {
+  max-width: 490px;
+  font-size: 14px;
+  line-height: 1.75;
+}
+@media (max-width: 900px) {
+  .lp-hero h1 { font-size: clamp(42px, 7.2vw, 60px); }
+}
+@media (max-width: 600px) {
+  .lp-hero h1 { font-size: clamp(38px, 10vw, 48px); line-height: 1.03; }
+  .lp-eyebrow { font-size: 9px; letter-spacing: .04em; }
+  .lp-hero-description { font-size: 13px; }
+}
