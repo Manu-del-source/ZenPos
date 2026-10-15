@@ -47,7 +47,9 @@ class TestEmployees:
         assert response.status_code == 200, response.data
         emp.refresh_from_db()
         assert emp.status == Employee.Status.SUSPENDED
-        assert AuditLog.objects.filter(action="staff.status_changed", entity_id=str(emp.pk)).exists()
+        assert AuditLog.objects.filter(
+            action="staff.status_changed", entity_id=str(emp.pk)
+        ).exists()
 
     def test_rival_cannot_see_employees(self, manager_client, rival_client, organization):
         Employee.objects.create(
