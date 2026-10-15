@@ -2,7 +2,7 @@
 
 ## Status
 
-Planning only. This document does not change runtime behavior, database schema, authentication, or deployment configuration.
+Phase 1 groundwork is present on this feature branch: nullable, unique external identity fields have been added to the Django User and Organization models with additive migrations and focused tests. Authentication behavior, frontend dependencies, and deployment configuration remain unchanged.
 
 The production application currently uses Django REST Framework SimpleJWT. The React/Vite frontend expects the `/auth/login/` response to contain `access` and `refresh`, stores those tokens in local storage, and loads the authoritative user profile from `/auth/me/`. Django owns role and permission checks, organization scoping, branch scoping, refresh-token rotation, and logout blacklisting. This contract must remain intact until a replacement has passed end-to-end tests.
 
@@ -76,6 +76,6 @@ Only after all checks pass in a preview/staging deployment:
 - Frontend `npm test`, `npm run build`, backend pytest, migration checks, and end-to-end auth tests pass.
 - Production is not switched on the basis of a successful frontend build alone.
 
-## Current decision
+## Current status and next step
 
-Do not switch production authentication yet. The next implementation step is to add the additive Django identity mapping and its tests first, then introduce Clerk verification behind a server-side feature flag. The frontend SDK should be added only after the dependency lock can be generated and CI/build tests can verify it.
+The additive identity mapping is implemented on this feature branch only. It does not authenticate Clerk tokens and does not change login behavior. Do not switch production authentication yet. Next, introduce Clerk verification behind a server-side feature flag, with signature/issuer/expiry validation and fail-closed mapping to an existing Django user. Add the frontend SDK only after the dependency lock can be generated and CI/build tests can verify it.
