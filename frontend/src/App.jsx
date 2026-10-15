@@ -122,7 +122,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
 
   if (!showAppNav) {
     return (
-      <main className="min-h-screen bg-slate-950">
+      <main className="zen-public-shell min-h-screen">
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Landing />} />
@@ -135,11 +135,11 @@ const AppLayout = ({ token, user, handleLogout }) => {
   const Sidebar = () => (
     <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-800 bg-slate-950/95 backdrop-blur-xl transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex h-full flex-col">
-        <div className="flex h-20 items-center justify-between border-b border-slate-800 px-5">
+        <div className="zen-sidebar-brand flex h-20 items-center justify-between border-b px-5">
           <NavLink to="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 text-lg font-black text-white">Z</div>
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#FF5938] text-lg font-black text-white">Z</div>
             <div>
-              <div className="text-lg font-black tracking-tight text-white">Zen<span className="text-blue-500">POS</span></div>
+              <div className="text-lg font-black tracking-tight text-white">Zen<span className="text-[#FF5938]">POS</span></div>
               <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">Retail platform</div>
             </div>
           </NavLink>
@@ -148,7 +148,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
 
         {can(user, 'sales.create') && (
           <div className="px-4 pt-5">
-            <NavLink to="/pos" onClick={() => setMobileOpen(false)} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500">
+            <NavLink to="/pos" onClick={() => setMobileOpen(false)} className="flex items-center justify-center gap-2 rounded-xl bg-[#FF5938] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#E94A2B]">
               <ShoppingCart size={18} /> New sale
             </NavLink>
           </div>
@@ -210,11 +210,11 @@ const AppLayout = ({ token, user, handleLogout }) => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="zen-app-shell min-h-screen text-slate-100">
       <Sidebar />
       {mobileOpen && <button aria-label="Close menu" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 bg-black/60 lg:hidden" />}
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800/80 bg-slate-950/90 px-4 backdrop-blur-xl sm:px-6">
+      <div className="zen-main lg:pl-64">
+        <header className="zen-topbar sticky top-0 z-30 flex h-16 items-center justify-between border-b px-4 backdrop-blur-xl sm:px-6">
           <div className="flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 lg:hidden" aria-label="Open menu"><Menu size={21} /></button>
             <div>
@@ -227,7 +227,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
             {organization}
           </div>
         </header>
-        <main className="min-h-[calc(100vh-4rem)]">
+        <main className="zen-page min-h-[calc(100vh-4rem)]">
           <Routes>
             <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
