@@ -221,3 +221,132 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-capability-card, .lp-secondary-link svg, .lp-inline-link svg { transition: none; }
 }
+
+
+/* Refined ZenPOS palette: warm paper, ink, and a single restrained olive accent. */
+.landing-page {
+  --lp-ink: #20211c;
+  --lp-muted: #68695f;
+  --lp-line: #dedbd0;
+  --lp-paper: #f4f1e8;
+  --lp-green: #596541;
+  --lp-green-2: #434d31;
+  --lp-pale: #e8e7d9;
+  background: #fbfaf6;
+  color: var(--lp-ink);
+}
+.landing-page .site-header {
+  background: #fbfaf6;
+  border-bottom-color: #e4e0d5;
+}
+.landing-page .zenpos-brand-mark,
+.landing-page .btn--primary { background: #596541; box-shadow: none; }
+.landing-page .zenpos-brand-name > span { color: #596541; }
+.landing-page .btn--primary:hover { background: #434d31; box-shadow: none; }
+.landing-page .site-nav-links a,
+.landing-page .nav-signin { color: #5f6056; }
+.lp-hero { background: #f4f1e8; }
+.lp-hero-glow { display: none; }
+.lp-hero h1 { color: #20211c; }
+.lp-hero h1 em,
+.lp-section-heading h2 em,
+.lp-principles-copy h2 em { color: #596541; }
+.lp-eyebrow,
+.lp-section-kicker { color: #596541; }
+.lp-eyebrow > span { background: #596541; box-shadow: none; }
+.lp-hero-description,
+.lp-section-heading > p,
+.lp-workflow-heading > p,
+.lp-principles-copy > p { color: #68695f; }
+.lp-proof-list { color: #5f6056; }
+.lp-proof-list svg,
+.lp-audience-strip svg,
+.lp-art-node > svg,
+.lp-art-caption-mark { color: #596541; }
+.lp-hero-art { filter: none; }
+.lp-art-ring { border-color: #d7d3c5; }
+.lp-art-ring-inner { border-color: #c7c4b4; }
+.lp-art-core {
+  border-color: #e2dfd1;
+  border-radius: 18px;
+  background: #596541;
+  box-shadow: none;
+  transform: none;
+}
+.lp-art-core span { transform: none; }
+.lp-art-node {
+  border-color: #dedbd0;
+  border-radius: 5px;
+  background: #fbfaf6;
+  box-shadow: 0 5px 14px rgb(32 33 28 / 5%);
+  color: #596541;
+}
+.lp-art-node span { color: #292a23; }
+.lp-art-caption {
+  border-color: #dedbd0;
+  border-radius: 5px;
+  background: #fbfaf6;
+  box-shadow: 0 5px 14px rgb(32 33 28 / 5%);
+}
+.lp-art-caption-mark { background: #e8e7d9; }
+.lp-art-caption b { color: #292a23; }
+.lp-art-caption small,
+.lp-hero-bottom { color: #77766b; }
+.lp-hero-bottom-line { background: #d7d3c5; }
+.lp-audience-strip { border-bottom-color: #dedbd0; }
+.lp-audience-strip > div { border-right-color: #dedbd0; color: #68695f; }
+.lp-product-section,
+.lp-principles-section { background: #fbfaf6; }
+.lp-section-heading h2,
+.lp-workflow-heading h2,
+.lp-principles-copy h2 { color: #20211c; }
+.lp-capability-grid { border-color: #dedbd0; }
+.lp-capability-card {
+  border-color: #dedbd0;
+  background: #fbfaf6;
+  transition: background .18s ease;
+}
+.lp-capability-card:hover { background: #f1eee4; transform: none; }
+.lp-capability-icon,
+.lp-step-icon,
+.lp-principles-list > div > span {
+  border-color: #dedbd0;
+  border-radius: 5px;
+  background: #e8e7d9;
+  color: #596541;
+}
+.lp-capability-card h3,
+.lp-workflow-step h3,
+.lp-principles-list b { color: #292a23; }
+.lp-capability-card p,
+.lp-workflow-step p,
+.lp-principles-list p { color: #68695f; }
+.lp-workflow-section { background: #efede4; }
+.lp-workflow-list,
+.lp-workflow-step,
+.lp-principles-list,
+.lp-principles-list > div { border-color: #d8d4c8; }
+.lp-step-number,
+.lp-step-arrow { color: #77766b; }
+.lp-cta-section {
+  background: #20211c;
+  color: #fbfaf6;
+}
+.lp-section-kicker-light { color: #c6c9ae; }
+.lp-cta-section h2 { color: #fbfaf6; }
+.lp-cta-section h2 em { color: #c6c9ae; }
+.lp-cta-section p { color: #c5c3b8; }
+.lp-cta-section .btn--light {
+  border: 1px solid #c6c9ae;
+  background: #c6c9ae;
+  color: #20211c;
+  border-radius: 5px;
+}
+.lp-cta-section .btn--light:hover { background: #d7d9c4; }
+.landing-page .site-footer { background: #20211c; }
+.landing-page .footer-brand-column p,
+.landing-page .footer-link-column a { color: #b6b4a8; }
+.landing-page .footer-link-column a:hover { color: #fbfaf6; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-capability-card { transition: none; }
+}
