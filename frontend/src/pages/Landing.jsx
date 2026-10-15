@@ -85,10 +85,10 @@ function Landing() {
           <div className="lp-hero-glow lp-hero-glow-two" aria-hidden="true" />
           <div className="lp-hero-inner">
             <div className="lp-hero-copy">
-              <span className="lp-eyebrow"><span /> Retail operations, brought together</span>
-              <h1>Run your shop with <em>more clarity.</em></h1>
+              <span className="lp-eyebrow"><span /> A simpler way to run your shop</span>
+              <h1>Sell smarter.<br /><em>Run your shop better.</em></h1>
               <p className="lp-hero-description">
-                ZenPOS brings point of sale, inventory, customer records and business reporting into one workspace for Kenyan retailers.
+                Keep sales, stock and daily records together in one easy-to-use system, built for the way Kenyan shops work.
               </p>
               <div className="lp-hero-actions">
                 <Link className="btn btn--primary" to="/login">Sign in to ZenPOS <ArrowUpRight size={16} /></Link>
