@@ -9,12 +9,10 @@ from django.utils.dateparse import parse_date
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.status import HTTP_400_BAD_REQUEST as HTTP_BAD_REQUEST
 
 from modules.core.audit import record_audit
 from modules.core.mixins import BranchScopedMixin
-
-from django.db import transaction
-from rest_framework.status import HTTP_400_BAD_REQUEST as HTTP_BAD_REQUEST
 
 from .models import Sale, SaleItem, SaleReturn
 from .receipts import (
