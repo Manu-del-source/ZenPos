@@ -133,7 +133,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
   }
 
   const Sidebar = () => (
-    <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-800 bg-slate-950/95 backdrop-blur-xl transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`zen-sidebar fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-800 bg-slate-950/95 backdrop-blur-xl transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex h-full flex-col">
         <div className="zen-sidebar-brand flex h-20 items-center justify-between border-b px-5">
           <NavLink to="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3">
@@ -210,7 +210,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
   );
 
   return (
-    <div className="zen-app-shell min-h-screen text-slate-100">
+    <div className="zen-app-shell min-h-screen text-[#171715]">
       <Sidebar />
       {mobileOpen && <button aria-label="Close menu" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 bg-black/60 lg:hidden" />}
       <div className="zen-main lg:pl-64">
