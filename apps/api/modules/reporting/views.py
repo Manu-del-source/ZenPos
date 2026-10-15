@@ -165,7 +165,10 @@ class AnalyticsViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"])
     def inventory_movements(self, request):
         rows = self._date_filtered(
-            self._scoped(InventoryMovement.objects.select_related("product", "branch"), "organization_id")
+            self._scoped(
+                InventoryMovement.objects.select_related("product", "branch"),
+                "organization_id",
+            )
         )
         movement_type = request.query_params.get("movement_type")
         if movement_type:
