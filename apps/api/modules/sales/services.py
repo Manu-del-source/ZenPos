@@ -466,7 +466,10 @@ def complete_return(*, sale_return, actor, request=None):
                 legacy_adjustment_type=StockAdjustment.AdjustmentType.DAMAGE,
             )
 
-    if sale_return.refund_amount and sale_return.refund_method != SaleReturn.RefundMethod.STORE_CREDIT:
+    if (
+        sale_return.refund_amount
+        and sale_return.refund_method != SaleReturn.RefundMethod.STORE_CREDIT
+    ):
         method = (
             Payment.Method.MPESA
             if sale_return.refund_method == SaleReturn.RefundMethod.MPESA
