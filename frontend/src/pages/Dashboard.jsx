@@ -42,7 +42,7 @@ const Dashboard = () => {
   const maxRevenue = Math.max(...trend.slice(-7).map((x) => Number(x.revenue || 0)), 1);
 
   return (
-    <div className="page-shell">
+    <div className="zen-dashboard-page page-shell">
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#FF5938]">Business overview</p>
