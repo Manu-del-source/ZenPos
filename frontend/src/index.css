@@ -112,3 +112,18 @@ body { background: var(--zen-paper); color: var(--zen-ink); }
 .zen-sidebar .bg-blue-600 { background-color: var(--zen-coral) !important; }
 .zen-sidebar .hover\\:bg-blue-500:hover { background-color: var(--zen-coral-hover) !important; }
 .zen-topbar .text-white { color: var(--zen-ink) !important; }
+
+/* Screen-specific finishing: inventory and checkout. */
+.zen-inventory-page h1 { color: var(--zen-ink); letter-spacing: -0.04em; }
+.zen-inventory-page table th { color: var(--zen-muted); font-size: 10px; font-weight: 800; }
+.zen-inventory-page table td { color: var(--zen-ink); }
+.zen-inventory-page input:focus, .zen-inventory-page select:focus { outline: 2px solid rgba(255,89,56,.16); outline-offset: 1px; }
+.zen-pos-page { color: var(--zen-ink); }
+.zen-pos-page .panel { border-radius: 16px; }
+.zen-pos-page .input { border-radius: 10px; }
+.zen-pos-page .product-tile { border-radius: 12px; }
+.zen-pos-page .payment-choice { border-radius: 12px; }
+@media (max-width: 640px) {
+  .zen-inventory-page { padding-top: 20px; }
+  .zen-inventory-page h1 { font-size: 26px; }
+}
