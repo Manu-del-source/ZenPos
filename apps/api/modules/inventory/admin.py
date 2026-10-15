@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import BranchStock, InventoryMovement, StockAdjustment, StockTransfer, StockTransferLine
+from .models import (
+    BranchStock,
+    InventoryMovement,
+    StockAdjustment,
+    StockTransfer,
+    StockTransferLine,
+)
 
 
 @admin.register(StockAdjustment)
