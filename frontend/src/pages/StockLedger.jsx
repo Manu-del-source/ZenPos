@@ -70,9 +70,9 @@ export default function StockLedger() {
   const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen">
+    <div className="mx-auto min-h-screen max-w-7xl p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-black tracking-tight text-white">Stock Ledger</h1>
+        <h1 className="text-3xl font-black tracking-tight text-[#171715]">Stock Ledger</h1>
         <p className="text-slate-500 text-sm">Every inventory movement, in order. Balances are not edited here.</p>
       </div>
 
@@ -103,7 +103,7 @@ export default function StockLedger() {
 
       <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-800/50">
+          <thead className="bg-[#F1EDE4]">
             <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.18em]">
               <th className="p-3">Date</th>
               <th className="p-3">Product</th>
