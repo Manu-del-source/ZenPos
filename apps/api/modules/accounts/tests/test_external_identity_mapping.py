@@ -1,8 +1,6 @@
 import pytest
 from django.db import IntegrityError, transaction
 
-from modules.accounts.models import User
-
 
 @pytest.mark.django_db
 def test_existing_users_do_not_need_a_clerk_identity(cashier):
