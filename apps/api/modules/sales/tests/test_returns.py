@@ -113,7 +113,11 @@ class TestReturns:
 
     def test_cannot_return_voided_sale(self, authenticated_client, supervisor_client, product):
         sale = _sell(authenticated_client, product, 1)
-        supervisor_client.post(f"{SALES_URL}{sale['id']}/void/", {"reason": "mistake"}, format="json")
+        supervisor_client.post(
+            f"{SALES_URL}{sale['id']}/void/",
+            {"reason": "mistake"},
+            format="json",
+        )
         item_id = sale["items"][0]["id"]
         response = authenticated_client.post(
             f"{SALES_URL}{sale['id']}/returns/",
