@@ -127,3 +127,16 @@ body { background: var(--zen-paper); color: var(--zen-ink); }
   .zen-inventory-page { padding-top: 20px; }
   .zen-inventory-page h1 { font-size: 26px; }
 }
+
+.zen-dashboard-page .panel { border-radius: 16px; }
+.zen-dashboard-page .panel-title { letter-spacing: -0.02em; }
+.zen-reports-page .panel { border-radius: 16px; }
+.zen-reports-page table thead { background: #F1EDE4; color: var(--zen-muted); }
+.zen-reports-page table tbody tr { border-color: var(--zen-line); }
+.zen-reports-page table tbody td { color: var(--zen-ink); }
+.zen-reports-page input:focus { outline: 2px solid rgba(255,89,56,.15); outline-offset: 1px; }
+@media (max-width: 640px) {
+ .zen-reports-page > div:first-child { align-items: stretch; }
+ .zen-reports-page > div:first-child > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
+ .zen-reports-page > div:first-child > div:last-child button { grid-column: 1 / -1; justify-content: center; }
+}
