@@ -67,7 +67,11 @@ class LoyaltyAccountViewSet(
         serializer = LoyaltyAdjustSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        account = self.get_object() if self.action != "adjust" or getattr(self, "basename", "") else None
+        account = (
+            self.get_object()
+            if self.action != "adjust" or getattr(self, "basename", "")
+            else None
+        )
         # detail actions have an account; list-style adjust uses customer id.
         if "pk" in self.kwargs:
             account = self.get_object()
