@@ -52,14 +52,14 @@ export default function Reports() {
   useEffect(() => { load(); }, []);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen">
+    <div className="zen-reports-page mx-auto min-h-screen max-w-7xl p-4 sm:p-6 lg:p-8">
       <div className="flex justify-between items-end mb-8 gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-white">Reports</h1>
+          <h1 className="text-3xl font-black tracking-tight text-[#171715]">Reports</h1>
           <p className="text-slate-500 text-sm">Purchasing, inventory, returns, loyalty and branch performance. Filtered on the server.</p>
         </div>
         <div className="flex gap-2 items-center">
-          <input type="date" className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-white text-sm" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} />
+          <input type="date" className="rounded-xl border border-[#E4DED3] bg-white p-3 text-sm text-[#171715] outline-none focus:border-[#FF5938]" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} />
           <input type="date" className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-white text-sm" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} />
           <button className="btn-secondary" onClick={load} disabled={loading}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Run</button>
         </div>
@@ -83,7 +83,7 @@ export default function Reports() {
               <table className="w-full text-sm">
                 <tbody>
                   {(returns.by_reason || []).map((row) => (
-                    <tr key={row.reason} className="border-t border-slate-800">
+                    <tr key={row.reason} className="border-t border-[#E4DED3]">
                       <td className="py-2 text-slate-300">{row.reason}</td>
                       <td className="py-2 text-right text-slate-400">{row.count}</td>
                       <td className="py-2 text-right text-white">{money(row.amount)}</td>
