@@ -85,7 +85,7 @@ const Inventory = () => {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto bg-slate-950 min-h-screen text-white">
+    <div className="zen-inventory-page mx-auto min-h-screen max-w-7xl p-4 text-[#171715] sm:p-6 lg:p-8">
       <div className="flex justify-between items-center mb-8">
         <div><h1 className="text-3xl font-black tracking-tight">Inventory</h1>
           <p className="text-slate-500 text-sm">Manage products, pricing and stock levels.</p></div>
@@ -94,27 +94,27 @@ const Inventory = () => {
         </button>
       </div>
       <div className="mb-6 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
-        <input className="w-full bg-slate-900 border border-slate-800 p-4 pl-12 rounded-2xl text-white outline-none focus:border-blue-500 transition-all"
+        <input className="w-full rounded-xl border border-[#E4DED3] bg-white p-4 pl-12 text-[#171715] outline-none transition focus:border-[#FF5938]"
           placeholder="Search product name or SKU..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
 
-      <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
-        <table className="w-full text-left"><thead className="bg-slate-800/50"><tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
+      <div className="overflow-hidden rounded-2xl border border-[#E4DED3] bg-white shadow-sm">
+        <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead className="bg-[#F1EDE4]"><tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
           <th className="p-5">Product Details</th><th className="p-5 text-right">Unit Price</th><th className="p-5 text-right">Stock</th><th className="p-5 text-center">Manage</th>
         </tr></thead><tbody className="divide-y divide-slate-800">
-          {products.map((p) => <tr key={p.id} className="hover:bg-slate-800/30 transition group">
+          {products.map((p) => <tr key={p.id} className="group border-t border-[#EEE9DF] transition-colors hover:bg-[#FFFCF7]">
             <td className="p-5"><div className="font-bold text-white group-hover:text-blue-400">{p.name}</div><div className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-wider">{p.sku || 'NO SKU'}</div></td>
             <td className="p-5 text-right font-black text-blue-400">KES {Number(p.price).toLocaleString()}</td>
-            <td className="p-5 text-right"><span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-green-500/10 text-green-500 border border-green-500/20">{p.stock_level} units</span></td>
+            <td className="p-5 text-right"><span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${Number(p.stock_level || 0) <= Number(p.low_stock_threshold || 0) ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>{p.stock_level} units</span></td>
             <td className="p-5 text-center"><div className="flex justify-center space-x-2">
-              <button onClick={() => handleOpenModal(p)} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-white"><Pencil size={16} /></button>
-              <button onClick={() => handleDelete(p.id)} className="p-2 bg-slate-800 rounded-lg text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
+              <button onClick={() => handleOpenModal(p)} className="rounded-lg border border-[#E4DED3] bg-white p-2 text-[#756F66] transition hover:border-[#FF5938] hover:text-[#171715]"><Pencil size={16} /></button>
+              <button onClick={() => handleDelete(p.id)} className="rounded-lg border border-[#E4DED3] bg-white p-2 text-[#756F66] transition hover:border-red-200 hover:text-red-600"><Trash2 size={16} /></button>
             </div></td>
           </tr>)}
-        </tbody></table>
+        </tbody></table></div>
         {products.length === 0 && !loading && <div className="p-20 text-center flex flex-col items-center"><Package size={64} className="text-slate-800 mb-4" /><p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Inventory Archive Empty — create your first product</p></div>}
       </div>
 
-      {showModal && <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4"><div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl">
+      {showModal && <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"><div className="my-auto w-full max-w-lg rounded-2xl border border-[#E4DED3] bg-[#F7F4ED] p-5 shadow-2xl sm:p-8">
         <h3 className="text-2xl font-black mb-8 text-white tracking-tighter uppercase italic">{editingProduct ? 'Update Stock Item' : 'New Inventory Record'}</h3>
         <form onSubmit={handleSubmit} className="space-y-5">
           {[
@@ -122,7 +122,7 @@ const Inventory = () => {
             ['cost_price','Cost Price','number'], ['stock_level','Opening Stock','number'], ['low_stock_threshold','Low Stock Alert','number']
           ].map(([key,label,type]) => <div key={key}><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{label}</label>
             <input required={['name','price','cost_price'].includes(key)} type={type} min={type === 'number' ? '0' : undefined}
-              className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500"
+              className="w-full rounded-xl border border-[#E4DED3] bg-white p-3.5 text-[#171715] outline-none focus:border-[#FF5938]"
               value={formData[key]} onChange={(e) => setFormData({...formData, [key]: e.target.value})} /></div>)}
           <div className="flex space-x-3 pt-4"><button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-slate-800 text-slate-400 py-4 rounded-2xl font-bold uppercase">Discard</button>
             <button type="submit" className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase">Save Item</button></div>

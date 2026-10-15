@@ -10,9 +10,9 @@ import '../styles/site.css';
 import '../styles/login.css';
 
 const benefits = [
-  { icon: CircleDollarSign, title: 'Fast point of sale', text: 'Products, cart and totals in one clear checkout.' },
-  { icon: Warehouse, title: 'Stock-aware selling', text: 'Catalogue and stock levels connected to sales.' },
-  { icon: Smartphone, title: 'Cash or M-Pesa', text: 'Start an M-Pesa STK push or take cash at the counter.' },
+  { icon: CircleDollarSign, title: 'Checkout, made clear', text: 'Find products, build the sale and keep totals in view.' },
+  { icon: Warehouse, title: 'Stock in view', text: 'Keep product and stock records connected to daily sales.' },
+  { icon: Smartphone, title: 'Payment options', text: 'Record supported cash and M-Pesa workflows at checkout.' },
 ];
 
 const Login = () => {
@@ -58,9 +58,9 @@ const Login = () => {
       <aside className="login-brand-panel" aria-label="About ZenPOS">
         <div className="login-brand-top"><Brand tone="dark" /></div>
         <div className="login-brand-body">
-          <span className="eyebrow eyebrow--light">Retail, brought together</span>
-          <h1>Everything you need to run your <em>retail business.</em></h1>
-          <p>Bring sales, inventory, payments, customers and business management together in one simple system.</p>
+          <span className="eyebrow eyebrow--light">YOUR SHOP, IN GOOD ORDER</span>
+          <h1>Your shop.<br /><em>Under control.</em></h1>
+          <p>A clearer way to handle sales, stock and the everyday work behind your counter.</p>
           <ul className="login-benefits">
             {benefits.map(({ icon: Icon, title, text }) => (
               <li key={title}>
@@ -93,7 +93,7 @@ const Login = () => {
           <div className="login-form-card">
             <div className="login-mobile-brand"><Brand /></div>
             <h2>Welcome back</h2>
-            <p>Sign in to your workspace to reach the retail tools available to your role.</p>
+            <p>Enter your details to open your ZenPOS workspace.</p>
             {error && (
               <div className="login-error" role="alert">
                 <ShieldCheck size={17} /> {error}

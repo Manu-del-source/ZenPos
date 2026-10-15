@@ -54,3 +54,109 @@ input::placeholder, textarea::placeholder { color: #64748b; }
   .method-tab { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm font-bold text-slate-400 transition hover:text-white; }
   .method-tab--active { @apply border-blue-500/60 bg-blue-500/10 text-white; }
 }
+
+
+/* ZenPOS retail design system — shared app shell and reusable controls. */
+:root { --zen-paper: #F7F4ED; --zen-ink: #171715; --zen-coral: #FF5938; --zen-coral-hover: #E94A2B; --zen-line: #E4DED3; --zen-muted: #756F66; --zen-surface: #FFFFFF; }
+body { background: var(--zen-paper); color: var(--zen-ink); }
+.zen-public-shell { background: var(--zen-ink); }
+.zen-app-shell { background: var(--zen-paper); color: var(--zen-ink); }
+.zen-main { min-width: 0; background: var(--zen-paper); }
+.zen-page { color: var(--zen-ink); }
+.zen-sidebar { background: var(--zen-ink); border-color: #302F2B; color: #F7F4ED; }
+.zen-sidebar-brand { border-color: #302F2B; }
+.zen-topbar { background: rgba(247, 244, 237, 0.94); border-color: var(--zen-line); color: var(--zen-ink); }
+.zen-topbar .text-white { color: var(--zen-ink); }
+.zen-topbar .text-slate-500, .zen-topbar .text-slate-600 { color: var(--zen-muted); }
+@layer components {
+.page-title { color: var(--zen-ink); }
+.page-subtitle { color: var(--zen-muted); }
+.panel { border-color: var(--zen-line); background: var(--zen-surface); box-shadow: 0 2px 10px rgba(23,23,21,.035); }
+.panel-header { border-color: var(--zen-line); }
+.panel-title { color: var(--zen-ink); }
+.input { border-color: var(--zen-line); background: var(--zen-surface); color: var(--zen-ink); }
+.input:focus { border-color: var(--zen-coral); --tw-ring-color: rgba(255,89,56,.12); }
+.btn-primary { background: var(--zen-coral); }
+.btn-primary:hover { background: var(--zen-coral-hover); }
+.btn-secondary { border-color: var(--zen-line); background: var(--zen-surface); color: var(--zen-ink); }
+.btn-secondary:hover { background: #EEE9DF; color: var(--zen-ink); }
+.product-tile { border-color: var(--zen-line); background: var(--zen-surface); color: var(--zen-ink); }
+.product-tile:hover { border-color: rgba(255,89,56,.55); background: #FFFCF7; }
+.product-tile--in-cart { border-color: var(--zen-coral); }
+.cart-chip { background: var(--zen-coral); }
+.payment-choice { border-color: var(--zen-line); background: var(--zen-surface); }
+.method-tab { border-color: var(--zen-line); background: var(--zen-surface); }
+.method-tab--active { border-color: var(--zen-coral); background: rgba(255,89,56,.08); }
+}
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+
+/* Utility palette bridge: migrate existing screens without changing behavior. */
+@layer utilities {
+  .bg-slate-950 { background-color: var(--zen-paper) !important; }
+  .bg-slate-900 { background-color: var(--zen-surface) !important; }
+  .bg-slate-800 { background-color: #EEE9DF !important; }
+  .border-slate-800, .border-slate-700 { border-color: var(--zen-line) !important; }
+  .text-white, .text-slate-100, .text-slate-200, .text-slate-300 { color: var(--zen-ink) !important; }
+  .text-slate-400, .text-slate-500, .text-slate-600 { color: var(--zen-muted) !important; }
+  .bg-blue-600 { background-color: var(--zen-coral) !important; }
+  .hover\\:bg-blue-500:hover { background-color: var(--zen-coral-hover) !important; }
+  .text-blue-400, .text-blue-300 { color: var(--zen-coral-hover) !important; }
+}
+.zen-sidebar .bg-slate-950 { background-color: #171715 !important; }
+.zen-sidebar .bg-slate-900 { background-color: #242421 !important; }
+.zen-sidebar .bg-slate-800 { background-color: #302F2B !important; }
+.zen-sidebar .border-slate-800, .zen-sidebar .border-slate-700 { border-color: #302F2B !important; }
+.zen-sidebar .text-white, .zen-sidebar .text-slate-100 { color: #F7F4ED !important; }
+.zen-sidebar .text-slate-200, .zen-sidebar .text-slate-300 { color: #E4DED3 !important; }
+.zen-sidebar .text-slate-400, .zen-sidebar .text-slate-500, .zen-sidebar .text-slate-600 { color: #AAA398 !important; }
+.zen-sidebar .bg-blue-600 { background-color: var(--zen-coral) !important; }
+.zen-sidebar .hover\\:bg-blue-500:hover { background-color: var(--zen-coral-hover) !important; }
+.zen-topbar .text-white { color: var(--zen-ink) !important; }
+
+/* Screen-specific finishing: inventory and checkout. */
+.zen-inventory-page h1 { color: var(--zen-ink); letter-spacing: -0.04em; }
+.zen-inventory-page table th { color: var(--zen-muted); font-size: 10px; font-weight: 800; }
+.zen-inventory-page table td { color: var(--zen-ink); }
+.zen-inventory-page input:focus, .zen-inventory-page select:focus { outline: 2px solid rgba(255,89,56,.16); outline-offset: 1px; }
+.zen-pos-page { color: var(--zen-ink); }
+.zen-pos-page .panel { border-radius: 16px; }
+.zen-pos-page .input { border-radius: 10px; }
+.zen-pos-page .product-tile { border-radius: 12px; }
+.zen-pos-page .payment-choice { border-radius: 12px; }
+@media (max-width: 640px) {
+  .zen-inventory-page { padding-top: 20px; }
+  .zen-inventory-page h1 { font-size: 26px; }
+}
+
+.zen-dashboard-page .panel { border-radius: 16px; }
+.zen-dashboard-page .panel-title { letter-spacing: -0.02em; }
+.zen-reports-page .panel { border-radius: 16px; }
+.zen-reports-page table thead { background: #F1EDE4; color: var(--zen-muted); }
+.zen-reports-page table tbody tr { border-color: var(--zen-line); }
+.zen-reports-page table tbody td { color: var(--zen-ink); }
+.zen-reports-page input:focus { outline: 2px solid rgba(255,89,56,.15); outline-offset: 1px; }
+@media (max-width: 640px) {
+ .zen-reports-page > div:first-child { align-items: stretch; }
+ .zen-reports-page > div:first-child > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
+ .zen-reports-page > div:first-child > div:last-child button { grid-column: 1 / -1; justify-content: center; }
+}
+
+/* Consistent surfaces for stock, purchasing, staff and compliance screens. */
+.zen-page h1 { letter-spacing: -0.035em; }
+.zen-page table { border-collapse: separate; border-spacing: 0; }
+.zen-page table thead th { color: var(--zen-muted); font-weight: 800; }
+.zen-page table tbody tr { border-color: var(--zen-line); }
+.zen-page table tbody tr:hover { background: #FFFCF7; }
+.zen-page input:not([type="checkbox"]):not([type="radio"]),
+.zen-page select,
+.zen-page textarea { border-radius: 10px; }
+.zen-page input:focus, .zen-page select:focus, .zen-page textarea:focus {
+ border-color: var(--zen-coral);
+ outline-color: rgba(255,89,56,.16);
+}
+.zen-page .panel { border-radius: 16px; }
+@media (max-width: 640px) {
+ .zen-page { overflow-wrap: anywhere; }
+ .zen-page h1 { font-size: 1.65rem; }
+ .zen-page .panel-header { align-items: stretch; }
+}

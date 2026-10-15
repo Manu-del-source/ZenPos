@@ -89,10 +89,10 @@ const Suppliers = () => {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen">
+    <div className="mx-auto min-h-screen max-w-7xl p-4 sm:p-6 lg:p-8">
       <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-white">Suppliers</h1>
+          <h1 className="text-3xl font-black tracking-tight text-[#171715]">Suppliers</h1>
           <p className="text-slate-500 text-sm">Who the business buys stock from.</p>
         </div>
         <button onClick={() => openModal()} className="btn-primary flex items-center">
@@ -120,7 +120,7 @@ const Suppliers = () => {
 
       <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
         <table className="w-full text-left">
-          <thead className="bg-slate-800/50">
+          <thead className="bg-[#F1EDE4]">
             <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
               <th className="p-5">Supplier</th>
               <th className="p-5">Contact</th>
