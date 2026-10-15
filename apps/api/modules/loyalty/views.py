@@ -14,7 +14,7 @@ from .serializers import (
     LoyaltyLedgerSerializer,
     LoyaltyRuleSerializer,
 )
-from .services import apply_ledger, get_or_create_account, rule_for
+from .services import apply_ledger, get_or_create_account
 
 
 class LoyaltyRuleViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
