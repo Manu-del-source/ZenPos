@@ -168,7 +168,7 @@ export default function Orders({ user: userProp }) {
         {filterRow}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-950 text-left text-[11px] uppercase tracking-wider text-slate-500">
+            <thead className="bg-[#F1EDE4] text-left text-[11px] uppercase tracking-wider text-[#756F66]">
               <tr>
                 <th className="p-4">Sale</th>
                 <th className="p-4">When</th>
