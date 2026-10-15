@@ -63,10 +63,10 @@ const Dashboard = () => {
         ].map(({ label, value, icon: Icon, accent }) => (
           <div key={label} className="panel p-5">
             <div className="mb-5 flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">{label}</span>
+              <span className="text-xs font-semibold text-[#756F66]">{label}</span>
               <Icon size={18} className={accent} />
             </div>
-            <div className="text-2xl font-black tracking-tight text-white">{loading ? '—' : value}</div>
+            <div className="text-2xl font-black tracking-tight text-[#171715]">{loading ? '—' : value}</div>
           </div>
         ))}
       </div>
@@ -75,8 +75,8 @@ const Dashboard = () => {
         <section className="panel p-5">
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h2 className="font-bold text-white">Sales activity</h2>
-              <p className="mt-1 text-xs text-slate-500">Last 7 recorded days</p>
+              <h2 className="font-bold text-[#171715]">Sales activity</h2>
+              <p className="mt-1 text-xs text-[#756F66]">Last 7 recorded days</p>
             </div>
             <Link to="/orders" className="flex items-center gap-1 text-xs font-bold text-[#FF5938] hover:text-[#E94A2B]">View sales <ArrowUpRight size={14} /></Link>
           </div>
@@ -85,43 +85,43 @@ const Dashboard = () => {
               const height = Math.max(8, (Number(row.revenue || 0) / maxRevenue) * 100);
               return (
                 <div key={row.date} className="flex h-full flex-1 flex-col justify-end gap-2">
-                  <div className="text-center text-[9px] font-bold text-slate-600">{Number(row.revenue || 0) > 0 ? money(row.revenue) : ''}</div>
+                  <div className="text-center text-[9px] font-bold text-[#756F66]">{Number(row.revenue || 0) > 0 ? money(row.revenue) : ''}</div>
                   <div className="group relative flex flex-1 items-end">
                     <div style={{ height: `${height}%` }} className="w-full rounded-t-lg bg-[#FF5938]/80 transition group-hover:bg-[#E94A2B]" />
                   </div>
-                  <div className="text-center text-[9px] font-semibold text-slate-600">{new Date(row.date).toLocaleDateString(undefined, { weekday: 'short' })}</div>
+                  <div className="text-center text-[9px] font-semibold text-[#756F66]">{new Date(row.date).toLocaleDateString(undefined, { weekday: 'short' })}</div>
                 </div>
               );
             })}
-            {!trend.length && <div className="flex w-full items-center justify-center text-sm text-slate-600">No sales recorded yet.</div>}
+            {!trend.length && <div className="flex w-full items-center justify-center text-sm text-[#756F66]">No sales recorded yet.</div>}
           </div>
         </section>
 
         <section className="panel">
           <div className="panel-header">
-            <div><h2 className="font-bold text-white">Stock attention</h2><p className="mt-1 text-xs text-slate-500">Items at or below threshold</p></div>
+            <div><h2 className="font-bold text-[#171715]">Stock attention</h2><p className="mt-1 text-xs text-[#756F66]">Items at or below threshold</p></div>
             <Link to="/inventory" className="text-xs font-bold text-[#FF5938]">Inventory</Link>
           </div>
           <div className="max-h-64 overflow-auto">
             {lowStock.slice(0, 6).map((item) => (
               <div key={item.id} className="flex items-center justify-between border-b border-slate-800 px-5 py-4 last:border-0">
-                <div className="min-w-0"><div className="truncate text-sm font-semibold text-slate-200">{item.name}</div><div className="mt-1 text-[11px] text-slate-600">{item.sku || 'No SKU'}</div></div>
+                <div className="min-w-0"><div className="truncate text-sm font-semibold text-[#171715]">{item.name}</div><div className="mt-1 text-[11px] text-[#756F66]">{item.sku || 'No SKU'}</div></div>
                 <span className="ml-4 shrink-0 rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-400">{item.stock_level} left</span>
               </div>
             ))}
-            {!lowStock.length && <div className="p-8 text-center text-sm text-slate-600">Inventory levels look healthy.</div>}
+            {!lowStock.length && <div className="p-8 text-center text-sm text-[#756F66]">Inventory levels look healthy.</div>}
           </div>
         </section>
       </div>
 
       <section className="mt-5 panel">
         <div className="panel-header">
-          <div><h2 className="font-bold text-white">Quick actions</h2><p className="mt-1 text-xs text-slate-500">Common tasks for your team</p></div>
+          <div><h2 className="font-bold text-[#171715]">Quick actions</h2><p className="mt-1 text-xs text-[#756F66]">Common tasks for your team</p></div>
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-3">
-          <Link to="/pos" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><ShoppingCart size={20} className="mb-3 text-[#FF5938]" /><div className="text-sm font-bold text-white">Start a sale</div><div className="mt-1 text-xs text-slate-500">Open the checkout terminal.</div></Link>
-          <Link to="/inventory" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><Package size={20} className="mb-3 text-[#FF5938]" /><div className="text-sm font-bold text-white">Manage inventory</div><div className="mt-1 text-xs text-slate-500">Add products or adjust stock.</div></Link>
-          <Link to="/orders" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><TrendingUp size={20} className="mb-3 text-emerald-400" /><div className="text-sm font-bold text-white">Review sales</div><div className="mt-1 text-xs text-slate-500">Check recent transactions.</div></Link>
+          <Link to="/pos" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><ShoppingCart size={20} className="mb-3 text-[#FF5938]" /><div className="text-sm font-bold text-[#171715]">Start a sale</div><div className="mt-1 text-xs text-[#756F66]">Open the checkout terminal.</div></Link>
+          <Link to="/inventory" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><Package size={20} className="mb-3 text-[#FF5938]" /><div className="text-sm font-bold text-[#171715]">Manage inventory</div><div className="mt-1 text-xs text-[#756F66]">Add products or adjust stock.</div></Link>
+          <Link to="/orders" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><TrendingUp size={20} className="mb-3 text-emerald-400" /><div className="text-sm font-bold text-[#171715]">Review sales</div><div className="mt-1 text-xs text-[#756F66]">Check recent transactions.</div></Link>
         </div>
       </section>
     </div>
