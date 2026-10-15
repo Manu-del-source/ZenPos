@@ -1095,7 +1095,7 @@ export default function POS() {
   }
 
   return (
-    <div className="page-shell !max-w-none">
+    <div className="page-shell zen-pos-page !max-w-none">
       <Shortcuts open={showShortcuts} onClose={() => setShowShortcuts(false)} />
 
       <OfflineBanner
