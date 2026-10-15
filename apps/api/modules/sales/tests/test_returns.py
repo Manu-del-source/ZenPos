@@ -7,7 +7,7 @@ import pytest
 from modules.core.models import AuditLog
 from modules.inventory.models import InventoryMovement
 from modules.payments.models import Payment
-from modules.sales.models import Sale, SaleReturn
+from modules.sales.models import SaleReturn
 
 pytestmark = pytest.mark.django_db
 
