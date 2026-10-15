@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 import pytest
+
 from modules.inventory.models import InventoryMovement, StockAdjustment
 from modules.inventory.services import apply_stock_movement
 
