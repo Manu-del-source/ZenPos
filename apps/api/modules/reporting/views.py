@@ -182,7 +182,9 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"])
     def transfers(self, request):
-        rows = self._date_filtered(self._scoped(StockTransfer.objects.all(), "organization_id"))
+        rows = self._date_filtered(
+            self._scoped(StockTransfer.objects.all(), "organization_id")
+        )
         data = list(
             rows.values("status").annotate(count=Count("id")).order_by("status")
         )
