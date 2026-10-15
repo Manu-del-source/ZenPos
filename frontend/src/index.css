@@ -101,8 +101,6 @@ body { background: var(--zen-paper); color: var(--zen-ink); }
   .bg-blue-600 { background-color: var(--zen-coral) !important; }
   .hover\\:bg-blue-500:hover { background-color: var(--zen-coral-hover) !important; }
   .text-blue-400, .text-blue-300 { color: var(--zen-coral-hover) !important; }
-  .border-blue-500, .border-blue-500\\/50, .border-blue-500\\/60 { border-color: var(--zen-coral) !important; }
-  .bg-blue-500\\/10 { background-color: rgba(255,89,56,.08) !important; }
 }
 .zen-sidebar .bg-slate-950 { background-color: #171715 !important; }
 .zen-sidebar .bg-slate-900 { background-color: #242421 !important; }
