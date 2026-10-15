@@ -82,6 +82,14 @@ class ProductSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeri
     brand_name = serializers.ReadOnlyField(source="brand.name")
     unit_abbreviation = serializers.ReadOnlyField(source="unit.abbreviation")
     tax_rate_name = serializers.ReadOnlyField(source="tax_rate.name")
+    tax_rate_rate = serializers.SerializerMethodField()
+    tax_rate_is_inclusive = serializers.SerializerMethodField()
+
+    def get_tax_rate_rate(self, obj):
+        return str(obj.tax_rate.rate) if obj.tax_rate_id else None
+
+    def get_tax_rate_is_inclusive(self, obj):
+        return obj.tax_rate.is_inclusive if obj.tax_rate_id else None
 
     class Meta:
         model = Product
@@ -98,6 +106,8 @@ class ProductSerializer(OrganizationScopedSerializerMixin, serializers.ModelSeri
             "unit_abbreviation",
             "tax_rate",
             "tax_rate_name",
+            "tax_rate_rate",
+            "tax_rate_is_inclusive",
             "price",
             "cost_price",
             "low_stock_threshold",
