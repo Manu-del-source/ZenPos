@@ -140,3 +140,23 @@ body { background: var(--zen-paper); color: var(--zen-ink); }
  .zen-reports-page > div:first-child > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
  .zen-reports-page > div:first-child > div:last-child button { grid-column: 1 / -1; justify-content: center; }
 }
+
+/* Consistent surfaces for stock, purchasing, staff and compliance screens. */
+.zen-page h1 { letter-spacing: -0.035em; }
+.zen-page table { border-collapse: separate; border-spacing: 0; }
+.zen-page table thead th { color: var(--zen-muted); font-weight: 800; }
+.zen-page table tbody tr { border-color: var(--zen-line); }
+.zen-page table tbody tr:hover { background: #FFFCF7; }
+.zen-page input:not([type="checkbox"]):not([type="radio"]),
+.zen-page select,
+.zen-page textarea { border-radius: 10px; }
+.zen-page input:focus, .zen-page select:focus, .zen-page textarea:focus {
+ border-color: var(--zen-coral);
+ outline-color: rgba(255,89,56,.16);
+}
+.zen-page .panel { border-radius: 16px; }
+@media (max-width: 640px) {
+ .zen-page { overflow-wrap: anywhere; }
+ .zen-page h1 { font-size: 1.65rem; }
+ .zen-page .panel-header { align-items: stretch; }
+}
