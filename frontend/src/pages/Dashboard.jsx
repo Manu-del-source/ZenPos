@@ -45,7 +45,7 @@ const Dashboard = () => {
     <div className="page-shell">
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-blue-400">Business overview</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#FF5938]">Business overview</p>
           <h1 className="page-title">Overview</h1>
           <p className="page-subtitle">Today's takings and the stock that needs attention.</p>
         </div>
@@ -56,9 +56,9 @@ const Dashboard = () => {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Today’s revenue', value: money(todayRevenue), icon: TrendingUp, accent: 'text-blue-400' },
+          { label: 'Today’s revenue', value: money(todayRevenue), icon: TrendingUp, accent: 'text-[#FF5938]' },
           { label: 'Sales today', value: todaySales, icon: ShoppingCart, accent: 'text-emerald-400' },
-          { label: 'Inventory value', value: money(stockValue), icon: Package, accent: 'text-violet-400' },
+          { label: 'Inventory value', value: money(stockValue), icon: Package, accent: 'text-[#FF5938]' },
           { label: 'Low stock', value: lowStockCount, icon: AlertTriangle, accent: lowStock.length ? 'text-amber-400' : 'text-slate-400' },
         ].map(({ label, value, icon: Icon, accent }) => (
           <div key={label} className="panel p-5">
@@ -78,7 +78,7 @@ const Dashboard = () => {
               <h2 className="font-bold text-white">Sales activity</h2>
               <p className="mt-1 text-xs text-slate-500">Last 7 recorded days</p>
             </div>
-            <Link to="/orders" className="flex items-center gap-1 text-xs font-bold text-blue-400 hover:text-blue-300">View sales <ArrowUpRight size={14} /></Link>
+            <Link to="/orders" className="flex items-center gap-1 text-xs font-bold text-[#FF5938] hover:text-[#E94A2B]">View sales <ArrowUpRight size={14} /></Link>
           </div>
           <div className="flex h-56 items-end gap-2 sm:gap-4">
             {trend.slice(-7).map((row) => {
@@ -87,7 +87,7 @@ const Dashboard = () => {
                 <div key={row.date} className="flex h-full flex-1 flex-col justify-end gap-2">
                   <div className="text-center text-[9px] font-bold text-slate-600">{Number(row.revenue || 0) > 0 ? money(row.revenue) : ''}</div>
                   <div className="group relative flex flex-1 items-end">
-                    <div style={{ height: `${height}%` }} className="w-full rounded-t-lg bg-blue-600/80 transition group-hover:bg-blue-500" />
+                    <div style={{ height: `${height}%` }} className="w-full rounded-t-lg bg-[#FF5938]/80 transition group-hover:bg-[#E94A2B]" />
                   </div>
                   <div className="text-center text-[9px] font-semibold text-slate-600">{new Date(row.date).toLocaleDateString(undefined, { weekday: 'short' })}</div>
                 </div>
@@ -100,7 +100,7 @@ const Dashboard = () => {
         <section className="panel">
           <div className="panel-header">
             <div><h2 className="font-bold text-white">Stock attention</h2><p className="mt-1 text-xs text-slate-500">Items at or below threshold</p></div>
-            <Link to="/inventory" className="text-xs font-bold text-blue-400">Inventory</Link>
+            <Link to="/inventory" className="text-xs font-bold text-[#FF5938]">Inventory</Link>
           </div>
           <div className="max-h-64 overflow-auto">
             {lowStock.slice(0, 6).map((item) => (
@@ -119,9 +119,9 @@ const Dashboard = () => {
           <div><h2 className="font-bold text-white">Quick actions</h2><p className="mt-1 text-xs text-slate-500">Common tasks for your team</p></div>
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-3">
-          <Link to="/pos" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-blue-500/40 hover:bg-slate-900"><ShoppingCart size={20} className="mb-3 text-blue-400" /><div className="text-sm font-bold text-white">Start a sale</div><div className="mt-1 text-xs text-slate-500">Open the checkout terminal.</div></Link>
-          <Link to="/inventory" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-blue-500/40 hover:bg-slate-900"><Package size={20} className="mb-3 text-violet-400" /><div className="text-sm font-bold text-white">Manage inventory</div><div className="mt-1 text-xs text-slate-500">Add products or adjust stock.</div></Link>
-          <Link to="/orders" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-blue-500/40 hover:bg-slate-900"><TrendingUp size={20} className="mb-3 text-emerald-400" /><div className="text-sm font-bold text-white">Review sales</div><div className="mt-1 text-xs text-slate-500">Check recent transactions.</div></Link>
+          <Link to="/pos" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><ShoppingCart size={20} className="mb-3 text-[#FF5938]" /><div className="text-sm font-bold text-white">Start a sale</div><div className="mt-1 text-xs text-slate-500">Open the checkout terminal.</div></Link>
+          <Link to="/inventory" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><Package size={20} className="mb-3 text-[#FF5938]" /><div className="text-sm font-bold text-white">Manage inventory</div><div className="mt-1 text-xs text-slate-500">Add products or adjust stock.</div></Link>
+          <Link to="/orders" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900"><TrendingUp size={20} className="mb-3 text-emerald-400" /><div className="text-sm font-bold text-white">Review sales</div><div className="mt-1 text-xs text-slate-500">Check recent transactions.</div></Link>
         </div>
       </section>
     </div>
