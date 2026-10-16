@@ -6,7 +6,6 @@ import { Package, Plus, Pencil, Trash2, Search } from 'lucide-react';
 const emptyForm = { name: '', sku: '', price: '', cost_price: '', stock_level: '', low_stock_threshold: 10, track_inventory: true, is_active: true };
 
 const Inventory = ({ user = {} }) => {
-  const roles = Array.isArray(user.roles) ? user.roles : [];
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   const isPlatformAdmin = Boolean(user.is_superuser);
   const canCreateProducts = isPlatformAdmin || permissions.includes('products.create');
