@@ -5,7 +5,13 @@ import { Package, Plus, Pencil, Trash2, Search } from 'lucide-react';
 
 const emptyForm = { name: '', sku: '', price: '', cost_price: '', stock_level: '', low_stock_threshold: 10, track_inventory: true, is_active: true };
 
-const Inventory = () => {
+const Inventory = ({ user = {} }) => {
+  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+  const isPlatformAdmin = Boolean(user.is_superuser);
+  const canCreateProducts = isPlatformAdmin || permissions.includes('products.create');
+  const canUpdateProducts = isPlatformAdmin || permissions.includes('products.update');
+  const canAdjustInventory = isPlatformAdmin || permissions.includes('inventory.adjust');
+  const canManageProducts = canCreateProducts || canUpdateProducts;
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -88,10 +94,10 @@ const Inventory = () => {
     <div className="zen-inventory-page mx-auto min-h-screen max-w-7xl p-4 text-[#171715] sm:p-6 lg:p-8">
       <div className="flex justify-between items-center mb-8">
         <div><h1 className="text-3xl font-black tracking-tight">Inventory</h1>
-          <p className="text-slate-500 text-sm">Manage products, pricing and stock levels.</p></div>
-        <button onClick={() => handleOpenModal()} className="btn-primary flex items-center">
+          <p className="text-slate-500 text-sm">{canManageProducts ? 'Manage products, pricing and stock levels.' : 'View product names, selling prices and available stock.'}</p></div>
+        {canCreateProducts && <button onClick={() => handleOpenModal()} className="btn-primary flex items-center">
           <Plus size={18} className="mr-2" /> Add product
-        </button>
+        </button>}
       </div>
       <div className="mb-6 relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
         <input className="w-full rounded-xl border border-[#E4DED3] bg-white p-4 pl-12 text-[#171715] outline-none transition focus:border-[#FF5938]"
@@ -99,16 +105,16 @@ const Inventory = () => {
 
       <div className="overflow-hidden rounded-2xl border border-[#E4DED3] bg-white shadow-sm">
         <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead className="bg-[#F1EDE4]"><tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-          <th className="p-5">Product Details</th><th className="p-5 text-right">Unit Price</th><th className="p-5 text-right">Stock</th><th className="p-5 text-center">Manage</th>
+          <th className="p-5">Product Details</th><th className="p-5 text-right">Unit Price</th><th className="p-5 text-right">Stock</th>{canManageProducts && <th className="p-5 text-center">Manage</th>}
         </tr></thead><tbody className="divide-y divide-slate-800">
           {products.map((p) => <tr key={p.id} className="group border-t border-[#EEE9DF] transition-colors hover:bg-[#FFFCF7]">
             <td className="p-5"><div className="font-bold text-white group-hover:text-blue-400">{p.name}</div><div className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-wider">{p.sku || 'NO SKU'}</div></td>
             <td className="p-5 text-right font-black text-blue-400">KES {Number(p.price).toLocaleString()}</td>
             <td className="p-5 text-right"><span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${Number(p.stock_level || 0) <= Number(p.low_stock_threshold || 0) ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>{p.stock_level} units</span></td>
-            <td className="p-5 text-center"><div className="flex justify-center space-x-2">
-              <button onClick={() => handleOpenModal(p)} className="rounded-lg border border-[#E4DED3] bg-white p-2 text-[#756F66] transition hover:border-[#FF5938] hover:text-[#171715]"><Pencil size={16} /></button>
-              <button onClick={() => handleDelete(p.id)} className="rounded-lg border border-[#E4DED3] bg-white p-2 text-[#756F66] transition hover:border-red-200 hover:text-red-600"><Trash2 size={16} /></button>
-            </div></td>
+            {canManageProducts && <td className="p-5 text-center"><div className="flex justify-center space-x-2">
+              {canUpdateProducts && <button onClick={() => handleOpenModal(p)} aria-label={`Edit ${p.name}`} className="rounded-lg border border-[#E4DED3] bg-white p-2 text-[#756F66] transition hover:border-[#FF5938] hover:text-[#171715]"><Pencil size={16} /></button>}
+              {canUpdateProducts && <button onClick={() => handleDelete(p.id)} aria-label={`Archive ${p.name}`} className="rounded-lg border border-[#E4DED3] bg-white p-2 text-[#756F66] transition hover:border-red-200 hover:text-red-600"><Trash2 size={16} /></button>}
+            </div></td>}
           </tr>)}
         </tbody></table></div>
         {products.length === 0 && !loading && <div className="p-20 text-center flex flex-col items-center"><Package size={64} className="text-slate-800 mb-4" /><p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Inventory Archive Empty — create your first product</p></div>}
@@ -119,17 +125,18 @@ const Inventory = () => {
         <form onSubmit={handleSubmit} className="space-y-5">
           {[
             ['name','Part Name','text'], ['sku','SKU / Barcode','text'], ['price','Selling Price','number'],
-            ['cost_price','Cost Price','number'], ['stock_level','Opening Stock','number'], ['low_stock_threshold','Low Stock Alert','number']
+            ...(canUpdateProducts || canCreateProducts ? [['cost_price','Cost Price','number']] : []),
+            ...(canAdjustInventory ? [['stock_level','Opening Stock','number'], ['low_stock_threshold','Low Stock Alert','number']] : []),
           ].map(([key,label,type]) => <div key={key}><label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{label}</label>
             <input required={['name','price','cost_price'].includes(key)} type={type} min={type === 'number' ? '0' : undefined}
               className="w-full rounded-xl border border-[#E4DED3] bg-white p-3.5 text-[#171715] outline-none focus:border-[#FF5938]"
               value={formData[key]} onChange={(e) => setFormData({...formData, [key]: e.target.value})} /></div>)}
           <div className="flex space-x-3 pt-4"><button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-slate-800 text-slate-400 py-4 rounded-2xl font-bold uppercase">Discard</button>
             <button type="submit" className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase">Save Item</button></div>
-          <label className="flex items-center gap-3 text-sm text-slate-300">
+          {(canUpdateProducts || canCreateProducts) && <label className="flex items-center gap-3 text-sm text-slate-300">
             <input type="checkbox" checked={formData.track_inventory} onChange={(e) => setFormData({ ...formData, track_inventory: e.target.checked })} />
             Track inventory for this product
-          </label>
+          </label>}
         </form>
       </div></div>}
     </div>

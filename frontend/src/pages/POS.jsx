@@ -463,6 +463,7 @@ export default function POS() {
       payment_method: paymentMethod,
       customer: customerId || null,
       branch: branchId || null,
+      till: localStorage.getItem('pos.till.branch') === branchId ? (localStorage.getItem('pos.till') || null) : null,
       items: cart.map((item) => ({ product: item.id, quantity: item.quantity })),
     };
     const { data } = await api.post('/sales/', payload);
@@ -485,6 +486,7 @@ export default function POS() {
         payment_method: 'CASH',
         customer: customerId || null,
         branch: branchId || null,
+        till: localStorage.getItem('pos.till.branch') === branchId ? (localStorage.getItem('pos.till') || null) : null,
         items: cart.map((item) => ({ product: item.id, quantity: item.quantity })),
       },
       snapshot: {
