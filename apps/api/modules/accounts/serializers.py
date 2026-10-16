@@ -75,9 +75,18 @@ class SetRolePermissionsSerializer(serializers.Serializer):
         # hold. Otherwise users.manage would let HR create an all-powerful role
         # and then grant it to themselves or colleagues.
         if not caller.is_superuser:
-            from .permissions import permission_codes_for
+            # Roles are reusable across branches, so changing a role's
+            # permission set requires the caller to hold each permission
+            # organization-wide, not merely at one branch.
+            from .models import RolePermission, UserRole
 
-            allowed = permission_codes_for(caller)
+            caller_role_ids = UserRole.objects.filter(
+                user=caller, branch__isnull=True
+            ).values_list("role_id", flat=True)
+            allowed = set(
+                RolePermission.objects.filter(role_id__in=caller_role_ids)
+                .values_list("permission__code", flat=True)
+            )
             forbidden = sorted(set(codes) - allowed)
             if forbidden:
                 raise serializers.ValidationError(
