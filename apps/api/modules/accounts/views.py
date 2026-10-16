@@ -262,6 +262,21 @@ class RoleViewSet(viewsets.ModelViewSet):
                 "System roles are shared by every organization and cannot be edited."
             )
 
+        # HR may manage staff accounts, but must not change the capabilities
+        # of owner-managed custom roles. Permission delegation is reserved for
+        # organization administrators/managers (or platform superusers).
+        caller_roles = set(request.user.role_names())
+        is_org_role_admin = bool(caller_roles.intersection({"ADMIN", "MANAGER"}))
+        if (
+            role.organization_id is not None
+            and "HR_MANAGER" in caller_roles
+            and not is_org_role_admin
+            and not request.user.is_superuser
+        ):
+            raise ValidationError(
+                {"detail": "HR managers cannot change permissions on custom roles."}
+            )
+
         payload = SetRolePermissionsSerializer(data=request.data, context={"request": request})
         payload.is_valid(raise_exception=True)
 
