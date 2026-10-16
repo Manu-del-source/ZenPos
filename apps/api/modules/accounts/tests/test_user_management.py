@@ -274,6 +274,8 @@ class TestRoleAssignment:
         )
         UserBranchAccess.objects.filter(user=manager).delete()
         UserBranchAccess.objects.create(user=manager, branch=branch, is_default=True)
+        UserBranchAccess.objects.filter(user=other_cashier).delete()
+        UserBranchAccess.objects.create(user=other_cashier, branch=branch, is_default=True)
 
         response = manager_client.post(
             f"{USERS_URL}{other_cashier.id}/set-roles/",
@@ -314,6 +316,8 @@ class TestRoleAssignment:
         )
         UserBranchAccess.objects.filter(user=manager).delete()
         UserBranchAccess.objects.create(user=manager, branch=branch, is_default=True)
+        UserBranchAccess.objects.filter(user=other_cashier).delete()
+        UserBranchAccess.objects.create(user=other_cashier, branch=branch, is_default=True)
         client = APIClient()
         client.force_authenticate(manager)
 
