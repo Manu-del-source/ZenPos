@@ -428,21 +428,26 @@ export default function POS() {
       }
     }
 
-    const exact = products.find(
-      (product) => product.sku?.toLowerCase() === term.toLowerCase(),
-    );
-    if (exact) {
-      addProduct(exact);
-      setSearchTerm('');
-      searchRef.current?.focus();
+    let matches = [];
+    try {
+      const { data } = await api.get('/products/', {
+        params: { search: term, page_size: PRODUCT_PAGE_SIZE },
+      });
+      matches = (data?.results || (Array.isArray(data) ? data : []))
+        .filter((product) => product.is_active !== false);
+    } catch (error) {
+      toast.error(apiError(error, 'Product search failed.'));
       return;
     }
 
-    const matches = products.filter((product) => product.is_active !== false);
-    if (matches.length > 0) {
-      // For a name search, Enter adds the best API-ranked match. The compact
-      // suggestions below the field let the cashier choose a different match.
-      addProduct(matches[0]);
+    const exact = matches.find(
+      (product) => product.sku?.toLowerCase() === term.toLowerCase(),
+    );
+    const match = exact || matches[0];
+    if (match) {
+      // Enter adds the best API-ranked search match; suggestions let the
+      // cashier choose a different product when several names match.
+      addProduct(match);
       setSearchTerm('');
       searchRef.current?.focus();
       return;
