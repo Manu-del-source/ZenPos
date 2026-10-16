@@ -46,15 +46,15 @@ const NAV_ITEMS = [
   { to: '/suppliers', label: 'Suppliers', icon: Truck, permission: ['purchases.view', 'purchases.create'] },
   { to: '/purchase-orders', label: 'Purchase Orders', icon: ClipboardList, permission: ['purchases.view', 'purchases.create'] },
   { to: '/goods-receiving', label: 'Goods Receiving', icon: PackageCheck, permission: ['purchases.view', 'purchases.create'] },
-  { to: '/stock-ledger', label: 'Stock Ledger', icon: ScrollText, permission: 'inventory.view' },
-  { to: '/stock-counts', label: 'Stock Take', icon: ClipboardCheck, permission: ['inventory.view', 'inventory.adjust'] },
-  { to: '/transfers', label: 'Transfers', icon: ArrowLeftRight, permission: ['inventory.view', 'inventory.transfer'] },
+  { to: '/stock-ledger', label: 'Stock Ledger', icon: ScrollText, permission: 'inventory.view', excludeRoles: ['CASHIER'] },
+  { to: '/stock-counts', label: 'Stock Take', icon: ClipboardCheck, permission: 'inventory.adjust' },
+  { to: '/transfers', label: 'Transfers', icon: ArrowLeftRight, permission: 'inventory.transfer' },
   { to: '/customers', label: 'Customers', icon: Users, permission: 'customers.manage' },
   { to: '/staff', label: 'Staff', icon: Contact, permission: 'users.manage' },
   { to: '/access', label: 'Access & roles', icon: ShieldCheck, permission: 'users.manage', tenantOnly: true },
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, permission: ['reports.view', 'users.manage'] },
   { to: '/reports', label: 'Reports', icon: BarChart3, permission: 'reports.view' },
-  { to: '/etims', label: 'eTIMS Invoices', icon: FileText, permission: 'sales.view' },
+  { to: '/etims', label: 'eTIMS Invoices', icon: FileText, permission: 'sales.view', excludeRoles: ['CASHIER'] },
 ];
 
 const MANAGEMENT_ITEMS = [
@@ -90,6 +90,11 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
+const PermissionRoute = ({ children, user, permission }) => {
+  const allowed = (Array.isArray(permission) ? permission : [permission]).some((code) => can(user, code));
+  return allowed ? children : <Navigate to={homePath(user) || '/login'} replace />;
+};
+
 const AppLayout = ({ token, user, handleLogout }) => {
   const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -97,6 +102,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
   const allows = (item) => {
     if (item.platformOnly) return Boolean(user?.is_superuser);
     if (item.tenantOnly && user?.is_superuser) return false;
+    if ((item.excludeRoles || []).some((role) => (user?.roles || []).includes(role))) return false;
     const codes = Array.isArray(item.permission) ? item.permission : [item.permission];
     return codes.some((code) => can(user, code));
   };
@@ -235,18 +241,18 @@ const AppLayout = ({ token, user, handleLogout }) => {
         <main className="zen-page min-h-[calc(100vh-4rem)]">
           <Routes>
             <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
-            <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute><PermissionRoute user={user} permission={['inventory.view', 'products.view']}><Inventory user={user} /></PermissionRoute></ProtectedRoute>} />
             <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
             <Route path="/purchase-orders" element={<ProtectedRoute><PurchaseOrders /></ProtectedRoute>} />
             <Route path="/goods-receiving" element={<ProtectedRoute><GoodsReceiving /></ProtectedRoute>} />
-            <Route path="/stock-ledger" element={<ProtectedRoute><StockLedger /></ProtectedRoute>} />
-            <Route path="/stock-counts" element={<ProtectedRoute><StockCounts /></ProtectedRoute>} />
-            <Route path="/transfers" element={<ProtectedRoute><Transfers /></ProtectedRoute>} />
+            <Route path="/stock-ledger" element={<ProtectedRoute><PermissionRoute user={user} permission="inventory.view"><StockLedger /></PermissionRoute></ProtectedRoute>} />
+            <Route path="/stock-counts" element={<ProtectedRoute><PermissionRoute user={user} permission="inventory.adjust"><StockCounts /></PermissionRoute></ProtectedRoute>} />
+            <Route path="/transfers" element={<ProtectedRoute><PermissionRoute user={user} permission="inventory.transfer"><Transfers /></PermissionRoute></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
             <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
             <Route path="/access" element={<ProtectedRoute><AccessManagement /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            <Route path="/etims" element={<ProtectedRoute><Etims /></ProtectedRoute>} />
+            <Route path="/etims" element={<ProtectedRoute><PermissionRoute user={user} permission="sales.view">{(user?.roles || []).includes('CASHIER') ? <Navigate to={homePath(user) || '/pos'} replace /> : <Etims />}</PermissionRoute></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><SettingsPage user={user} /></ProtectedRoute>} />
