@@ -35,7 +35,7 @@ Clerk Organizations must not become a second, competing source of truth for POS 
 
 ### Phase 2 — Optional backend token verification
 
-1. Add a separate Clerk JWT authentication class that verifies signatures using Clerk's published JWKS, validates issuer and time claims, and applies an explicit allowed-origin/authorized-party policy where configured.
+1. The follow-up branch `feat/clerk-backend-token-verification` adds a separate Clerk JWT authentication class that verifies signatures using Clerk's published JWKS, validates issuer and time claims, and applies an explicit allowed-party (`azp`) policy when `CLERK_ALLOWED_PARTIES` is configured. `PyJWT[crypto]` is declared directly as a runtime dependency.
 2. Gate the new authenticator behind server-side environment configuration. Default to disabled; missing or invalid Clerk configuration must never disable or weaken the existing SimpleJWT authentication.
 3. Map the verified Clerk subject to one existing Django user. Unknown identities fail closed; never auto-promote users or infer permissions from client-supplied claims.
 4. Preserve Django's existing `HasPermission`, tenant scoping, branch scoping, deactivation, audit, and suspended-organization checks.
@@ -78,4 +78,4 @@ Only after all checks pass in a preview/staging deployment:
 
 ## Current status and next step
 
-The additive identity mapping is implemented on this feature branch only. It does not authenticate Clerk tokens and does not change login behavior. Do not switch production authentication yet. Next, introduce Clerk verification behind a server-side feature flag, with signature/issuer/expiry validation and fail-closed mapping to an existing Django user. Add the frontend SDK only after the dependency lock can be generated and CI/build tests can verify it.
+The additive identity mapping has been merged. A follow-up branch now adds an optional Clerk JWT authenticator behind `CLERK_AUTH_ENABLED` (default `false`), issuer/JWKS configuration, an optional `azp` allowlist, and tests for signature, expiry, account mapping, and disabled-user rejection. The existing SimpleJWT authenticator remains registered and is still the only active path by default. This branch is not yet merged or deployed; do not enable the flag in production. The frontend SDK, account-linking workflow, and production cutover remain separate later phases.
