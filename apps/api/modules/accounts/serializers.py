@@ -227,22 +227,37 @@ class RoleAssignmentSerializer(serializers.Serializer):
                         f"Branch {branch_id} is not in your organization."
                     )
 
-            # Delegation cannot increase authority. Organization-wide grants
-            # require the caller to hold the delegated permissions organization-
-            # wide; branch grants may only delegate permissions held at that
-            # branch or organization-wide.
-            if not caller.is_superuser:
-                from .models import UserRole
-                from .models import RolePermission
+            # HR may assign approved employee roles without personally
+            # holding cashier/accounting permissions. The HR role is deliberately
+            # limited to this allowlist; it cannot grant manager, owner, or
+            # platform authority and cannot assign organization-created custom
+            # roles. Owners and other managers are still bounded by the
+            # permissions they hold in the target scope.
+            caller_roles = set(caller.role_names()) if not caller.is_superuser else set()
+            is_limited_hr = (
+                "HR_MANAGER" in caller_roles
+                and "ADMIN" not in caller_roles
+                and "SUPER_ADMIN" not in caller_roles
+                and not caller.is_superuser
+            )
+            hr_assignable_roles = {
+                "HR_MANAGER", "CASHIER", "SUPERVISOR",
+                "INVENTORY_MANAGER", "ACCOUNTANT",
+            }
+            if is_limited_hr:
+                if role.organization_id is not None or name not in hr_assignable_roles:
+                    raise serializers.ValidationError(
+                        f"HR cannot assign the '{name}' role. Ask the business owner."
+                    )
+            elif not caller.is_superuser:
+                from .models import RolePermission, UserRole
 
                 if branch_id is None:
                     caller_role_ids = UserRole.objects.filter(
                         user=caller, branch__isnull=True
                     ).values_list("role_id", flat=True)
                 else:
-                    caller_role_ids = UserRole.objects.filter(
-                        user=caller
-                    ).filter(
+                    caller_role_ids = UserRole.objects.filter(user=caller).filter(
                         Q(branch__isnull=True) | Q(branch_id=branch_id)
                     ).values_list("role_id", flat=True)
                 caller_codes = set(
