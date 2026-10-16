@@ -19,6 +19,7 @@ import StockLedger from './pages/StockLedger';
 import StockCounts from './pages/StockCounts';
 import Transfers from './pages/Transfers';
 import Staff from './pages/Staff';
+import AccessManagement from './pages/AccessManagement';
 import Reports from './pages/Reports';
 import Etims from './pages/Etims';
 import Landing from './pages/Landing';
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
   { to: '/transfers', label: 'Transfers', icon: ArrowLeftRight, permission: ['inventory.view', 'inventory.transfer'] },
   { to: '/customers', label: 'Customers', icon: Users, permission: 'customers.manage' },
   { to: '/staff', label: 'Staff', icon: Contact, permission: 'users.manage' },
+  { to: '/access', label: 'Access & roles', icon: ShieldCheck, permission: 'users.manage', tenantOnly: true },
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, permission: 'reports.view' },
   { to: '/reports', label: 'Reports', icon: BarChart3, permission: 'reports.view' },
   { to: '/etims', label: 'eTIMS Invoices', icon: FileText, permission: 'sales.view' },
@@ -92,6 +94,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
 
   const allows = (item) => {
     if (item.platformOnly) return Boolean(user?.is_superuser);
+    if (item.tenantOnly && user?.is_superuser) return false;
     const codes = Array.isArray(item.permission) ? item.permission : [item.permission];
     return codes.some((code) => can(user, code));
   };
@@ -239,6 +242,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
             <Route path="/transfers" element={<ProtectedRoute><Transfers /></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
             <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
+            <Route path="/access" element={<ProtectedRoute><AccessManagement /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/etims" element={<ProtectedRoute><Etims /></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />

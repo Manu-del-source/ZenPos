@@ -87,12 +87,39 @@ class BranchViewSet(BranchScopedMixin, viewsets.ModelViewSet):
             )
 
     def destroy(self, request, *args, **kwargs):
-        """Refuse deletion: stock, tills, cash sessions and sales hang off a branch.
+        """Let platform super admins remove a branch from operation safely.
 
-        Closing a shop is ``PATCH {"is_active": false}``. Deleting it would take
-        its history with it, and that history is the business's records.
+        Branches own historical stock, till, cash-session and sales records, so
+        even platform administrators must not hard-delete the row. For platform
+        support, DELETE is an audited deactivation across any organization.
+        Business-level users must use the normal branch-management flow.
         """
-        raise MethodNotAllowed("DELETE", detail="Branches are deactivated, not deleted.")
+        if not getattr(request.user, "is_superuser", False):
+            raise MethodNotAllowed(
+                "DELETE",
+                detail=(
+                    "Only a ZenPOS super admin can remove a branch. "
+                    "Business users can deactivate branches."
+                ),
+            )
+
+        branch = self.get_object()
+        with transaction.atomic():
+            before = snapshot(branch)
+            if branch.is_active:
+                branch.is_active = False
+                branch.save(update_fields=["is_active", "updated_at"])
+            record_audit(
+                action="branch.deactivated_by_platform",
+                entity_type="branch",
+                entity_id=branch.pk,
+                actor=request.user,
+                request=request,
+                branch=branch,
+                before=before,
+                after=snapshot(branch),
+            )
+        return Response(status=204)
 
 
 class TillViewSet(BranchScopedMixin, viewsets.ModelViewSet):

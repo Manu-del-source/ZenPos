@@ -1,5 +1,6 @@
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -64,10 +65,37 @@ class SetRolePermissionsSerializer(serializers.Serializer):
     permission_codes = serializers.ListField(child=serializers.CharField(), allow_empty=True)
 
     def validate_permission_codes(self, codes):
+        caller = self.context["request"].user
         known = set(Permission.objects.filter(code__in=codes).values_list("code", flat=True))
         unknown = sorted(set(codes) - known)
         if unknown:
             raise serializers.ValidationError(f"Unknown permission code(s): {', '.join(unknown)}.")
+
+        # A manager may configure roles only with capabilities they personally
+        # hold. Otherwise users.manage would let HR create an all-powerful role
+        # and then grant it to themselves or colleagues.
+        if not caller.is_superuser:
+            # Roles are reusable across branches, so changing a role's
+            # permission set requires the caller to hold each permission
+            # organization-wide, not merely at one branch.
+            from .models import RolePermission, UserRole
+
+            caller_role_ids = UserRole.objects.filter(
+                user=caller, branch__isnull=True
+            ).values_list("role_id", flat=True)
+            allowed = set(
+                RolePermission.objects.filter(role_id__in=caller_role_ids)
+                .values_list("permission__code", flat=True)
+            )
+            forbidden = sorted(set(codes) - allowed)
+            if forbidden:
+                raise serializers.ValidationError(
+                    {"permission_codes": (
+                        "You cannot delegate permissions you do not hold: "
+                        + ", ".join(forbidden)
+                        + "."
+                    )}
+                )
         return codes
 
 
@@ -179,6 +207,19 @@ class RoleAssignmentSerializer(serializers.Serializer):
             role = assignable.get(name)
             if role is None:
                 raise serializers.ValidationError(f"'{name}' is not a role you can assign.")
+
+            # Platform authority is never granted through ordinary staff
+            # management. Django's is_superuser flag is the platform boundary.
+            if role.name == "SUPER_ADMIN" and not caller.is_superuser:
+                raise serializers.ValidationError(
+                    "Only a platform super admin can grant the SUPER_ADMIN role."
+                )
+            if (
+                role.organization_id not in (None, caller.organization_id)
+                and not caller.is_superuser
+            ):
+                raise serializers.ValidationError("You cannot assign another organization's role.")
+
             branch_id = entry["branch"]
             if branch_id is not None:
                 in_organization = Branch.objects.filter(
@@ -188,6 +229,52 @@ class RoleAssignmentSerializer(serializers.Serializer):
                     raise serializers.ValidationError(
                         f"Branch {branch_id} is not in your organization."
                     )
+
+            # HR may assign approved employee roles without personally
+            # holding cashier/accounting permissions. The HR role is deliberately
+            # limited to this allowlist; it cannot grant manager, owner, or
+            # platform authority and cannot assign organization-created custom
+            # roles. Owners and other managers are still bounded by the
+            # permissions they hold in the target scope.
+            caller_roles = set(caller.role_names()) if not caller.is_superuser else set()
+            is_limited_hr = (
+                "HR_MANAGER" in caller_roles
+                and "ADMIN" not in caller_roles
+                and "SUPER_ADMIN" not in caller_roles
+                and not caller.is_superuser
+            )
+            hr_assignable_roles = {
+                "HR_MANAGER", "CASHIER", "SUPERVISOR",
+                "INVENTORY_MANAGER", "ACCOUNTANT",
+            }
+            if is_limited_hr:
+                if role.organization_id is not None or name not in hr_assignable_roles:
+                    raise serializers.ValidationError(
+                        f"HR cannot assign the '{name}' role. Ask the business owner."
+                    )
+            elif not caller.is_superuser:
+                from .models import RolePermission, UserRole
+
+                if branch_id is None:
+                    caller_role_ids = UserRole.objects.filter(
+                        user=caller, branch__isnull=True
+                    ).values_list("role_id", flat=True)
+                else:
+                    caller_role_ids = UserRole.objects.filter(user=caller).filter(
+                        Q(branch__isnull=True) | Q(branch_id=branch_id)
+                    ).values_list("role_id", flat=True)
+                caller_codes = set(
+                    RolePermission.objects.filter(role_id__in=caller_role_ids)
+                    .values_list("permission__code", flat=True)
+                )
+                role_codes = set(role.permissions.values_list("code", flat=True))
+                forbidden = sorted(role_codes - caller_codes)
+                if forbidden:
+                    raise serializers.ValidationError(
+                        f"You cannot delegate '{name}' because it includes permissions "
+                        f"you do not hold in this scope: {', '.join(forbidden)}."
+                    )
+
             key = (role.pk, branch_id)
             if key in seen:
                 raise serializers.ValidationError(f"'{name}' is listed twice for the same scope.")
