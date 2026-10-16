@@ -52,7 +52,7 @@ const NAV_ITEMS = [
   { to: '/customers', label: 'Customers', icon: Users, permission: 'customers.manage' },
   { to: '/staff', label: 'Staff', icon: Contact, permission: 'users.manage' },
   { to: '/access', label: 'Access & roles', icon: ShieldCheck, permission: 'users.manage', tenantOnly: true },
-  { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, permission: 'reports.view' },
+  { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, permission: ['reports.view', 'users.manage'] },
   { to: '/reports', label: 'Reports', icon: BarChart3, permission: 'reports.view' },
   { to: '/etims', label: 'eTIMS Invoices', icon: FileText, permission: 'sales.view' },
 ];
@@ -64,6 +64,8 @@ const MANAGEMENT_ITEMS = [
 
 /** The first screen this account may actually open. */
 export const homePath = (user) => {
+  const roleNames = Array.isArray(user?.roles) ? user.roles : [];
+  if (roleNames.includes('HR_MANAGER') || roleNames.includes('MANAGER')) return '/dashboard';
   const first = [...NAV_ITEMS, ...MANAGEMENT_ITEMS].find((item) => {
     const codes = Array.isArray(item.permission) ? item.permission : [item.permission];
     return codes.some((code) => can(user, code));
@@ -169,7 +171,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
               {({ isActive }) => (
                 <>
                   <Icon size={19} className={isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'} />
-                  <span>{label}</span>
+                  <span>{to === '/dashboard' && (user?.roles || []).includes('HR_MANAGER') ? 'HR workspace' : to === '/dashboard' && (user?.roles || []).includes('MANAGER') ? 'Manager workspace' : label}</span>
                   {isActive && <ChevronRight size={15} className="ml-auto text-slate-600" />}
                 </>
               )}
@@ -221,7 +223,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
           <div className="flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 lg:hidden" aria-label="Open menu"><Menu size={21} /></button>
             <div>
-              <div className="text-sm font-bold text-white">{current?.label || 'ZenPOS'}</div>
+              <div className="text-sm font-bold text-white">{current?.to === '/dashboard' && (user?.roles || []).includes('HR_MANAGER') ? 'HR workspace' : current?.to === '/dashboard' && (user?.roles || []).includes('MANAGER') ? 'Manager workspace' : current?.label || 'ZenPOS'}</div>
               <div className="hidden text-[10px] uppercase tracking-wider text-slate-600 sm:block">{organization}</div>
             </div>
           </div>
