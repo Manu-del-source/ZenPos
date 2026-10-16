@@ -165,7 +165,7 @@ const OfflineBanner = ({ online, queued, conflicts, history, corruptWarning, onR
         </div>
       )}
       {history.length > 0 && (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-900/50 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-900/50 bg-emerald-500/10 px-4 py-3 text-sm text-amber-200">
           <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
           <span>
             Recorded from the offline queue:{' '}
@@ -203,7 +203,6 @@ export default function POS() {
 
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All products');
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [customers, setCustomers] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -303,10 +302,6 @@ export default function POS() {
     const timer = setTimeout(() => loadProducts(searchTerm), 250);
     return () => clearTimeout(timer);
   }, [searchTerm, loadProducts]);
-
-  useEffect(() => {
-    setActiveCategory('All products');
-  }, [searchTerm]);
 
   useEffect(() => {
     if (branchId) localStorage.setItem('pos.branch', branchId);
@@ -443,8 +438,11 @@ export default function POS() {
       return;
     }
 
-    if (products.length === 1) {
-      addProduct(products[0]);
+    const matches = products.filter((product) => product.is_active !== false);
+    if (matches.length > 0) {
+      // For a name search, Enter adds the best API-ranked match. The compact
+      // suggestions below the field let the cashier choose a different match.
+      addProduct(matches[0]);
       setSearchTerm('');
       searchRef.current?.focus();
       return;
@@ -780,23 +778,6 @@ export default function POS() {
     if (step === 'sale') searchRef.current?.focus();
   }, [step]);
 
-  const productCategories = useMemo(() => {
-    const names = [...new Set(products
-      .filter((product) => product.is_active !== false)
-      .map((product) => product.category_name)
-      .filter(Boolean))].sort((a, b) => a.localeCompare(b));
-    return ['All products', ...names];
-  }, [products]);
-
-  const visibleProducts = useMemo(
-    () => products.filter((product) => {
-      if (product.is_active === false) return false;
-      if (activeCategory !== 'All products' && (product.category_name || '') !== activeCategory) return false;
-      return true;
-    }),
-    [products, activeCategory],
-  );
-
   const branchOptions = useMemo(() => {
     const allowed = me?.branch_ids || [];
     const list = branches.filter((branch) => !allowed.length || allowed.includes(branch.id));
@@ -855,9 +836,9 @@ export default function POS() {
         <Shortcuts open={showShortcuts} onClose={() => setShowShortcuts(false)} />
         <section className="panel mt-6 overflow-hidden">
           <div className="border-b border-emerald-900/40 bg-emerald-500/10 px-6 py-5 text-center">
-            <CheckCircle2 className="mx-auto mb-2 text-emerald-400" size={34} />
+            <CheckCircle2 className="mx-auto mb-2 text-amber-400" size={34} />
             <h1 className="text-xl font-black text-white">Sale completed</h1>
-            <p className="mt-1 text-sm text-emerald-200/80">{outcome.saleNumber}</p>
+            <p className="mt-1 text-sm text-amber-200/80">{outcome.saleNumber}</p>
           </div>
           <dl className="grid gap-4 p-6 sm:grid-cols-2">
             <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
@@ -962,7 +943,7 @@ export default function POS() {
                 <kbd className="kbd">F3</kbd>
               </button>
               <button className="payment-choice" onClick={enterMpesa}>
-                <Smartphone size={22} className="text-emerald-400" />
+                <Smartphone size={22} className="text-amber-400" />
                 <span>
                   <b>M-Pesa</b>
                   <small>Send an STK push to the customer's phone.</small>
@@ -1063,7 +1044,7 @@ export default function POS() {
               </div>
               <div className="my-6 border-y border-slate-800 py-5 text-center">
                 <span className="text-xs uppercase tracking-wider text-slate-500">Change</span>
-                <div className={cash >= total ? 'text-4xl font-black text-emerald-400' : 'text-4xl font-black text-red-400'}>
+                <div className={cash >= total ? 'text-4xl font-black text-amber-400' : 'text-4xl font-black text-red-400'}>
                   KES {money(change)}
                 </div>
                 {cashShort && <p className="mt-2 text-xs text-red-300">Cash received is less than the amount due.</p>}
@@ -1092,13 +1073,13 @@ export default function POS() {
               <div className="my-6 rounded-xl border border-slate-800 bg-slate-950 p-5 text-center">
                 {awaiting ? (
                   <>
-                    <RefreshCw className="mx-auto mb-3 animate-spin text-emerald-400" size={30} />
+                    <RefreshCw className="mx-auto mb-3 animate-spin text-amber-400" size={30} />
                     <p className="font-semibold text-white">Waiting for the customer to confirm</p>
                     <p className="mt-1 text-sm text-slate-500">Ask them to enter their M-Pesa PIN. This screen updates by itself.</p>
                   </>
                 ) : (
                   <>
-                    <Smartphone className="mx-auto mb-3 text-emerald-400" size={30} />
+                    <Smartphone className="mx-auto mb-3 text-amber-400" size={30} />
                     <p className="font-semibold text-white">An STK push will be sent to this number</p>
                     <p className="mt-1 text-sm text-slate-500">The sale is only completed once Safaricom confirms the payment.</p>
                   </>
@@ -1168,26 +1149,28 @@ export default function POS() {
         </div>
       </div>
 
-      <div className="grid gap-5">
-        <section className="panel flex min-h-[620px] flex-col overflow-hidden">
-          <div className="border-b border-slate-800 bg-slate-950/55 p-4 sm:p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="grid gap-4">
+        <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/20">
+          <div className="border-b border-slate-700 bg-slate-950 px-4 py-5 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold tracking-tight text-white">Product catalogue</h2>
-                <p className="mt-1 text-xs text-slate-500">Tap a product to add it to the active sale.</p>
+                <div className="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-amber-400">Cashier terminal</div>
+                <h2 className="text-lg font-bold text-white">Scan or find a product</h2>
+                <p className="mt-1 text-sm text-slate-400">Barcode scans and search selections go straight into the cart. No product catalogue grid.</p>
               </div>
-              <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-xs text-slate-400">
-                <Package size={15} />
-                <span>{visibleProducts.length} products</span>
-                {lineCount > 0 && <span className="ml-1 border-l border-slate-700 pl-2 font-semibold text-emerald-300">{lineCount} in sale</span>}
+              <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-300">
+                <Package size={16} className="text-amber-400" />
+                <span>{lineCount} item{lineCount === 1 ? '' : 's'} in cart</span>
+                <span className="mx-1 h-4 w-px bg-slate-700" />
+                <span className="font-bold text-white">KES {money(total)}</span>
               </div>
             </div>
-            <div className="relative">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+            <div className="relative mt-5">
+              <Barcode size={20} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-amber-400" />
               <input
                 ref={searchRef}
-                className="input !h-14 !rounded-xl !border-slate-700 !bg-slate-900/80 !py-4 pl-11 pr-12 text-base shadow-inner focus:!border-emerald-500/70"
-                placeholder="Scan barcode, or search by product name or SKU…"
+                className="h-16 w-full rounded-xl border border-slate-600 bg-slate-900 py-4 pl-12 pr-28 text-base text-white shadow-inner outline-none placeholder:text-slate-500 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
+                placeholder="Scan barcode or search product name / SKU…"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 onKeyDown={(event) => {
@@ -1196,108 +1179,91 @@ export default function POS() {
                     submitSearch();
                   }
                 }}
-                aria-label="Product search"
+                aria-label="Scan barcode or search products"
+                autoComplete="off"
               />
               <button
                 type="button"
                 onClick={submitSearch}
-                aria-label="Look up barcode"
-                title="Look up barcode"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 transition hover:border-emerald-500/50 hover:bg-slate-700 hover:text-white"
+                aria-label="Add searched or scanned product"
+                title="Add product to cart"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!searchTerm.trim()}
               >
-                <Barcode size={19} />
+                Add item
               </button>
+              {searchTerm.trim() && (
+                <div className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-2xl">
+                  {loadingProducts ? (
+                    <div className="flex items-center gap-2 px-4 py-4 text-sm text-slate-400">
+                      <RefreshCw size={16} className="animate-spin text-amber-400" /> Searching products…
+                    </div>
+                  ) : products.filter((product) => product.is_active !== false).length > 0 ? (
+                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-800">
+                      {products.filter((product) => product.is_active !== false).slice(0, 8).map((product) => {
+                        const stock = Number(product.stock_level || 0);
+                        const out = product.track_inventory && stock <= 0;
+                        return (
+                          <button
+                            key={product.id}
+                            type="button"
+                            disabled={out}
+                            onClick={() => {
+                              addProduct(product);
+                              setSearchTerm('');
+                              searchRef.current?.focus();
+                            }}
+                            className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-slate-800/80 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold text-white">{product.name}</span>
+                              <span className="mt-1 block truncate font-mono text-xs text-slate-500">{product.sku || 'No SKU'}{product.category_name ? ` · ${product.category_name}` : ''}</span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                              <span className="block text-sm font-bold text-amber-300">KES {money(product.price)}</span>
+                              <span className={`mt-1 block text-[11px] ${out ? 'text-red-400' : product.track_inventory && stock <= Number(product.low_stock_threshold ?? 0) ? 'text-orange-300' : 'text-slate-500'}`}>{out ? 'Out of stock' : product.track_inventory ? `${stock} in stock` : 'Available'}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="px-4 py-4 text-sm text-slate-400">No matches. Check the product name or scan the barcode again.</div>
+                  )}
+                  <div className="border-t border-slate-800 px-4 py-2 text-[11px] text-slate-500">Press Enter to add the top match · Click a result to choose it</div>
+                </div>
+              )}
             </div>
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Product categories">
-              {productCategories.map((category) => {
-                const selected = activeCategory === category;
-                const count = category === 'All products'
-                  ? products.filter((product) => product.is_active !== false).length
-                  : products.filter((product) => product.is_active !== false && (product.category_name || '') === category).length;
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    onClick={() => setActiveCategory(category)}
-                    className={`shrink-0 rounded-lg border px-3.5 py-2 text-xs font-semibold transition ${selected
-                      ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200 shadow-sm'
-                      : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700 hover:text-slate-200'}`}
-                  >
-                    {category}<span className={`ml-2 ${selected ? 'text-emerald-300' : 'text-slate-600'}`}>{count}</span>
-                  </button>
-                );
-              })}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+              <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">Enter</kbd> Add product</span>
+              <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">F2</kbd> Search</span>
+              <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">F8</kbd> Checkout</span>
             </div>
           </div>
 
-          <div className="grid flex-1 content-start gap-3 overflow-y-auto bg-slate-950/20 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3 2xl:grid-cols-4">
-            {loadingProducts ? (
-              <div className="col-span-full grid min-h-64 place-items-center text-center text-slate-500">
-                <div><RefreshCw className="mx-auto mb-3 animate-spin text-emerald-400" size={25} /><p>Loading product catalogue…</p></div>
-              </div>
-            ) : visibleProducts.length === 0 ? (
-              <div className="col-span-full grid min-h-64 place-items-center p-8 text-center">
-                <div>
-                  <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-slate-800 bg-slate-900"><Package className="text-slate-500" size={25} /></div>
-                  <p className="font-semibold text-slate-200">
-                    {searchTerm ? 'No products match that search' : 'No products in this category'}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {searchTerm ? 'Check the spelling, or scan the barcode again.' : 'Choose another category or add products in Inventory.'}
-                  </p>
-                  {activeCategory !== 'All products' && <button className="mt-4 text-sm font-semibold text-emerald-300 hover:text-emerald-200" onClick={() => setActiveCategory('All products')}>Show all products</button>}
-                </div>
-              </div>
-            ) : (
-              visibleProducts.map((product) => {
-                const stock = Number(product.stock_level || 0);
-                const tracked = product.track_inventory;
-                const out = tracked && stock <= 0;
-                const low = tracked && !out && stock <= Number(product.low_stock_threshold ?? 0);
-                const inCart = getQuantityFor(product.id);
-                return (
-                  <button
-                    key={product.id}
-                    type="button"
-                    disabled={out}
-                    onClick={() => addProduct(product)}
-                    className={`group relative flex min-h-[205px] flex-col overflow-hidden rounded-xl border p-3.5 text-left transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${out
-                      ? 'cursor-not-allowed border-slate-800/70 bg-slate-950/40 opacity-60'
-                      : inCart
-                        ? 'border-emerald-400/50 bg-emerald-400/[0.055] shadow-[0_0_0_1px_rgba(52,211,153,0.08)]'
-                        : 'border-slate-800 bg-slate-900/65 hover:-translate-y-0.5 hover:border-slate-700 hover:bg-slate-900 hover:shadow-lg hover:shadow-black/20'}`}
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-2">
-                      <span className="max-w-[75%] truncate rounded-md border border-slate-800 bg-slate-950/70 px-2 py-1 font-mono text-[10px] tracking-wide text-slate-400">{product.sku || 'NO SKU'}</span>
-                      <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-lg text-xs font-bold ${inCart ? 'bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'}`}>
-                        {inCart || <Plus size={15} />}
-                      </span>
-                    </div>
-                    <div className={`mb-3 grid h-20 place-items-center overflow-hidden rounded-lg border ${out ? 'border-slate-800 bg-slate-950/70' : inCart ? 'border-emerald-400/15 bg-gradient-to-br from-emerald-500/10 to-slate-950' : 'border-slate-800 bg-gradient-to-br from-slate-800/80 via-slate-900 to-slate-950'}`}>
-                      <div className="flex flex-col items-center gap-1">
-                        <Package size={25} strokeWidth={1.5} className={out ? 'text-slate-600' : inCart ? 'text-emerald-300' : 'text-slate-500 group-hover:text-slate-300'} />
-                        <span className="max-w-full truncate px-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-600">{product.category_name || product.brand_name || 'Product'}</span>
-                      </div>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-100">{product.name}</p>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-base font-extrabold tracking-tight text-white">KES {money(product.price)}</span>
-                        <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${out ? 'bg-red-500/10 text-red-300' : low ? 'bg-amber-400/10 text-amber-300' : tracked ? 'bg-emerald-400/10 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
-                          {tracked ? (out ? 'Out of stock' : low ? `Low · ${stock}` : `${stock} left`) : 'Available'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className={`mt-3 flex items-center justify-between border-t pt-2.5 text-[11px] font-semibold ${inCart ? 'border-emerald-400/15 text-emerald-200' : 'border-slate-800 text-slate-500 group-hover:text-slate-300'}`}>
-                      <span>{inCart ? `${inCart} in current sale` : out ? 'Unavailable to sell' : 'Tap to add'}</span>
-                      {!out && <span className="inline-flex items-center gap-1">{inCart ? 'Add another' : 'Add'} <Plus size={12} /></span>}
-                    </div>
-                  </button>
-                );
-              })
-            )}
+          <div className="grid gap-4 p-4 sm:grid-cols-3 sm:p-6">
+            <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500"><Package size={15} /> Cart lines</div>
+              <div className="mt-2 text-2xl font-black text-white">{lineCount}</div>
+              <p className="mt-1 text-xs text-slate-500">Different products in this sale</p>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500"><Wallet size={15} /> Subtotal</div>
+              <div className="mt-2 text-2xl font-black text-white">KES {money(subtotal)}</div>
+              <p className="mt-1 text-xs text-slate-500">Before VAT / tax</p>
+            </div>
+            <div className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-300"><CreditCard size={15} /> Total due</div>
+              <div className="mt-2 text-2xl font-black text-amber-300">KES {money(total)}</div>
+              <p className="mt-1 text-xs text-slate-400">{taxTotal > 0 ? `Includes KES ${money(taxTotal)} VAT / tax` : 'VAT / tax calculated at checkout'}</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 border-t border-slate-700 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <p className="text-sm text-slate-400">{cart.length ? 'Products are in the cart. Open the cart panel to adjust quantities or proceed to payment.' : 'Ready for the next scan. Search by name or SKU if a barcode is unavailable.'}</p>
+            <div className="flex gap-2">
+              {cart.length > 0 && <button className="rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800" onClick={() => setCartOpen(true)}>View cart</button>}
+              <button className="rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40" disabled={!cart.length} onClick={openReview}>Checkout <kbd className="ml-1 rounded border border-slate-950/20 px-1.5 py-0.5">F8</kbd></button>
+            </div>
           </div>
         </section>
 
