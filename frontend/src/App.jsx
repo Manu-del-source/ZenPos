@@ -4,9 +4,10 @@ import {
   LayoutDashboard, ShoppingCart, Package, ReceiptText, Users, Settings,
   LogOut, Menu, X, ChevronRight, Store, ShieldAlert, Truck, ClipboardList,
   PackageCheck, ScrollText, ArrowLeftRight, Contact, BarChart3, ShieldCheck,
-  ClipboardCheck, FileText,
+  ClipboardCheck, FileText, Wallet,
 } from 'lucide-react';
 import POS from './pages/POS';
+import Shift from './pages/Shift';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
@@ -41,6 +42,7 @@ export const can = (user, code) => {
 // so a cashier is not shown a menu item that answers 403.
 const NAV_ITEMS = [
   { to: '/pos', label: 'Point of Sale', icon: ShoppingCart, permission: 'sales.create' },
+  { to: '/shift', label: 'My Shift', icon: Wallet, permission: 'cash.open' },
   { to: '/orders', label: 'Sales', icon: ReceiptText, permission: 'sales.view' },
   { to: '/inventory', label: 'Inventory', icon: Package, permission: ['inventory.view', 'products.view'] },
   { to: '/suppliers', label: 'Suppliers', icon: Truck, permission: ['purchases.view', 'purchases.create'] },
@@ -242,6 +244,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
         <main className="zen-page min-h-[calc(100vh-4rem)]">
           <Routes>
             <Route path="/pos" element={<ProtectedRoute><PermissionRoute user={user} permission="sales.create"><POS /></PermissionRoute></ProtectedRoute>} />
+            <Route path="/shift" element={<ProtectedRoute><PermissionRoute user={user} permission="cash.open"><Shift user={user} /></PermissionRoute></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute><PermissionRoute user={user} permission={['inventory.view', 'products.view']}><Inventory user={user} /></PermissionRoute></ProtectedRoute>} />
             <Route path="/suppliers" element={<ProtectedRoute><PermissionRoute user={user} permission={["purchases.view", "purchases.create"]}><Suppliers /></PermissionRoute></ProtectedRoute>} />
             <Route path="/purchase-orders" element={<ProtectedRoute><PermissionRoute user={user} permission={["purchases.view", "purchases.create"]}><PurchaseOrders /></PermissionRoute></ProtectedRoute>} />
