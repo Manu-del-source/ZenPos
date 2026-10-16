@@ -2,11 +2,11 @@ import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import jwt
+import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from django.test import override_settings
-import jwt
-import pytest
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 
