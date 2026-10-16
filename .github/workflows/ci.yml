@@ -58,12 +58,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements/dev.txt
 
-      - name: Capture Ruff's exact auto-fix
-        run: |
-          ruff check --fix modules/accounts/tests/test_clerk_authentication.py || true
-          git --no-pager diff -- modules/accounts/tests/test_clerk_authentication.py
-          ruff check modules/accounts/tests/test_clerk_authentication.py
-
       - name: Lint
         run: ruff check .
 
