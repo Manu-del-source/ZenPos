@@ -7,11 +7,10 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from django.test import override_settings
-from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.test import APIRequestFactory
-
 from modules.accounts.authentication import ClerkJWTAuthentication
 from modules.accounts.models import User
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.test import APIRequestFactory
 
 
 ISSUER = "https://clerk.example.test"
