@@ -259,7 +259,7 @@ class RoleViewSet(viewsets.ModelViewSet):
                 "System roles are shared by every organization and cannot be edited."
             )
 
-        payload = SetRolePermissionsSerializer(data=request.data)
+        payload = SetRolePermissionsSerializer(data=request.data, context={"request": request})
         payload.is_valid(raise_exception=True)
 
         with transaction.atomic():
