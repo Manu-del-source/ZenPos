@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { AlertTriangle, ArrowUpRight, Package, RefreshCw, ShoppingCart, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, Contact, Package, RefreshCw, ShoppingCart, TrendingUp, Users } from 'lucide-react';
 
 const money = (value) => `KES ${Number(value || 0).toLocaleString()}`;
 
