@@ -97,7 +97,10 @@ class BranchViewSet(BranchScopedMixin, viewsets.ModelViewSet):
         if not getattr(request.user, "is_superuser", False):
             raise MethodNotAllowed(
                 "DELETE",
-                detail="Only a ZenPOS super admin can remove a branch. Business users can deactivate branches.",
+                detail=(
+                    "Only a ZenPOS super admin can remove a branch. "
+                    "Business users can deactivate branches."
+                ),
             )
 
         branch = self.get_object()
