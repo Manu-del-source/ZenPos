@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Clock3, Wallet, RefreshCw, CheckCircle2, AlertTriangle, Banknote, Store } from 'lucide-react';
+import { Clock3, Wallet, RefreshCw, CheckCircle2, AlertTriangle, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { apiError } from '../services/api';
 
@@ -54,7 +54,7 @@ export default function Shift({ user = {} }) {
     setSelectedTillId(id);
     setLastClosed(null);
     const till = tills.find((item) => String(item.id) === String(id));
-    if (till) {
+    if (till && (!till.open_session || till.open_session.opened_by === user.username)) {
       localStorage.setItem('pos.till', String(till.id));
       localStorage.setItem('pos.till.branch', String(till.branch));
       localStorage.setItem('pos.branch', String(till.branch));
