@@ -183,7 +183,10 @@ class RoleViewSet(viewsets.ModelViewSet):
     }
 
     def get_queryset(self):
-        return Role.objects.visible_to(self.request.user).prefetch_related("permissions")
+        queryset = Role.objects.visible_to(self.request.user)
+        if not self.request.user.is_superuser:
+            queryset = queryset.exclude(name="SUPER_ADMIN")
+        return queryset.prefetch_related("permissions")
 
     def get_serializer_class(self):
         if self.action in {"create", "update", "partial_update"}:
