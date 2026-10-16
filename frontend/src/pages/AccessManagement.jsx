@@ -52,10 +52,20 @@ export default function AccessManagement() {
     && !(caller.roles || []).includes('ADMIN')
     && !caller.is_superuser;
   const availableRoles = useMemo(() => {
-    const hrAllowed = new Set(['CASHIER', 'SUPERVISOR', 'INVENTORY_MANAGER', 'ACCOUNTANT']);
+    const hrAllowed = new Set(['MANAGER', 'CASHIER', 'SUPERVISOR', 'INVENTORY_MANAGER', 'ACCOUNTANT']);
     return roles.filter((role) => !limitedHr || (role.is_system && hrAllowed.has(role.name)))
       .filter((role) => role.name !== 'SUPER_ADMIN');
   }, [roles, limitedHr]);
+
+  const availableBranches = useMemo(() => {
+    const assignedIds = new Set((caller.branch_ids || []).map(String));
+    const hasRestrictedScope = !caller.is_superuser
+      && !(caller.roles || []).some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role))
+      && assignedIds.size > 0;
+    return hasRestrictedScope
+      ? branches.filter((branch) => assignedIds.has(String(branch.id)))
+      : branches;
+  }, [branches, caller]);
 
   const filteredUsers = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -96,7 +106,7 @@ export default function AccessManagement() {
         branches: form.branches.map((branch) => ({ branch, is_default: branch === form.branches[0] })),
       });
       await api.post(`/users/${createdUser.id}/set-roles/`, {
-        roles: [{ role: form.role }],
+        roles: form.branches.map((branch) => ({ role: form.role, branch })),
       });
       toast.success(`Login access created for ${createdUser.username}.`);
       setForm(null);
@@ -125,7 +135,7 @@ export default function AccessManagement() {
             Create login accounts, assign an approved role, and limit each person to the branches where they work.
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setForm({ ...EMPTY, role: availableRoles.some((role) => role.name === 'CASHIER') ? 'CASHIER' : availableRoles[0]?.name || '' , branches: branches[0] ? [branches[0].id] : [] })}>
+        <button className="btn-primary" onClick={() => setForm({ ...EMPTY, role: availableRoles.some((role) => role.name === 'CASHIER') ? 'CASHIER' : availableRoles[0]?.name || '' , branches: availableBranches[0] ? [availableBranches[0].id] : [] })}>
           <Plus size={16} /> Grant access
         </button>
       </div>
@@ -184,16 +194,16 @@ export default function AccessManagement() {
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">First name<input className="input mt-2" value={form.first_name} onChange={(event) => setField('first_name', event.target.value)} /></label>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Last name<input className="input mt-2" value={form.last_name} onChange={(event) => setField('last_name', event.target.value)} /></label>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 sm:col-span-2">Temporary password<input className="input mt-2" type="password" minLength={8} value={form.password} onChange={(event) => setField('password', event.target.value)} required autoComplete="new-password" /><span className="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-600">Share this privately with the employee. Password reset is available to authorized managers.</span></label>
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 sm:col-span-2">Role<select className="input mt-2" value={form.role} onChange={(event) => setField('role', event.target.value)} required>{availableRoles.map((role) => <option key={role.id} value={role.name}>{role.name.replaceAll('_', ' ')} — {role.description}</option>)}</select></label>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 sm:col-span-2">Role<select className="input mt-2" value={form.role} onChange={(event) => setField('role', event.target.value)} required>{availableRoles.map((role) => <option key={role.id} value={role.name}>{role.name.replaceAll('_', ' ')} — {role.description}</option>)}</select>{form.role === 'MANAGER' && <span className="mt-2 block text-xs font-normal normal-case tracking-normal text-amber-600">Manager permissions will apply only to the branch or branches selected below. The manager cannot manage unassigned branches.</span>}</label>
               <div className="sm:col-span-2">
                 <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Allowed branches</div>
-                {branches.length ? <div className="grid gap-2 sm:grid-cols-2">{branches.map((branch) => <label key={branch.id} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/50 p-3 text-sm text-slate-300"><input type="checkbox" checked={form.branches.includes(branch.id)} onChange={() => toggleBranch(branch.id)} /><span>{branch.name}<span className="ml-2 text-xs text-slate-600">{branch.code}</span></span></label>)}</div> : <p className="text-sm text-amber-400">Create a branch before granting staff access.</p>}
+                {availableBranches.length ? <div className="grid gap-2 sm:grid-cols-2">{availableBranches.map((branch) => <label key={branch.id} className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/50 p-3 text-sm text-slate-300"><input type="checkbox" checked={form.branches.includes(branch.id)} onChange={() => toggleBranch(branch.id)} /><span>{branch.name}<span className="ml-2 text-xs text-slate-600">{branch.code}</span></span></label>)}</div> : <p className="text-sm text-amber-400">No branch is available in your access scope. Ask the business owner to assign you to a branch.</p>}
                 <p className="mt-2 text-[11px] text-slate-600">Select at least one branch. Users are not given organization-wide branch access by default.</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-800 p-5">
               <button type="button" className="btn-secondary" onClick={() => setForm(null)} disabled={saving}>Cancel</button>
-              <button type="submit" className="btn-primary" disabled={saving || !branches.length}>{saving ? 'Creating access...' : <><KeyRound size={15} /> Create login access</>}</button>
+              <button type="submit" className="btn-primary" disabled={saving || !availableBranches.length}>{saving ? 'Creating access...' : <><KeyRound size={15} /> Create login access</>}</button>
             </div>
           </form>
         </div>

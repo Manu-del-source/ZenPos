@@ -226,8 +226,8 @@ class TestRoleAssignment:
         assert response.status_code == 200, response.data
         assert response.data["roles"] == ["CASHIER"]
 
-    def test_hr_cannot_grant_manager_or_owner_authority(
-        self, manager, other_cashier
+    def test_hr_can_grant_branch_manager_but_not_org_wide_or_owner_authority(
+        self, manager, other_cashier, branch
     ):
         from rest_framework.test import APIClient
 
@@ -239,13 +239,94 @@ class TestRoleAssignment:
         client = APIClient()
         client.force_authenticate(manager)
 
-        for role_name in ("MANAGER", "ADMIN", "SUPER_ADMIN"):
+        branch_grant = client.post(
+            f"{USERS_URL}{other_cashier.id}/set-roles/",
+            {"roles": [{"role": "MANAGER", "branch": str(branch.id)}]},
+            format="json",
+        )
+        assert branch_grant.status_code == 200, branch_grant.data
+        grant = UserRole.objects.get(user=other_cashier, role__name="MANAGER")
+        assert grant.branch_id == branch.id
+
+        org_wide_manager = client.post(
+            f"{USERS_URL}{other_cashier.id}/set-roles/",
+            {"roles": [{"role": "MANAGER"}]},
+            format="json",
+        )
+        assert org_wide_manager.status_code == 400, org_wide_manager.data
+
+        for role_name in ("ADMIN", "SUPER_ADMIN"):
             response = client.post(
                 f"{USERS_URL}{other_cashier.id}/set-roles/",
-                {"roles": [{"role": role_name}]},
+                {"roles": [{"role": role_name, "branch": str(branch.id)}]},
                 format="json",
             )
             assert response.status_code == 400, (role_name, response.data)
+
+    def test_a_branch_manager_cannot_grant_roles_outside_their_branch(
+        self, manager, manager_client, other_cashier, branch, other_branch
+    ):
+        UserRole.objects.filter(user=manager).delete()
+        UserRole.objects.create(
+            user=manager,
+            role=Role.objects.get(name="MANAGER", organization__isnull=True),
+            branch=branch,
+        )
+        UserBranchAccess.objects.filter(user=manager).delete()
+        UserBranchAccess.objects.create(user=manager, branch=branch, is_default=True)
+        UserBranchAccess.objects.filter(user=other_cashier).delete()
+        UserBranchAccess.objects.create(user=other_cashier, branch=branch, is_default=True)
+
+        response = manager_client.post(
+            f"{USERS_URL}{other_cashier.id}/set-roles/",
+            {"roles": [{"role": "MANAGER", "branch": str(other_branch.id)}]},
+            format="json",
+        )
+        assert response.status_code == 400, response.data
+
+    def test_a_branch_manager_cannot_list_staff_from_another_branch(
+        self, manager_client, manager, other_cashier, branch, other_branch
+    ):
+        UserRole.objects.filter(user=manager).delete()
+        UserRole.objects.create(
+            user=manager,
+            role=Role.objects.get(name="MANAGER", organization__isnull=True),
+            branch=branch,
+        )
+        UserBranchAccess.objects.filter(user=manager).delete()
+        UserBranchAccess.objects.create(user=manager, branch=branch, is_default=True)
+        UserBranchAccess.objects.filter(user=other_cashier).delete()
+        UserBranchAccess.objects.create(user=other_cashier, branch=other_branch, is_default=True)
+
+        response = manager_client.get(USERS_URL)
+        assert response.status_code == 200, response.data
+        usernames = {row["username"] for row in response.data["results"]}
+        assert other_cashier.username not in usernames
+
+    def test_a_branch_manager_cannot_assign_staff_to_another_branch(
+        self, manager, other_cashier, branch, other_branch
+    ):
+        from rest_framework.test import APIClient
+
+        UserRole.objects.filter(user=manager).delete()
+        UserRole.objects.create(
+            user=manager,
+            role=Role.objects.get(name="MANAGER", organization__isnull=True),
+            branch=branch,
+        )
+        UserBranchAccess.objects.filter(user=manager).delete()
+        UserBranchAccess.objects.create(user=manager, branch=branch, is_default=True)
+        UserBranchAccess.objects.filter(user=other_cashier).delete()
+        UserBranchAccess.objects.create(user=other_cashier, branch=branch, is_default=True)
+        client = APIClient()
+        client.force_authenticate(manager)
+
+        response = client.post(
+            f"{USERS_URL}{other_cashier.id}/set-branch-access/",
+            {"branches": [{"branch": str(other_branch.id)}]},
+            format="json",
+        )
+        assert response.status_code in (400, 404), response.data
 
     def test_hr_cannot_add_permissions_to_a_custom_role(
         self, manager, organization
