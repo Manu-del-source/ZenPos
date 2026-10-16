@@ -214,7 +214,10 @@ class RoleAssignmentSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     "Only a platform super admin can grant the SUPER_ADMIN role."
                 )
-            if role.organization_id not in (None, caller.organization_id) and not caller.is_superuser:
+            if (
+                role.organization_id not in (None, caller.organization_id)
+                and not caller.is_superuser
+            ):
                 raise serializers.ValidationError("You cannot assign another organization's role.")
 
             branch_id = entry["branch"]
