@@ -52,7 +52,7 @@ export default function AccessManagement() {
     && !(caller.roles || []).includes('ADMIN')
     && !caller.is_superuser;
   const availableRoles = useMemo(() => {
-    const hrAllowed = new Set(['HR_MANAGER', 'CASHIER', 'SUPERVISOR', 'INVENTORY_MANAGER', 'ACCOUNTANT']);
+    const hrAllowed = new Set(['CASHIER', 'SUPERVISOR', 'INVENTORY_MANAGER', 'ACCOUNTANT']);
     return roles.filter((role) => !limitedHr || (role.is_system && hrAllowed.has(role.name)))
       .filter((role) => role.name !== 'SUPER_ADMIN');
   }, [roles, limitedHr]);
