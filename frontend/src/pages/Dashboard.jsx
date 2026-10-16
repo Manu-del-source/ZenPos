@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { AlertTriangle, ArrowUpRight, Package, RefreshCw, ShoppingCart, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, Contact, Package, RefreshCw, ShoppingCart, TrendingUp, Users } from 'lucide-react';
 
 const money = (value) => `KES ${Number(value || 0).toLocaleString()}`;
 
-const Dashboard = () => {
+const ManagerDashboard = () => {
   const [trend, setTrend] = useState([]);
   const [lowStock, setLowStock] = useState([]);
   const [lowStockCount, setLowStockCount] = useState(0);
@@ -126,6 +126,93 @@ const Dashboard = () => {
       </section>
     </div>
   );
+};
+
+
+const HRWorkspace = () => {
+  const [employees, setEmployees] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      api.get('/employees/'),
+      api.get('/branches/', { params: { page_size: 100 } }),
+    ]).then(([employeeRes, branchRes]) => {
+      if (!active) return;
+      const employeeData = employeeRes.data;
+      const branchData = branchRes.data;
+      setEmployees(Array.isArray(employeeData) ? employeeData : employeeData.results || []);
+      setBranches(Array.isArray(branchData) ? branchData : branchData.results || []);
+    }).catch((err) => {
+      if (active) setError(err.response?.data?.detail || 'Unable to load staff information. Check the account permissions.');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const activeEmployees = employees.filter((employee) => employee.status === 'ACTIVE').length;
+  const inactiveEmployees = employees.filter((employee) => employee.status && employee.status !== 'ACTIVE').length;
+  const cards = [
+    { label: 'Total employee records', value: employees.length, icon: Users },
+    { label: 'Active employees', value: activeEmployees, icon: Contact },
+    { label: 'Inactive / other status', value: inactiveEmployees, icon: AlertTriangle },
+    { label: 'Branches', value: branches.length, icon: Package },
+  ];
+
+  return (
+    <div className="zen-dashboard-page page-shell">
+      <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#FF5938]">People operations</p>
+          <h1 className="page-title">HR workspace</h1>
+          <p className="page-subtitle">Employee records and staff administration for your organization.</p>
+        </div>
+        <Link to="/staff" className="btn-primary"><Users size={16} /> Manage employees</Link>
+      </div>
+
+      {error && <div role="alert" className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700">{error}</div>}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map(({ label, value, icon: Icon }) => (
+          <div key={label} className="panel p-5">
+            <div className="mb-5 flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#756F66]">{label}</span>
+              <Icon size={18} className="text-[#FF5938]" />
+            </div>
+            <div className="text-2xl font-black tracking-tight text-[#171715]">{loading ? '—' : value}</div>
+          </div>
+        ))}
+      </div>
+
+      <section className="mt-5 panel">
+        <div className="panel-header">
+          <div><h2 className="font-bold text-[#171715]">Staff administration</h2><p className="mt-1 text-xs text-[#756F66]">Current employee-record tools available in ZenPOS.</p></div>
+        </div>
+        <div className="grid gap-3 p-4 sm:grid-cols-2">
+          <Link to="/staff" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900">
+            <Users size={20} className="mb-3 text-[#FF5938]" /><div className="text-sm font-bold text-[#171715]">Employee directory</div><div className="mt-1 text-xs text-[#756F66]">Create, search, update and maintain employee records.</div>
+          </Link>
+          <Link to="/staff" className="rounded-xl border border-slate-800 bg-slate-950 p-4 transition hover:border-[#FF5938]/40 hover:bg-slate-900">
+            <Contact size={20} className="mb-3 text-[#FF5938]" /><div className="text-sm font-bold text-[#171715]">Employment status</div><div className="mt-1 text-xs text-[#756F66]">Review active, inactive, suspended and terminated records.</div>
+          </Link>
+        </div>
+      </section>
+
+      <section className="mt-5 rounded-2xl border border-amber-500/25 bg-amber-500/5 p-5">
+        <h2 className="font-bold text-[#171715]">HR capabilities to build next</h2>
+        <p className="mt-2 text-sm leading-6 text-[#756F66]">Leave requests and balances, attendance and shifts, recruitment and onboarding, performance reviews, training, confidential employee relations, and payroll preparation are not yet exposed as complete workflows in the current application. They should be added with dedicated records, approval rules and server-side permissions rather than displayed as if already working.</p>
+      </section>
+    </div>
+  );
+};
+
+const Dashboard = () => {
+  let user = {};
+  try { user = JSON.parse(localStorage.getItem('user') || '{}') || {}; } catch { /* invalid session profile */ }
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  return roles.includes('HR_MANAGER') ? <HRWorkspace /> : <ManagerDashboard />;
 };
 
 export default Dashboard;

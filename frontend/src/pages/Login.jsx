@@ -45,7 +45,8 @@ const Login = () => {
       localStorage.setItem('user', JSON.stringify(profile.data));
 
       window.dispatchEvent(new Event('zenpos:auth'));
-      navigate('/pos');
+      const roles = Array.isArray(profile.data?.roles) ? profile.data.roles : [];
+      navigate(roles.includes('HR_MANAGER') || roles.includes('MANAGER') ? '/dashboard' : '/pos');
     } catch (err) {
       setError(apiError(err, err?.message || 'Authentication failed'));
     } finally {
