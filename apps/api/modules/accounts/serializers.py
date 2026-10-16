@@ -64,10 +64,28 @@ class SetRolePermissionsSerializer(serializers.Serializer):
     permission_codes = serializers.ListField(child=serializers.CharField(), allow_empty=True)
 
     def validate_permission_codes(self, codes):
+        caller = self.context["request"].user
         known = set(Permission.objects.filter(code__in=codes).values_list("code", flat=True))
         unknown = sorted(set(codes) - known)
         if unknown:
             raise serializers.ValidationError(f"Unknown permission code(s): {', '.join(unknown)}.")
+
+        # A manager may configure roles only with capabilities they personally
+        # hold. Otherwise users.manage would let HR create an all-powerful role
+        # and then grant it to themselves or colleagues.
+        if not caller.is_superuser:
+            from .permissions import permission_codes_for
+
+            allowed = permission_codes_for(caller)
+            forbidden = sorted(set(codes) - allowed)
+            if forbidden:
+                raise serializers.ValidationError(
+                    {"permission_codes": (
+                        "You cannot delegate permissions you do not hold: "
+                        + ", ".join(forbidden)
+                        + "."
+                    )}
+                )
         return codes
 
 
@@ -179,6 +197,16 @@ class RoleAssignmentSerializer(serializers.Serializer):
             role = assignable.get(name)
             if role is None:
                 raise serializers.ValidationError(f"'{name}' is not a role you can assign.")
+
+            # Platform authority is never granted through ordinary staff
+            # management. Django's is_superuser flag is the platform boundary.
+            if role.name == "SUPER_ADMIN" and not caller.is_superuser:
+                raise serializers.ValidationError(
+                    "Only a platform super admin can grant the SUPER_ADMIN role."
+                )
+            if role.organization_id not in (None, caller.organization_id) and not caller.is_superuser:
+                raise serializers.ValidationError("You cannot assign another organization's role.")
+
             branch_id = entry["branch"]
             if branch_id is not None:
                 in_organization = Branch.objects.filter(
@@ -188,6 +216,37 @@ class RoleAssignmentSerializer(serializers.Serializer):
                     raise serializers.ValidationError(
                         f"Branch {branch_id} is not in your organization."
                     )
+
+            # Delegation cannot increase authority. Organization-wide grants
+            # require the caller to hold the delegated permissions organization-
+            # wide; branch grants may only delegate permissions held at that
+            # branch or organization-wide.
+            if not caller.is_superuser:
+                from .models import UserRole
+                from .models import RolePermission
+
+                if branch_id is None:
+                    caller_role_ids = UserRole.objects.filter(
+                        user=caller, branch__isnull=True
+                    ).values_list("role_id", flat=True)
+                else:
+                    caller_role_ids = UserRole.objects.filter(
+                        user=caller
+                    ).filter(
+                        models.Q(branch__isnull=True) | models.Q(branch_id=branch_id)
+                    ).values_list("role_id", flat=True)
+                caller_codes = set(
+                    RolePermission.objects.filter(role_id__in=caller_role_ids)
+                    .values_list("permission__code", flat=True)
+                )
+                role_codes = set(role.permissions.values_list("code", flat=True))
+                forbidden = sorted(role_codes - caller_codes)
+                if forbidden:
+                    raise serializers.ValidationError(
+                        f"You cannot delegate '{name}' because it includes permissions "
+                        f"you do not hold in this scope: {', '.join(forbidden)}."
+                    )
+
             key = (role.pk, branch_id)
             if key in seen:
                 raise serializers.ValidationError(f"'{name}' is listed twice for the same scope.")
