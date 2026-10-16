@@ -1,5 +1,6 @@
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -233,7 +234,7 @@ class RoleAssignmentSerializer(serializers.Serializer):
                     caller_role_ids = UserRole.objects.filter(
                         user=caller
                     ).filter(
-                        models.Q(branch__isnull=True) | models.Q(branch_id=branch_id)
+                        Q(branch__isnull=True) | Q(branch_id=branch_id)
                     ).values_list("role_id", flat=True)
                 caller_codes = set(
                     RolePermission.objects.filter(role_id__in=caller_role_ids)
