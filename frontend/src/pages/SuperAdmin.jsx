@@ -128,6 +128,7 @@ export default function SuperAdmin() {
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState([]);
   const [flipping, setFlipping] = useState(null);
+  const [flippingBranch, setFlippingBranch] = useState(null);
   const [onboarding, setOnboarding] = useState(false);
 
   const load = useCallback(async () => {
@@ -167,6 +168,25 @@ export default function SuperAdmin() {
       toast.error(apiError(err, 'Could not change the organization status'));
     } finally {
       setFlipping(null);
+    }
+  };
+
+  const setBranchActive = async (branch, activate) => {
+    const action = activate ? 'reactivate' : 'deactivate';
+    if (!window.confirm(
+      `${activate ? 'Reactivate' : 'Deactivate'} "${branch.name}" (${branch.organization_name || 'business'})? `
+      + 'Historical sales, stock, tills, and cash-session records will be retained.',
+    )) return;
+    setFlippingBranch(branch.id);
+    try {
+      if (activate) await api.patch(`/branches/${branch.id}/`, { is_active: true });
+      else await api.delete(`/branches/${branch.id}/`);
+      toast.success(`Branch "${branch.name}" ${activate ? 'reactivated' : 'deactivated'}.`);
+      await load();
+    } catch (error) {
+      toast.error(apiError(error, `Could not ${action} branch`));
+    } finally {
+      setFlippingBranch(null);
     }
   };
 
@@ -264,6 +284,42 @@ export default function SuperAdmin() {
               {!loading && organizations.length === 0 && (
                 <tr><td colSpan={6} className="p-8 text-center text-slate-500">No organizations returned, or this endpoint is not available to this account.</td></tr>
               )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div><h2 className="panel-title">All branches</h2><p className="panel-subtitle">Platform-wide branch controls. Deactivation preserves historical records.</p></div>
+          <span className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-400">{branches.length} loaded</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="bg-slate-800/40 text-[10px] uppercase tracking-widest text-slate-400">
+              <tr><th className="p-4 text-left">Branch</th><th className="p-4 text-left">Business</th><th className="p-4 text-left">Code</th><th className="p-4 text-left">Status</th><th className="p-4 text-right">Action</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {branches.map((branch) => (
+                <tr key={branch.id}>
+                  <td className="p-4 font-semibold text-white">{branch.name}</td>
+                  <td className="p-4 text-slate-400">{branch.organization_name || branch.organization}</td>
+                  <td className="p-4 text-slate-400">{branch.code}</td>
+                  <td className="p-4"><span className={`rounded-md border px-2 py-1 text-xs ${branch.is_active ? 'border-emerald-500/20 text-emerald-300' : 'border-red-500/30 text-red-300'}`}>{branch.is_active ? 'Active' : 'Inactive'}</span></td>
+                  <td className="p-4 text-right">
+                    {branch.is_active ? (
+                      <button className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/10 disabled:opacity-50" disabled={flippingBranch === branch.id} onClick={() => setBranchActive(branch, false)}>
+                        <PowerOff size={14} className="mr-1 inline" />{flippingBranch === branch.id ? 'Working…' : 'Deactivate'}
+                      </button>
+                    ) : (
+                      <button className="btn-secondary !py-1.5 !text-xs" disabled={flippingBranch === branch.id} onClick={() => setBranchActive(branch, true)}>
+                        <Power size={14} />{flippingBranch === branch.id ? 'Working…' : 'Reactivate'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {!loading && branches.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-500">No branches returned.</td></tr>}
             </tbody>
           </table>
         </div>
