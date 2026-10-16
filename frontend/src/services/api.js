@@ -14,6 +14,10 @@ const api = axios.create({
   headers: { Accept: 'application/json' },
 });
 
+// Keep simultaneous 401 responses from rotating the same refresh token more
+// than once. SimpleJWT rotates refresh tokens and blacklists the previous one.
+let refreshInFlight = null;
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -30,6 +34,60 @@ export const endSession = () => {
   clearSession();
   if (window.location.pathname !== '/login') window.location.href = '/login';
 };
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    const status = error.response?.status;
+    const url = original?.url || '';
+
+    // Never refresh a failed login, refresh, or logout request, and never
+    // retry the same API request more than once.
+    const isAuthEndpoint = /\/auth\/(login|refresh|logout)\//.test(url);
+    if (status !== 401 || !original || original._authRetry || isAuthEndpoint) {
+      return Promise.reject(error);
+    }
+
+    const refresh = localStorage.getItem('refreshToken');
+    if (!refresh) {
+      endSession();
+      return Promise.reject(error);
+    }
+
+    original._authRetry = true;
+
+    try {
+      if (!refreshInFlight) {
+        refreshInFlight = axios
+          .post(`${API_BASE_URL}/auth/refresh/`, { refresh }, {
+            headers: { Accept: 'application/json' },
+          })
+          .then(({ data }) => {
+            if (!data?.access) {
+              throw new Error('The refresh response did not include an access token.');
+            }
+            localStorage.setItem('token', data.access);
+            // ROTATE_REFRESH_TOKENS is enabled on the API. Persist the new
+            // refresh token or the next refresh will fail as blacklisted.
+            if (data.refresh) localStorage.setItem('refreshToken', data.refresh);
+            return data.access;
+          })
+          .finally(() => {
+            refreshInFlight = null;
+          });
+      }
+
+      const access = await refreshInFlight;
+      original.headers = original.headers || {};
+      original.headers.Authorization = `Bearer ${access}`;
+      return api(original);
+    } catch (refreshError) {
+      endSession();
+      return Promise.reject(refreshError);
+    }
+  },
+);
 
 export const logout = async () => {
   const refresh = localStorage.getItem('refreshToken');
@@ -54,7 +112,7 @@ export const apiError = (error, fallback = 'Something went wrong.') => {
       if (typeof value === 'string') return value;
     }
   }
-  if (error?.response?.status === 401) return 'Invalid username or password.';
+  if (error?.response?.status === 401) return 'Your session is invalid or has expired. Please sign in again.';
   if (error?.response?.status === 403) return 'Your account does not have permission to do that.';
   if (error?.response?.status) return `The server returned HTTP ${error.response.status}.`;
   if (error?.message === 'Network Error') return 'The server could not be reached.';
