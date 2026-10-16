@@ -244,7 +244,7 @@ class RoleAssignmentSerializer(serializers.Serializer):
                 and not caller.is_superuser
             )
             hr_assignable_roles = {
-                "HR_MANAGER", "CASHIER", "SUPERVISOR",
+                "CASHIER", "SUPERVISOR",
                 "INVENTORY_MANAGER", "ACCOUNTANT",
             }
             if is_limited_hr:
