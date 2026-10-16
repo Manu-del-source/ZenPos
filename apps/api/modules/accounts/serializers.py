@@ -230,6 +230,15 @@ class RoleAssignmentSerializer(serializers.Serializer):
                         f"Branch {branch_id} is not in your organization."
                     )
 
+            # A branch-posted manager may not grant permissions at head-office
+            # scope or at a branch they do not control.
+            caller_branch_ids = set(caller.branch_access.values_list("branch_id", flat=True))
+            if not caller.is_superuser and caller_branch_ids:
+                if branch_id is None or branch_id not in caller_branch_ids:
+                    raise serializers.ValidationError(
+                        "You may assign roles only within your assigned branches."
+                    )
+
             # HR may assign approved employee roles without personally
             # holding cashier/accounting permissions. The HR role is deliberately
             # limited to this allowlist; it cannot grant manager, owner, or
@@ -310,9 +319,19 @@ class BranchAccessAssignmentSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     f"Branch {branch_id} is not in your organization."
                 )
+            caller_branch_ids = set(caller.branch_access.values_list("branch_id", flat=True))
+            if not caller.is_superuser and caller_branch_ids and branch_id not in caller_branch_ids:
+                raise serializers.ValidationError(
+                    "You may assign staff only to your own branches."
+                )
             if entry["is_default"]:
                 defaults += 1
             resolved.append(entry)
+        caller_branch_ids = set(caller.branch_access.values_list("branch_id", flat=True))
+        if not caller.is_superuser and caller_branch_ids and not resolved:
+            raise serializers.ValidationError(
+                "You cannot remove all branch assignments from staff you manage."
+            )
         if defaults > 1:
             raise serializers.ValidationError("Only one branch may be the default.")
         return resolved
