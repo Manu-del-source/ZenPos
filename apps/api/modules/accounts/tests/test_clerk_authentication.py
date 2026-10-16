@@ -13,7 +13,6 @@ from rest_framework.test import APIRequestFactory
 from modules.accounts.authentication import ClerkJWTAuthentication
 from modules.accounts.models import User
 
-
 ISSUER = "https://clerk.example.test"
 
 
