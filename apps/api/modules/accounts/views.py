@@ -360,12 +360,25 @@ class UserViewSet(OrganizationScopedMixin, viewsets.ModelViewSet):
     queryset = User.objects.all()
 
     def get_queryset(self):
-        return (
+        queryset = (
             super()
             .get_queryset()
             .select_related("organization", "default_branch")
             .prefetch_related("user_roles__role__permissions", "branch_access")
         )
+
+        # Branch-posted managers and HR staff may manage accounts only for their
+        # own branches. During account setup, permit a roleless, unposted account
+        # to be found by set-branch-access so the first branch can be assigned.
+        caller = self.request.user
+        caller_branch_ids = list(caller.branch_access.values_list("branch_id", flat=True))
+        if caller_branch_ids and not getattr(caller, "is_superuser", False):
+            in_scope = Q(branch_access__branch_id__in=caller_branch_ids)
+            if self.action == "set_branch_access":
+                in_scope |= Q(branch_access__isnull=True, user_roles__isnull=True)
+            queryset = queryset.filter(in_scope).distinct()
+
+        return queryset
 
     def get_serializer_class(self):
         if self.action in {"create", "update", "partial_update"}:
