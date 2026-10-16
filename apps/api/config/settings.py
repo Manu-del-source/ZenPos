@@ -149,10 +149,30 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# Clerk authentication is opt-in. When disabled, the production SimpleJWT
+# authentication path is exactly the same as before.
+CLERK_AUTH_ENABLED = _env_bool("CLERK_AUTH_ENABLED", False)
+CLERK_ISSUER = os.environ.get("CLERK_ISSUER", "").rstrip("/")
+CLERK_JWKS_URL = os.environ.get(
+    "CLERK_JWKS_URL",
+    f"{CLERK_ISSUER}/.well-known/jwks.json" if CLERK_ISSUER else "",
+)
+CLERK_ALLOWED_PARTIES = _env_list("CLERK_ALLOWED_PARTIES")
+
+if CLERK_AUTH_ENABLED and not (CLERK_ISSUER and CLERK_JWKS_URL):
+    raise ImproperlyConfigured(
+        "CLERK_ISSUER and CLERK_JWKS_URL must be configured when CLERK_AUTH_ENABLED is true."
+    )
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
+        (
+            "modules.accounts.authentication.ClerkJWTAuthentication",
+        )
+        if CLERK_AUTH_ENABLED
+        else ()
+    )
+    + ("rest_framework_simplejwt.authentication.JWTAuthentication",),
     # Authorization is enforced by the project's own class, which requires an
     # authenticated user plus whatever permissions the view declares in
     # ``required_permissions``. A view that declares nothing still needs a login,
