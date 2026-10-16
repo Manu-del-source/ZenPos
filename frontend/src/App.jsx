@@ -90,8 +90,9 @@ const ProtectedRoute = ({ children }) => {
   return token ? children : <Navigate to="/login" replace />;
 };
 
-const PermissionRoute = ({ children, user, permission }) => {
-  const allowed = (Array.isArray(permission) ? permission : [permission]).some((code) => can(user, code));
+const PermissionRoute = ({ children, user, permission, excludeRoles = [] }) => {
+  const roleBlocked = !user?.is_superuser && excludeRoles.some((role) => (user?.roles || []).includes(role));
+  const allowed = !roleBlocked && (Array.isArray(permission) ? permission : [permission]).some((code) => can(user, code));
   return allowed ? children : <Navigate to={homePath(user) || '/login'} replace />;
 };
 
@@ -102,7 +103,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
   const allows = (item) => {
     if (item.platformOnly) return Boolean(user?.is_superuser);
     if (item.tenantOnly && user?.is_superuser) return false;
-    if ((item.excludeRoles || []).some((role) => (user?.roles || []).includes(role))) return false;
+    if (!user?.is_superuser && (item.excludeRoles || []).some((role) => (user?.roles || []).includes(role))) return false;
     const codes = Array.isArray(item.permission) ? item.permission : [item.permission];
     return codes.some((code) => can(user, code));
   };
@@ -245,14 +246,14 @@ const AppLayout = ({ token, user, handleLogout }) => {
             <Route path="/suppliers" element={<ProtectedRoute><PermissionRoute user={user} permission={["purchases.view", "purchases.create"]}><Suppliers /></PermissionRoute></ProtectedRoute>} />
             <Route path="/purchase-orders" element={<ProtectedRoute><PermissionRoute user={user} permission={["purchases.view", "purchases.create"]}><PurchaseOrders /></PermissionRoute></ProtectedRoute>} />
             <Route path="/goods-receiving" element={<ProtectedRoute><PermissionRoute user={user} permission={["purchases.view", "purchases.create"]}><GoodsReceiving /></PermissionRoute></ProtectedRoute>} />
-            <Route path="/stock-ledger" element={<ProtectedRoute><PermissionRoute user={user} permission="inventory.view"><StockLedger /></PermissionRoute></ProtectedRoute>} />
+            <Route path="/stock-ledger" element={<ProtectedRoute><PermissionRoute user={user} permission="inventory.view" excludeRoles={["CASHIER"]}><StockLedger /></PermissionRoute></ProtectedRoute>} />
             <Route path="/stock-counts" element={<ProtectedRoute><PermissionRoute user={user} permission="inventory.adjust"><StockCounts /></PermissionRoute></ProtectedRoute>} />
             <Route path="/transfers" element={<ProtectedRoute><PermissionRoute user={user} permission="inventory.transfer"><Transfers /></PermissionRoute></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute><PermissionRoute user={user} permission="customers.manage"><Customers /></PermissionRoute></ProtectedRoute>} />
             <Route path="/staff" element={<ProtectedRoute><PermissionRoute user={user} permission="users.manage"><Staff /></PermissionRoute></ProtectedRoute>} />
             <Route path="/access" element={<ProtectedRoute><PermissionRoute user={user} permission="users.manage"><AccessManagement /></PermissionRoute></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><PermissionRoute user={user} permission="reports.view"><Reports /></PermissionRoute></ProtectedRoute>} />
-            <Route path="/etims" element={<ProtectedRoute><PermissionRoute user={user} permission="sales.view">{(user?.roles || []).includes('CASHIER') ? <Navigate to={homePath(user) || '/pos'} replace /> : <Etims />}</PermissionRoute></ProtectedRoute>} />
+            <Route path="/etims" element={<ProtectedRoute><PermissionRoute user={user} permission="sales.view" excludeRoles={["CASHIER"]}><Etims /></PermissionRoute></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute><PermissionRoute user={user} permission="sales.view"><Orders /></PermissionRoute></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><PermissionRoute user={user} permission={["reports.view", "users.manage"]}><Dashboard /></PermissionRoute></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><PermissionRoute user={user} permission="settings.manage"><SettingsPage user={user} /></PermissionRoute></ProtectedRoute>} />
