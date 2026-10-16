@@ -244,13 +244,17 @@ class RoleAssignmentSerializer(serializers.Serializer):
                 and not caller.is_superuser
             )
             hr_assignable_roles = {
-                "CASHIER", "SUPERVISOR",
+                "MANAGER", "CASHIER", "SUPERVISOR",
                 "INVENTORY_MANAGER", "ACCOUNTANT",
             }
             if is_limited_hr:
                 if role.organization_id is not None or name not in hr_assignable_roles:
                     raise serializers.ValidationError(
                         f"HR cannot assign the '{name}' role. Ask the business owner."
+                    )
+                if name == "MANAGER" and branch_id is None:
+                    raise serializers.ValidationError(
+                        "HR may assign MANAGER only to explicitly selected branch(es)."
                     )
             elif not caller.is_superuser:
                 from .models import RolePermission, UserRole
