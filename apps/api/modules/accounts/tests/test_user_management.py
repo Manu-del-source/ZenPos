@@ -247,6 +247,34 @@ class TestRoleAssignment:
             )
             assert response.status_code == 400, (role_name, response.data)
 
+    def test_hr_cannot_add_permissions_to_a_custom_role(
+        self, manager, organization
+    ):
+        from rest_framework.test import APIClient
+
+        UserRole.objects.filter(user=manager).delete()
+        UserRole.objects.create(
+            user=manager,
+            role=Role.objects.get(name="HR_MANAGER", organization__isnull=True),
+        )
+        custom_role = Role.objects.create(
+            organization=organization,
+            name="LIMITED_CASHIER",
+            description="Owner-managed role",
+            is_system=False,
+        )
+        client = APIClient()
+        client.force_authenticate(manager)
+
+        response = client.post(
+            f"/api/v2/roles/{custom_role.id}/set-permissions/",
+            {"permission_codes": ["sales.create"]},
+            format="json",
+        )
+
+        assert response.status_code == 400, response.data
+        assert not custom_role.permissions.filter(code="sales.create").exists()
+
     def test_an_unknown_role_is_rejected(self, manager_client, cashier):
         response = manager_client.post(
             f"{USERS_URL}{cashier.id}/set-roles/",
