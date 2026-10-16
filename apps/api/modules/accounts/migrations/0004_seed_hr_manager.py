@@ -7,6 +7,7 @@ def seed_hr_manager(apps, schema_editor):
     RolePermission = apps.get_model("accounts", "RolePermission")
 
     manage_users = Permission.objects.get(code="users.manage")
+    view_branches = Permission.objects.get(code="branches.view")
     role, _ = Role.objects.update_or_create(
         organization=None,
         name="HR_MANAGER",
@@ -16,6 +17,7 @@ def seed_hr_manager(apps, schema_editor):
         },
     )
     RolePermission.objects.get_or_create(role=role, permission=manage_users)
+    RolePermission.objects.get_or_create(role=role, permission=view_branches)
 
 
 def remove_hr_manager(apps, schema_editor):
