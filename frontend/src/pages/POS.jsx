@@ -203,6 +203,7 @@ export default function POS() {
 
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All products');
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [customers, setCustomers] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -302,6 +303,10 @@ export default function POS() {
     const timer = setTimeout(() => loadProducts(searchTerm), 250);
     return () => clearTimeout(timer);
   }, [searchTerm, loadProducts]);
+
+  useEffect(() => {
+    setActiveCategory('All products');
+  }, [searchTerm]);
 
   useEffect(() => {
     if (branchId) localStorage.setItem('pos.branch', branchId);
@@ -775,9 +780,21 @@ export default function POS() {
     if (step === 'sale') searchRef.current?.focus();
   }, [step]);
 
+  const productCategories = useMemo(() => {
+    const names = [...new Set(products
+      .filter((product) => product.is_active !== false)
+      .map((product) => product.category_name)
+      .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    return ['All products', ...names];
+  }, [products]);
+
   const visibleProducts = useMemo(
-    () => products.filter((product) => product.is_active !== false),
-    [products],
+    () => products.filter((product) => {
+      if (product.is_active === false) return false;
+      if (activeCategory !== 'All products' && (product.category_name || '') !== activeCategory) return false;
+      return true;
+    }),
+    [products, activeCategory],
   );
 
   const branchOptions = useMemo(() => {
@@ -1153,13 +1170,24 @@ export default function POS() {
 
       <div className="grid gap-5">
         <section className="panel flex min-h-[620px] flex-col overflow-hidden">
-          <div className="border-b border-slate-800 p-4">
+          <div className="border-b border-slate-800 bg-slate-950/55 p-4 sm:p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold tracking-tight text-white">Product catalogue</h2>
+                <p className="mt-1 text-xs text-slate-500">Tap a product to add it to the active sale.</p>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-xs text-slate-400">
+                <Package size={15} />
+                <span>{visibleProducts.length} products</span>
+                {lineCount > 0 && <span className="ml-1 border-l border-slate-700 pl-2 font-semibold text-emerald-300">{lineCount} in sale</span>}
+              </div>
+            </div>
             <div className="relative">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 ref={searchRef}
-                className="input !py-4 pl-11 pr-12 text-base"
-                placeholder="Scan a barcode or type a product name or SKU…"
+                className="input !h-14 !rounded-xl !border-slate-700 !bg-slate-900/80 !py-4 pl-11 pr-12 text-base shadow-inner focus:!border-emerald-500/70"
+                placeholder="Scan barcode, or search by product name or SKU…"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 onKeyDown={(event) => {
@@ -1174,49 +1202,97 @@ export default function POS() {
                 type="button"
                 onClick={submitSearch}
                 aria-label="Look up barcode"
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-500 hover:bg-slate-800 hover:text-white"
+                title="Look up barcode"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 transition hover:border-emerald-500/50 hover:bg-slate-700 hover:text-white"
               >
                 <Barcode size={19} />
               </button>
             </div>
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Product categories">
+              {productCategories.map((category) => {
+                const selected = activeCategory === category;
+                const count = category === 'All products'
+                  ? products.filter((product) => product.is_active !== false).length
+                  : products.filter((product) => product.is_active !== false && (product.category_name || '') === category).length;
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setActiveCategory(category)}
+                    className={`shrink-0 rounded-lg border px-3.5 py-2 text-xs font-semibold transition ${selected
+                      ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200 shadow-sm'
+                      : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-700 hover:text-slate-200'}`}
+                  >
+                    {category}<span className={`ml-2 ${selected ? 'text-emerald-300' : 'text-slate-600'}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid flex-1 content-start gap-3 overflow-y-auto p-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid flex-1 content-start gap-3 overflow-y-auto bg-slate-950/20 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3 2xl:grid-cols-4">
             {loadingProducts ? (
-              <div className="col-span-full py-20 text-center text-slate-500">Loading catalogue…</div>
+              <div className="col-span-full grid min-h-64 place-items-center text-center text-slate-500">
+                <div><RefreshCw className="mx-auto mb-3 animate-spin text-emerald-400" size={25} /><p>Loading product catalogue…</p></div>
+              </div>
             ) : visibleProducts.length === 0 ? (
-              <div className="col-span-full py-16 text-center">
-                <Package className="mx-auto mb-3 text-slate-600" size={36} />
-                <p className="font-semibold text-slate-300">
-                  {searchTerm ? 'No products match that search' : 'The catalogue is empty'}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {searchTerm ? 'Check the spelling, or scan the barcode again.' : 'Add products in Inventory to start selling.'}
-                </p>
+              <div className="col-span-full grid min-h-64 place-items-center p-8 text-center">
+                <div>
+                  <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-slate-800 bg-slate-900"><Package className="text-slate-500" size={25} /></div>
+                  <p className="font-semibold text-slate-200">
+                    {searchTerm ? 'No products match that search' : 'No products in this category'}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {searchTerm ? 'Check the spelling, or scan the barcode again.' : 'Choose another category or add products in Inventory.'}
+                  </p>
+                  {activeCategory !== 'All products' && <button className="mt-4 text-sm font-semibold text-emerald-300 hover:text-emerald-200" onClick={() => setActiveCategory('All products')}>Show all products</button>}
+                </div>
               </div>
             ) : (
               visibleProducts.map((product) => {
                 const stock = Number(product.stock_level || 0);
                 const tracked = product.track_inventory;
                 const out = tracked && stock <= 0;
+                const low = tracked && !out && stock <= Number(product.low_stock_threshold ?? 0);
                 const inCart = getQuantityFor(product.id);
                 return (
                   <button
                     key={product.id}
+                    type="button"
                     disabled={out}
                     onClick={() => addProduct(product)}
-                    className={`product-tile ${out ? 'product-tile--out' : ''} ${inCart ? 'product-tile--in-cart' : ''}`}
+                    className={`group relative flex min-h-[205px] flex-col overflow-hidden rounded-xl border p-3.5 text-left transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${out
+                      ? 'cursor-not-allowed border-slate-800/70 bg-slate-950/40 opacity-60'
+                      : inCart
+                        ? 'border-emerald-400/50 bg-emerald-400/[0.055] shadow-[0_0_0_1px_rgba(52,211,153,0.08)]'
+                        : 'border-slate-800 bg-slate-900/65 hover:-translate-y-0.5 hover:border-slate-700 hover:bg-slate-900 hover:shadow-lg hover:shadow-black/20'}`}
                   >
-                    <div className="mb-4 flex items-start justify-between gap-2">
-                      <span className="truncate font-mono text-[11px] text-slate-500">{product.sku || '—'}</span>
-                      {inCart ? <span className="cart-chip">{inCart}</span> : <Plus size={16} className="shrink-0 text-slate-600" />}
-                    </div>
-                    <p className="min-h-10 text-left font-semibold text-slate-100">{product.name}</p>
-                    <div className="mt-3 flex items-end justify-between gap-2">
-                      <span className="text-lg font-bold text-white">KES {money(product.price)}</span>
-                      <span className={`text-xs font-medium ${out ? 'text-red-400' : stock <= Number(product.low_stock_threshold ?? 0) ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        {tracked ? (out ? 'Out of stock' : `${stock} in stock`) : 'Not stocked'}
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <span className="max-w-[75%] truncate rounded-md border border-slate-800 bg-slate-950/70 px-2 py-1 font-mono text-[10px] tracking-wide text-slate-400">{product.sku || 'NO SKU'}</span>
+                      <span className={`inline-flex h-7 min-w-7 items-center justify-center rounded-lg text-xs font-bold ${inCart ? 'bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'}`}>
+                        {inCart || <Plus size={15} />}
                       </span>
+                    </div>
+                    <div className={`mb-3 grid h-20 place-items-center overflow-hidden rounded-lg border ${out ? 'border-slate-800 bg-slate-950/70' : inCart ? 'border-emerald-400/15 bg-gradient-to-br from-emerald-500/10 to-slate-950' : 'border-slate-800 bg-gradient-to-br from-slate-800/80 via-slate-900 to-slate-950'}`}>
+                      <div className="flex flex-col items-center gap-1">
+                        <Package size={25} strokeWidth={1.5} className={out ? 'text-slate-600' : inCart ? 'text-emerald-300' : 'text-slate-500 group-hover:text-slate-300'} />
+                        <span className="max-w-full truncate px-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-600">{product.category_name || product.brand_name || 'Product'}</span>
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-100">{product.name}</p>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="text-base font-extrabold tracking-tight text-white">KES {money(product.price)}</span>
+                        <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${out ? 'bg-red-500/10 text-red-300' : low ? 'bg-amber-400/10 text-amber-300' : tracked ? 'bg-emerald-400/10 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                          {tracked ? (out ? 'Out of stock' : low ? `Low · ${stock}` : `${stock} left`) : 'Available'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={`mt-3 flex items-center justify-between border-t pt-2.5 text-[11px] font-semibold ${inCart ? 'border-emerald-400/15 text-emerald-200' : 'border-slate-800 text-slate-500 group-hover:text-slate-300'}`}>
+                      <span>{inCart ? `${inCart} in current sale` : out ? 'Unavailable to sell' : 'Tap to add'}</span>
+                      {!out && <span className="inline-flex items-center gap-1">{inCart ? 'Add another' : 'Add'} <Plus size={12} /></span>}
                     </div>
                   </button>
                 );
