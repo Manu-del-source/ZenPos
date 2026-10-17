@@ -486,7 +486,11 @@ def match_till_transaction(request):
             outstanding = outstanding_for(sale)
             if outstanding <= 0 or incoming.amount > outstanding:
                 return Response({"detail": f"Receipt amount must not exceed the outstanding balance of {outstanding}."}, status=400)  # noqa: E501
-            if Payment.objects.filter(provider_reference=incoming.receipt_number).exclude(status=Payment.Status.REFUNDED).exists():  # noqa: E501
+            # A refund reverses money movement; it does not make the receipt reusable.
+            receipt_exists = Payment.objects.filter(
+                provider_reference=incoming.receipt_number
+            ).exists()
+            if receipt_exists:
                 incoming.status = IncomingTillTransaction.Status.DUPLICATE_REVIEW
                 incoming.save(update_fields=["status", "updated_at"])
                 return Response({"detail": "This M-Pesa receipt is already recorded on another payment and requires review."}, status=409)  # noqa: E501
