@@ -1,4 +1,8 @@
-from django.db import transaction
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+
+from django.conf import settings
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -8,11 +12,12 @@ from rest_framework.throttling import AnonRateThrottle
 
 from modules.core.audit import record_audit
 from modules.core.mixins import BranchScopedMixin
+from modules.accounts.permissions import user_has_permission
 from modules.sales.models import Sale
 from modules.sales.services import record_sale_cash_in, reserve_sale_stock
 
 from .base import PaymentCallbackError, PaymentGatewayError
-from .models import Payment
+from .models import IncomingTillTransaction, MerchantTillAccount, Payment
 from .serializers import InitiatePaymentSerializer, PaymentSerializer
 from .services import (
     STK_RECONCILE_AFTER,
@@ -254,3 +259,277 @@ def mpesa_callback(request, secret: str):
         raise ValidationError({"detail": "Callback rejected."}) from exc
 
     return Response(result, status=200)
+
+
+# C2B manual Till reconciliation ------------------------------------------------
+
+def _c2b_response(code=0, description="Accepted"):
+    # Daraja C2B expects this acknowledgement shape for validation/confirmation.
+    return Response({"ResultCode": code, "ResultDesc": description}, status=200)
+
+
+def _c2b_transaction_fields(payload):
+    """Validate and normalize the C2B fields without trusting client metadata."""
+    if not isinstance(payload, dict):
+        raise ValueError("Callback must be a JSON object.")
+    receipt = str(payload.get("TransID") or "").strip()
+    shortcode = str(payload.get("BusinessShortCode") or "").strip()
+    try:
+        amount = Decimal(str(payload.get("TransAmount"))).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError("Invalid transaction amount.") from None
+    if not receipt or len(receipt) > 64 or not shortcode or amount <= 0:
+        raise ValueError("Required C2B transaction fields are missing.")
+    timestamp_text = str(payload.get("TransTime") or "").strip()
+    try:
+        transaction_time = datetime.strptime(timestamp_text, "%Y%m%d%H%M%S")
+    except ValueError:
+        raise ValueError("Invalid transaction timestamp.") from None
+    if timezone.is_naive(transaction_time):
+        transaction_time = timezone.make_aware(transaction_time, timezone.get_current_timezone())
+    return {
+        "receipt_number": receipt,
+        "shortcode": shortcode,
+        "amount": amount,
+        "transaction_time": transaction_time,
+    }
+
+
+def _c2b_account(shortcode):
+    environment = getattr(settings, "MPESA_C2B_ENV", settings.MPESA_ENV)
+    return MerchantTillAccount.objects.filter(
+        shortcode=shortcode, environment=environment, is_active=True,
+    ).first()
+
+
+class C2BCallbackRateThrottle(AnonRateThrottle):
+    scope = "mpesa_c2b_callback"
+
+
+@api_view(["POST"])
+@permission_classes([])
+@throttle_classes([C2BCallbackRateThrottle])
+def mpesa_c2b_validation(request, secret: str):
+    """Safaricom C2B validation URL; rejects unconfigured or malformed receipts."""
+    expected_secret = getattr(settings, "MPESA_C2B_CALLBACK_SECRET", "")
+    if not expected_secret or secret != expected_secret:
+        raise NotFound("Unknown callback address.")
+    try:
+        fields = _c2b_transaction_fields(request.data)
+    except ValueError:
+        return _c2b_response(1, "Rejected: invalid transaction details.")
+    if not _c2b_account(fields["shortcode"]):
+        return _c2b_response(1, "Rejected: merchant shortcode is not configured.")
+    return _c2b_response()
+
+
+@api_view(["POST"])
+@permission_classes([])
+@throttle_classes([C2BCallbackRateThrottle])
+def mpesa_c2b_confirmation(request, secret: str):
+    """Persist verified C2B confirmation before acknowledging Safaricom."""
+    expected_secret = getattr(settings, "MPESA_C2B_CALLBACK_SECRET", "")
+    if not expected_secret or secret != expected_secret:
+        raise NotFound("Unknown callback address.")
+    try:
+        fields = _c2b_transaction_fields(request.data)
+    except ValueError:
+        return _c2b_response(1, "Rejected: invalid transaction details.")
+    account = _c2b_account(fields["shortcode"])
+    if account is None:
+        return _c2b_response(1, "Rejected: merchant shortcode is not configured.")
+
+    payload = request.data
+    try:
+        with transaction.atomic():
+            transaction_row, created = IncomingTillTransaction.objects.get_or_create(
+                account=account,
+                receipt_number=fields["receipt_number"],
+                defaults={
+                    "amount": fields["amount"],
+                    "transaction_time": fields["transaction_time"],
+                    "currency": "KES",
+                    "payer_phone": str(payload.get("MSISDN") or "")[:32],
+                    "payer_first_name": str(payload.get("FirstName") or "")[:80],
+                    "payer_middle_name": str(payload.get("MiddleName") or "")[:80],
+                    "payer_last_name": str(payload.get("LastName") or "")[:80],
+                    "bill_reference": str(payload.get("BillRefNumber") or "")[:64],
+                    "third_party_transaction_id": str(payload.get("ThirdPartyTransID") or "")[:64],
+                    "raw_payload": payload,
+                },
+            )
+            if not created and (
+                transaction_row.amount != fields["amount"]
+                or transaction_row.transaction_time != fields["transaction_time"]
+            ):
+                transaction_row.status = IncomingTillTransaction.Status.DUPLICATE_REVIEW
+                transaction_row.save(update_fields=["status", "updated_at"])
+                record_audit(
+                    action="mpesa.till_duplicate_conflict",
+                    entity_type="incoming_till_transaction",
+                    entity_id=transaction_row.pk,
+                    branch=account.branch,
+                    after={"receipt_number": fields["receipt_number"], "shortcode": account.shortcode},
+                )
+    except IntegrityError:
+        # A concurrent duplicate callback is already represented by the unique
+        # (account, receipt_number) constraint. Safaricom retries are harmless.
+        pass
+    return _c2b_response()
+
+
+def _mask_phone(value):
+    digits = str(value or "")
+    if len(digits) <= 4:
+        return "••••" if digits else ""
+    return f"{digits[:3]}••••{digits[-3:]}"
+
+
+@api_view(["GET"])
+def unmatched_till_transactions(request):
+    """List unmatched incoming Till receipts scoped to the signed-in tenant."""
+    user = request.user
+    if not user_has_permission(user, "sales.view"):
+        return Response({"detail": "You do not have permission to view sales."}, status=403)
+    organization = getattr(user, "organization", None)
+    if organization is None:
+        return Response({"detail": "No organization is assigned to this account."}, status=403)
+
+    queryset = IncomingTillTransaction.objects.select_related("account", "account__branch").filter(
+        account__organization=organization,
+        status=IncomingTillTransaction.Status.UNMATCHED,
+        currency="KES",
+    )
+    branch_ids = list(user.branch_access.values_list("branch_id", flat=True))
+    if branch_ids:
+        queryset = queryset.filter(models.Q(account__branch__isnull=True) | models.Q(account__branch_id__in=branch_ids))
+    sale_id = request.query_params.get("sale")
+    if sale_id:
+        try:
+            sale = Sale.objects.get(pk=sale_id, organization=organization, status=Sale.Status.COMPLETED)
+        except (Sale.DoesNotExist, ValueError):
+            return Response({"detail": "Sale not found."}, status=404)
+        if branch_ids and sale.branch_id and sale.branch_id not in branch_ids:
+            return Response({"detail": "You do not have access to this sale's branch."}, status=403)
+        queryset = queryset.filter(amount=outstanding_for(sale))
+        if sale.branch_id:
+            queryset = queryset.filter(models.Q(account__branch__isnull=True) | models.Q(account__branch_id=sale.branch_id))
+    amount = request.query_params.get("amount")
+    if amount:
+        try:
+            amount_decimal = Decimal(amount).quantize(Decimal("0.01"))
+        except (InvalidOperation, ValueError):
+            return Response({"detail": "Amount must be a valid KES amount."}, status=400)
+        queryset = queryset.filter(amount=amount_decimal)
+
+    rows = []
+    for item in queryset.order_by("-transaction_time")[:100]:
+        rows.append({
+            "id": str(item.pk),
+            "receipt_number": item.receipt_number,
+            "amount": str(item.amount),
+            "currency": item.currency,
+            "transaction_time": item.transaction_time.isoformat(),
+            "payer_phone": _mask_phone(item.payer_phone),
+            "payer_name": " ".join(part for part in (item.payer_first_name, item.payer_middle_name, item.payer_last_name) if part),
+            "bill_reference": item.bill_reference,
+            "shortcode": item.account.shortcode,
+            "branch": item.account.branch.name if item.account.branch_id else None,
+            "status": item.status,
+        })
+    return Response({"results": rows, "count": len(rows)})
+
+
+@api_view(["POST"])
+def match_till_transaction(request):
+    """Atomically assign one confirmed incoming receipt to one eligible sale."""
+    transaction_id = request.data.get("transaction_id")
+    sale_id = request.data.get("sale_id")
+    if not transaction_id or not sale_id:
+        return Response({"detail": "transaction_id and sale_id are required."}, status=400)
+
+    user = request.user
+    organization = getattr(user, "organization", None)
+    if organization is None:
+        return Response({"detail": "No organization is assigned to this account."}, status=403)
+
+    try:
+        with transaction.atomic():
+            try:
+                sale = Sale.objects.select_for_update().get(
+                    pk=sale_id, organization=organization, status=Sale.Status.COMPLETED,
+                )
+            except (Sale.DoesNotExist, ValueError):
+                return Response({"detail": "Eligible sale not found."}, status=404)
+            if not user_has_permission(user, "sales.create", branch_id=sale.branch_id):
+                return Response({"detail": "You do not have permission to match payments for this sale."}, status=403)
+            branch_ids = list(user.branch_access.values_list("branch_id", flat=True))
+            if branch_ids and sale.branch_id and sale.branch_id not in branch_ids:
+                return Response({"detail": "You do not have access to this sale's branch."}, status=403)
+
+            try:
+                incoming = IncomingTillTransaction.objects.select_for_update().select_related("account").get(
+                    pk=transaction_id, account__organization=organization,
+                )
+            except (IncomingTillTransaction.DoesNotExist, ValueError):
+                return Response({"detail": "Incoming Till transaction not found."}, status=404)
+
+            if incoming.status != IncomingTillTransaction.Status.UNMATCHED:
+                return Response({"detail": "This receipt has already been assigned or requires review."}, status=409)
+            if incoming.currency != "KES" or incoming.amount <= 0:
+                return Response({"detail": "Only positive KES transactions can be matched."}, status=400)
+            if incoming.account.branch_id and incoming.account.branch_id != sale.branch_id:
+                return Response({"detail": "The receipt belongs to a different branch."}, status=403)
+            if branch_ids and incoming.account.branch_id and incoming.account.branch_id not in branch_ids:
+                return Response({"detail": "You do not have access to this receipt's branch."}, status=403)
+
+            outstanding = outstanding_for(sale)
+            if outstanding <= 0 or incoming.amount > outstanding:
+                return Response({"detail": f"Receipt amount must not exceed the outstanding balance of {outstanding}."}, status=400)
+            if Payment.objects.filter(provider_reference=incoming.receipt_number).exclude(status=Payment.Status.REFUNDED).exists():
+                incoming.status = IncomingTillTransaction.Status.DUPLICATE_REVIEW
+                incoming.save(update_fields=["status", "updated_at"])
+                return Response({"detail": "This M-Pesa receipt is already recorded on another payment and requires review."}, status=409)
+
+            payment = Payment.objects.create(
+                sale=sale,
+                method=Payment.Method.MPESA,
+                amount=incoming.amount,
+                currency="KES",
+                status=Payment.Status.COMPLETED,
+                provider_reference=incoming.receipt_number,
+                received_by=user,
+            )
+            incoming.status = IncomingTillTransaction.Status.MATCHED
+            incoming.matched_sale = sale
+            incoming.matched_payment = payment
+            incoming.matched_by = user
+            incoming.matched_at = timezone.now()
+            incoming.save(update_fields=["status", "matched_sale", "matched_payment", "matched_by", "matched_at", "updated_at"])
+            record_audit(
+                action="payment.till_matched",
+                entity_type="incoming_till_transaction",
+                entity_id=incoming.pk,
+                actor=user,
+                request=request,
+                branch=sale.branch,
+                after={
+                    "sale_id": str(sale.pk),
+                    "payment_id": str(payment.pk),
+                    "receipt_number": incoming.receipt_number,
+                    "amount": str(incoming.amount),
+                    "outstanding_after": str(outstanding - incoming.amount),
+                },
+            )
+    except IntegrityError:
+        return Response({"detail": "This receipt was matched by another request. Refresh and try again."}, status=409)
+
+    return Response({
+        "matched": True,
+        "transaction_id": str(incoming.pk),
+        "receipt_number": incoming.receipt_number,
+        "payment_id": str(payment.pk),
+        "sale_id": str(sale.pk),
+        "amount": str(payment.amount),
+        "outstanding_after": str(outstanding - payment.amount),
+    }, status=200)
