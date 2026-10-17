@@ -24,6 +24,8 @@ import AccessManagement from './pages/AccessManagement';
 import Reports from './pages/Reports';
 import Etims from './pages/Etims';
 import Landing from './pages/Landing';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsAndConditions from './pages/TermsAndConditions';
 import SettingsPage from './pages/Settings';
 import SuperAdmin from './pages/SuperAdmin';
 import { logout } from './services/api';
@@ -101,6 +103,7 @@ const PermissionRoute = ({ children, user, permission, excludeRoles = [] }) => {
 const AppLayout = ({ token, user, handleLogout }) => {
   const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isPublicPage = pathname === '/' || pathname === '/login' || pathname === '/privacy' || pathname === '/terms';
 
   const allows = (item) => {
     if (item.platformOnly) return Boolean(user?.is_superuser);
@@ -111,7 +114,7 @@ const AppLayout = ({ token, user, handleLogout }) => {
   };
   const items = NAV_ITEMS.filter(allows);
   const management = MANAGEMENT_ITEMS.filter(allows);
-  const showAppNav = Boolean(token) && pathname !== '/' && pathname !== '/login';
+  const showAppNav = Boolean(token) && !isPublicPage;
   const current = [...NAV_ITEMS, ...MANAGEMENT_ITEMS].find(
     (item) => pathname === item.to || pathname.startsWith(`${item.to}/`),
   );
@@ -140,6 +143,8 @@ const AppLayout = ({ token, user, handleLogout }) => {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Landing />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsAndConditions />} />
           <Route path="*" element={<Navigate to={token ? '/pos' : '/login'} replace />} />
         </Routes>
       </main>
