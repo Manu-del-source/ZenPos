@@ -737,7 +737,6 @@ export default function POS() {
       }
       if (event.key === 'Escape') {
         if (showShortcuts) { setShowShortcuts(false); return; }
-        if (cartOpen) { setCartOpen(false); return; }
         if (isTypingTarget(event.target) && step === 'sale') { setSearchTerm(''); return; }
         if (step === 'review') { setStep('sale'); return; }
         if (step === 'payment') {
@@ -774,7 +773,7 @@ export default function POS() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, cart.length, method, outcome, showShortcuts, cartOpen, cash, total, busy, phone]);
+  }, [step, cart.length, method, outcome, showShortcuts, cash, total, busy, phone]);
 
   useEffect(() => {
     if (step === 'sale') searchRef.current?.focus();
