@@ -411,7 +411,7 @@ def unmatched_till_transactions(request):
             return Response({"detail": "Sale not found."}, status=404)
         if branch_ids and sale.branch_id and sale.branch_id not in branch_ids:
             return Response({"detail": "You do not have access to this sale's branch."}, status=403)
-        queryset = queryset.filter(amount=outstanding_for(sale))
+        queryset = queryset.filter(amount__lte=outstanding_for(sale))
         if sale.branch_id:
             queryset = queryset.filter(models.Q(account__branch__isnull=True) | models.Q(account__branch_id=sale.branch_id))
     amount = request.query_params.get("amount")
