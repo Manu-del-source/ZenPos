@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from . import views
+from modules.payments.views import mpesa_c2b_confirmation, mpesa_c2b_validation
 
 # Each module owns its own router and urlconf. They are mounted under a shared
 # prefix rather than each declaring its own, so the API surface stays in one
@@ -32,4 +33,6 @@ urlpatterns = [
     # by a secret path segment rather than a permission, and Safaricom is
     # given the full URL. See modules/payments/views.py (ADR-0012).
     path("callbacks/", include("modules.payments.mpesa_urls")),
+    path("callbacks/mpesa/c2b/<str:secret>/validation/", mpesa_c2b_validation, name="mpesa-c2b-validation"),
+    path("callbacks/mpesa/c2b/<str:secret>/confirmation/", mpesa_c2b_confirmation, name="mpesa-c2b-confirmation"),
 ]
