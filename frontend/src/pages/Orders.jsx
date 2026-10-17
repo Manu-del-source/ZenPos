@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Ban, ChevronLeft, ChevronRight, Eye, FileText, Printer, RefreshCw, Search, X } from 'lucide-react';
+import { Ban, CheckCircle2, ChevronLeft, ChevronRight, Eye, FileText, Printer, RefreshCw, Search, Smartphone, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { apiError } from '../services/api';
 import { can } from '../App';
@@ -41,6 +41,10 @@ export default function Orders({ user: userProp }) {
   const [voiding, setVoiding] = useState(false);
   const [returning, setReturning] = useState(null);
   const [returnBusy, setReturnBusy] = useState(false);
+  const [showTillMatch, setShowTillMatch] = useState(false);
+  const [tillTransactions, setTillTransactions] = useState([]);
+  const [tillLoading, setTillLoading] = useState(false);
+  const [matchingReceipt, setMatchingReceipt] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,6 +77,45 @@ export default function Orders({ user: userProp }) {
       setSelected(data);
     } catch (error) {
       toast.error(apiError(error, 'Could not load the sale.'));
+    }
+  };
+
+  const loadTillTransactions = async (sale) => {
+    if (!sale?.id) return;
+    setTillLoading(true);
+    try {
+      const { data } = await api.get('/mpesa/till-transactions/', { params: { sale: sale.id } });
+      setTillTransactions(data?.results || []);
+    } catch (error) {
+      toast.error(apiError(error, 'Could not load unmatched Till payments.'));
+    } finally {
+      setTillLoading(false);
+    }
+  };
+
+  const openTillMatch = async () => {
+    setShowTillMatch(true);
+    await loadTillTransactions(selected);
+  };
+
+  const matchTillReceipt = async (receipt) => {
+    if (!selected?.id || !receipt?.id) return;
+    setMatchingReceipt(receipt.id);
+    try {
+      await api.post('/mpesa/till-transactions/match/', {
+        transaction_id: receipt.id,
+        sale_id: selected.id,
+      });
+      toast.success(`M-Pesa receipt ${receipt.receipt_number} matched to ${selected.sale_number}.`);
+      setShowTillMatch(false);
+      const { data } = await api.get(`/sales/${selected.id}/`);
+      setSelected(data);
+      await load();
+    } catch (error) {
+      toast.error(apiError(error, 'Could not match this Till payment.'));
+      await loadTillTransactions(selected);
+    } finally {
+      setMatchingReceipt(null);
     }
   };
 
@@ -289,6 +332,51 @@ export default function Orders({ user: userProp }) {
                 </div>
               )}
 
+              {showTillMatch && (
+                <section className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.04] p-4" aria-label="Match Till payment">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold text-slate-100">Match Till Payment</h3>
+                      <p className="mt-1 text-xs text-slate-400">Select the exact receipt from Safaricom's confirmed incoming payments. Amount alone does not identify a customer.</p>
+                    </div>
+                    <button className="btn-secondary !px-2 !py-1.5" onClick={() => setShowTillMatch(false)} aria-label="Close Till matching"><X size={15} /></button>
+                  </div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-sm text-slate-300">Outstanding balance <strong className="text-white">{money(Math.max(0, Number(selected.total_amount || 0) - (selected.payments || []).filter((payment) => payment.status === 'COMPLETED').reduce((sum, payment) => sum + Number(payment.amount || 0), 0)))}</strong></p>
+                    <button className="btn-secondary !px-3 !py-2" onClick={() => loadTillTransactions(selected)} disabled={tillLoading}>
+                      <RefreshCw size={14} className={tillLoading ? 'animate-spin' : ''} /> Refresh
+                    </button>
+                  </div>
+                  {tillLoading ? (
+                    <p className="py-5 text-center text-sm text-slate-400">Loading confirmed receipts…</p>
+                  ) : tillTransactions.length === 0 ? (
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-center">
+                      <Smartphone size={22} className="mx-auto mb-2 text-slate-500" />
+                      <p className="text-sm font-semibold text-slate-200">No matching Till payments found</p>
+                      <p className="mt-1 text-xs text-slate-500">Keep the sale unpaid and refresh after the customer’s payment appears in Safaricom’s C2B confirmation feed.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {tillTransactions.map((receipt) => (
+                        <div key={receipt.id} className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-sm font-bold text-white">{receipt.receipt_number}</span>
+                              <span className="text-sm font-bold text-emerald-300">KES {money(receipt.amount)}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-400">{new Date(receipt.transaction_time).toLocaleString('en-KE')} · {receipt.payer_phone || 'Phone unavailable'}</p>
+                            <p className="mt-1 text-xs text-slate-500">Bill reference: {receipt.bill_reference || 'Not provided'}{receipt.payer_name ? ` · ${receipt.payer_name}` : ''}</p>
+                          </div>
+                          <button className="btn-primary shrink-0 !px-3 !py-2" disabled={Boolean(matchingReceipt)} onClick={() => matchTillReceipt(receipt)}>
+                            <CheckCircle2 size={15} /> {matchingReceipt === receipt.id ? 'Matching…' : 'Match this receipt'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
               {selected.status === 'VOIDED' && (
                 <div className="rounded-xl border border-red-900/50 bg-red-500/10 p-4 text-sm text-red-200">
                   Voided{selected.voided_by_name ? ` by ${selected.voided_by_name}` : ''}
@@ -298,6 +386,11 @@ export default function Orders({ user: userProp }) {
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
                 <div className="flex gap-2">
+                  {selected.status === 'COMPLETED' && can(user, 'sales.create') && (
+                    <button className="btn-secondary !border-amber-500/30 !text-amber-200" onClick={openTillMatch}>
+                      <Smartphone size={16} /> Match Till Payment
+                    </button>
+                  )}
                   <button className="btn-secondary" onClick={() => printReceipt(selected.id)}>
                     <Printer size={16} /> Print receipt
                   </button>
