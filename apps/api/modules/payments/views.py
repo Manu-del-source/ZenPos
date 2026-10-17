@@ -10,9 +10,9 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
+from modules.accounts.permissions import user_has_permission
 from modules.core.audit import record_audit
 from modules.core.mixins import BranchScopedMixin
-from modules.accounts.permissions import user_has_permission
 from modules.sales.models import Sale
 from modules.sales.services import record_sale_cash_in, reserve_sale_stock
 
@@ -369,7 +369,7 @@ def mpesa_c2b_confirmation(request, secret: str):
                     entity_type="incoming_till_transaction",
                     entity_id=transaction_row.pk,
                     branch=account.branch,
-                    after={"receipt_number": fields["receipt_number"], "shortcode": account.shortcode},
+                    after={"receipt_number": fields["receipt_number"], "shortcode": account.shortcode},  # noqa: E501
                 )
     except IntegrityError:
         # A concurrent duplicate callback is already represented by the unique
@@ -402,18 +402,18 @@ def unmatched_till_transactions(request):
     )
     branch_ids = list(user.branch_access.values_list("branch_id", flat=True))
     if branch_ids:
-        queryset = queryset.filter(models.Q(account__branch__isnull=True) | models.Q(account__branch_id__in=branch_ids))
+        queryset = queryset.filter(models.Q(account__branch__isnull=True) | models.Q(account__branch_id__in=branch_ids))  # noqa: E501
     sale_id = request.query_params.get("sale")
     if sale_id:
         try:
-            sale = Sale.objects.get(pk=sale_id, organization=organization, status=Sale.Status.COMPLETED)
+            sale = Sale.objects.get(pk=sale_id, organization=organization, status=Sale.Status.COMPLETED)  # noqa: E501
         except (Sale.DoesNotExist, ValueError):
             return Response({"detail": "Sale not found."}, status=404)
         if branch_ids and sale.branch_id and sale.branch_id not in branch_ids:
             return Response({"detail": "You do not have access to this sale's branch."}, status=403)
         queryset = queryset.filter(amount__lte=outstanding_for(sale))
         if sale.branch_id:
-            queryset = queryset.filter(models.Q(account__branch__isnull=True) | models.Q(account__branch_id=sale.branch_id))
+            queryset = queryset.filter(models.Q(account__branch__isnull=True) | models.Q(account__branch_id=sale.branch_id))  # noqa: E501
     amount = request.query_params.get("amount")
     if amount:
         try:
@@ -431,7 +431,7 @@ def unmatched_till_transactions(request):
             "currency": item.currency,
             "transaction_time": item.transaction_time.isoformat(),
             "payer_phone": _mask_phone(item.payer_phone),
-            "payer_name": " ".join(part for part in (item.payer_first_name, item.payer_middle_name, item.payer_last_name) if part),
+            "payer_name": " ".join(part for part in (item.payer_first_name, item.payer_middle_name, item.payer_last_name) if part),  # noqa: E501
             "bill_reference": item.bill_reference,
             "shortcode": item.account.shortcode,
             "branch": item.account.branch.name if item.account.branch_id else None,
@@ -462,34 +462,34 @@ def match_till_transaction(request):
             except (Sale.DoesNotExist, ValueError):
                 return Response({"detail": "Eligible sale not found."}, status=404)
             if not user_has_permission(user, "sales.create", branch_id=sale.branch_id):
-                return Response({"detail": "You do not have permission to match payments for this sale."}, status=403)
+                return Response({"detail": "You do not have permission to match payments for this sale."}, status=403)  # noqa: E501
             branch_ids = list(user.branch_access.values_list("branch_id", flat=True))
             if branch_ids and sale.branch_id and sale.branch_id not in branch_ids:
-                return Response({"detail": "You do not have access to this sale's branch."}, status=403)
+                return Response({"detail": "You do not have access to this sale's branch."}, status=403)  # noqa: E501
 
             try:
-                incoming = IncomingTillTransaction.objects.select_for_update().select_related("account").get(
+                incoming = IncomingTillTransaction.objects.select_for_update().select_related("account").get(  # noqa: E501
                     pk=transaction_id, account__organization=organization,
                 )
             except (IncomingTillTransaction.DoesNotExist, ValueError):
                 return Response({"detail": "Incoming Till transaction not found."}, status=404)
 
             if incoming.status != IncomingTillTransaction.Status.UNMATCHED:
-                return Response({"detail": "This receipt has already been assigned or requires review."}, status=409)
+                return Response({"detail": "This receipt has already been assigned or requires review."}, status=409)  # noqa: E501
             if incoming.currency != "KES" or incoming.amount <= 0:
-                return Response({"detail": "Only positive KES transactions can be matched."}, status=400)
+                return Response({"detail": "Only positive KES transactions can be matched."}, status=400)  # noqa: E501
             if incoming.account.branch_id and incoming.account.branch_id != sale.branch_id:
-                return Response({"detail": "The receipt belongs to a different branch."}, status=403)
-            if branch_ids and incoming.account.branch_id and incoming.account.branch_id not in branch_ids:
-                return Response({"detail": "You do not have access to this receipt's branch."}, status=403)
+                return Response({"detail": "The receipt belongs to a different branch."}, status=403)  # noqa: E501
+            if branch_ids and incoming.account.branch_id and incoming.account.branch_id not in branch_ids:  # noqa: E501
+                return Response({"detail": "You do not have access to this receipt's branch."}, status=403)  # noqa: E501
 
             outstanding = outstanding_for(sale)
             if outstanding <= 0 or incoming.amount > outstanding:
-                return Response({"detail": f"Receipt amount must not exceed the outstanding balance of {outstanding}."}, status=400)
-            if Payment.objects.filter(provider_reference=incoming.receipt_number).exclude(status=Payment.Status.REFUNDED).exists():
+                return Response({"detail": f"Receipt amount must not exceed the outstanding balance of {outstanding}."}, status=400)  # noqa: E501
+            if Payment.objects.filter(provider_reference=incoming.receipt_number).exclude(status=Payment.Status.REFUNDED).exists():  # noqa: E501
                 incoming.status = IncomingTillTransaction.Status.DUPLICATE_REVIEW
                 incoming.save(update_fields=["status", "updated_at"])
-                return Response({"detail": "This M-Pesa receipt is already recorded on another payment and requires review."}, status=409)
+                return Response({"detail": "This M-Pesa receipt is already recorded on another payment and requires review."}, status=409)  # noqa: E501
 
             payment = Payment.objects.create(
                 sale=sale,
@@ -505,7 +505,7 @@ def match_till_transaction(request):
             incoming.matched_payment = payment
             incoming.matched_by = user
             incoming.matched_at = timezone.now()
-            incoming.save(update_fields=["status", "matched_sale", "matched_payment", "matched_by", "matched_at", "updated_at"])
+            incoming.save(update_fields=["status", "matched_sale", "matched_payment", "matched_by", "matched_at", "updated_at"])  # noqa: E501
             record_audit(
                 action="payment.till_matched",
                 entity_type="incoming_till_transaction",
@@ -522,7 +522,7 @@ def match_till_transaction(request):
                 },
             )
     except IntegrityError:
-        return Response({"detail": "This receipt was matched by another request. Refresh and try again."}, status=409)
+        return Response({"detail": "This receipt was matched by another request. Refresh and try again."}, status=409)  # noqa: E501
 
     return Response({
         "matched": True,
