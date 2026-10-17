@@ -398,7 +398,6 @@ export default function POS() {
       }
     }
     addToCart(product, quantity);
-    setCartOpen(true);
   }, [addToCart, getQuantityFor]);
 
   const changeQuantity = (item, delta) => {
@@ -1181,7 +1180,8 @@ export default function POS() {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault();
-                    submitSearch();
+                    if (searchTerm.trim()) submitSearch();
+                    else if (cart.length) openReview();
                   }
                 }}
                 aria-label="Scan barcode or search products"
@@ -1240,7 +1240,7 @@ export default function POS() {
               )}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-              <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">Enter</kbd> Add product</span>
+              <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">Enter</kbd> Add product; press Enter again to checkout</span>
               <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">F2</kbd> Search</span>
               <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">F8</kbd> Checkout</span>
             </div>
@@ -1264,9 +1264,8 @@ export default function POS() {
             </div>
           </div>
           <div className="flex flex-col gap-3 border-t border-slate-700 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <p className="text-sm text-slate-400">{cart.length ? 'Products are in the cart. Open the cart panel to adjust quantities or proceed to payment.' : 'Ready for the next scan. Search by name or SKU if a barcode is unavailable.'}</p>
+            <p className="text-sm text-slate-400">{cart.length ? 'Keep scanning to add items. Press Enter with the search box empty to review the sale and choose Cash or M-Pesa.' : 'Ready for the next scan. Search by name or SKU if a barcode is unavailable.'}</p>
             <div className="flex gap-2">
-              {cart.length > 0 && <button className="rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800" onClick={() => setCartOpen(true)}>View cart</button>}
               <button className="rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40" disabled={!cart.length} onClick={openReview}>Checkout <kbd className="ml-1 rounded border border-slate-950/20 px-1.5 py-0.5">F8</kbd></button>
             </div>
           </div>
