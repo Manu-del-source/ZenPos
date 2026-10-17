@@ -1,8 +1,7 @@
-from config.routing import ModuleRouter
-
-from .views import PaymentViewSet, match_till_transaction, unmatched_till_transactions
-
 from django.urls import path
+
+from config.routing import ModuleRouter
+from .views import PaymentViewSet, match_till_transaction, unmatched_till_transactions
 
 router = ModuleRouter()
 router.register("payments", PaymentViewSet, basename="payment")
