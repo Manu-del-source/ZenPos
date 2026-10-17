@@ -131,3 +131,94 @@ class WebhookEvent(BaseModel):
 
     def __str__(self):
         return f"{self.provider}:{self.external_id}"
+
+
+class MerchantTillAccount(models.Model):
+    """A merchant shortcode registered to one ZenPOS organization/branch.
+
+    C2B callbacks are routed by shortcode, never by a client-supplied tenant ID.
+    """
+    class Environment(models.TextChoices):
+        SANDBOX = "sandbox", "Sandbox"
+        PRODUCTION = "production", "Production"
+
+    organization = models.ForeignKey(
+        "organizations.Organization", related_name="mpesa_till_accounts",
+        on_delete=models.PROTECT,
+    )
+    branch = models.ForeignKey(
+        "branches.Branch", related_name="mpesa_till_accounts",
+        null=True, blank=True, on_delete=models.PROTECT,
+    )
+    shortcode = models.CharField(max_length=32)
+    environment = models.CharField(max_length=12, choices=Environment.choices)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["organization__name", "shortcode"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shortcode", "environment"],
+                name="uniq_mpesa_shortcode_environment",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.shortcode} ({self.environment})"
+
+
+class IncomingTillTransaction(models.Model):
+    """Verified C2B money received by a merchant, awaiting sale assignment."""
+    class Status(models.TextChoices):
+        UNMATCHED = "UNMATCHED", "Unmatched"
+        MATCHED = "MATCHED", "Matched"
+        DUPLICATE_REVIEW = "DUPLICATE_REVIEW", "Duplicate review"
+        REJECTED = "REJECTED", "Rejected"
+
+    account = models.ForeignKey(
+        MerchantTillAccount, related_name="transactions", on_delete=models.PROTECT,
+    )
+    receipt_number = models.CharField(max_length=64)
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.CharField(max_length=3, default="KES")
+    transaction_time = models.DateTimeField()
+    payer_phone = models.CharField(max_length=32, blank=True, default="")
+    payer_first_name = models.CharField(max_length=80, blank=True, default="")
+    payer_middle_name = models.CharField(max_length=80, blank=True, default="")
+    payer_last_name = models.CharField(max_length=80, blank=True, default="")
+    bill_reference = models.CharField(max_length=64, blank=True, default="")
+    third_party_transaction_id = models.CharField(max_length=64, blank=True, default="")
+    raw_payload = models.JSONField(default=dict)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UNMATCHED, db_index=True)  # noqa: E501
+    matched_sale = models.ForeignKey(
+        "sales.Sale", related_name="matched_till_transactions",
+        null=True, blank=True, on_delete=models.PROTECT,
+    )
+    matched_payment = models.OneToOneField(
+        Payment, related_name="matched_till_transaction",
+        null=True, blank=True, on_delete=models.PROTECT,
+    )
+    matched_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        related_name="matched_till_transactions", on_delete=models.PROTECT,
+    )
+    matched_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-transaction_time", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["account", "receipt_number"],
+                name="uniq_till_receipt_per_account",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["account", "status", "transaction_time"], name="idx_till_txn_queue"),  # noqa: E501
+        ]
+
+    def __str__(self):
+        return f"{self.receipt_number} — {self.amount} {self.currency}"
