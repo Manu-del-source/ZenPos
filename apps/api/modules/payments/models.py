@@ -191,7 +191,7 @@ class IncomingTillTransaction(models.Model):
     bill_reference = models.CharField(max_length=64, blank=True, default="")
     third_party_transaction_id = models.CharField(max_length=64, blank=True, default="")
     raw_payload = models.JSONField(default=dict)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UNMATCHED, db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UNMATCHED, db_index=True)  # noqa: E501
     matched_sale = models.ForeignKey(
         "sales.Sale", related_name="matched_till_transactions",
         null=True, blank=True, on_delete=models.PROTECT,
@@ -217,7 +217,7 @@ class IncomingTillTransaction(models.Model):
             ),
         ]
         indexes = [
-            models.Index(fields=["account", "status", "transaction_time"], name="idx_till_txn_queue"),
+            models.Index(fields=["account", "status", "transaction_time"], name="idx_till_txn_queue"),  # noqa: E501
         ]
 
     def __str__(self):
