@@ -217,7 +217,6 @@ export default function POS() {
   const [statusMessage, setStatusMessage] = useState('');
   const [outcome, setOutcome] = useState(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
 
   const searchRef = useRef(null);
   const clientRef = useRef(null);
@@ -398,7 +397,6 @@ export default function POS() {
       }
     }
     addToCart(product, quantity);
-    setCartOpen(true);
   }, [addToCart, getQuantityFor]);
 
   const changeQuantity = (item, delta) => {
@@ -460,7 +458,6 @@ export default function POS() {
   const openReview = () => {
     if (!cart.length) return;
     if (!clientRef.current) clientRef.current = newClientReference();
-    setCartOpen(false);
     setStep('review');
   };
 
@@ -740,7 +737,6 @@ export default function POS() {
       }
       if (event.key === 'Escape') {
         if (showShortcuts) { setShowShortcuts(false); return; }
-        if (cartOpen) { setCartOpen(false); return; }
         if (isTypingTarget(event.target) && step === 'sale') { setSearchTerm(''); return; }
         if (step === 'review') { setStep('sale'); return; }
         if (step === 'payment') {
@@ -777,7 +773,7 @@ export default function POS() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, cart.length, method, outcome, showShortcuts, cartOpen, cash, total, busy, phone]);
+  }, [step, cart.length, method, outcome, showShortcuts, cash, total, busy, phone]);
 
   useEffect(() => {
     if (step === 'sale') searchRef.current?.focus();
@@ -901,7 +897,7 @@ export default function POS() {
         <section className="panel overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-950 text-left text-xs uppercase text-slate-500">
+              <thead className="bg-slate-800 text-left text-xs font-bold uppercase tracking-wide text-slate-200">
                 <tr>
                   <th className="p-4">Code</th>
                   <th className="p-4">Product</th>
@@ -910,14 +906,14 @@ export default function POS() {
                   <th className="p-4 text-right">Line total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
-                {cart.map((item) => (
-                  <tr key={item.id}>
-                    <td className="p-4 font-mono text-xs text-slate-500">{item.sku || '—'}</td>
-                    <td className="p-4 font-medium text-white">{item.name}</td>
-                    <td className="p-4 text-right">KES {money(item.price)}</td>
-                    <td className="p-4 text-right">{item.quantity}</td>
-                    <td className="p-4 text-right font-semibold text-white">
+              <tbody className="divide-y divide-slate-700">
+                {cart.map((item, index) => (
+                  <tr key={item.id} className={index % 2 === 0 ? "bg-slate-900" : "bg-slate-800/80"}>
+                    <td className="p-4 font-mono text-xs font-semibold text-slate-200">{item.sku || '—'}</td>
+                    <td className="p-4 font-semibold text-white">{item.name}</td>
+                    <td className="p-4 text-right font-medium text-white">KES {money(item.price)}</td>
+                    <td className="p-4 text-right font-semibold text-white">{item.quantity}</td>
+                    <td className="p-4 text-right font-bold text-amber-300">
                       KES {money(getLineTotal(item))}
                     </td>
                   </tr>
@@ -925,18 +921,18 @@ export default function POS() {
               </tbody>
             </table>
           </div>
-          <div className="border-t border-slate-800 p-6">
-            <dl className="mb-5 space-y-2 text-sm">
-              <div className="flex justify-between gap-4 text-slate-400">
-                <dt>Subtotal (before tax)</dt><dd className="font-medium text-slate-200">KES {money(subtotal)}</dd>
+          <div className="border-t border-slate-700 bg-slate-800 p-6">
+            <dl className="mb-5 space-y-2 rounded-xl border border-slate-600 bg-slate-900 p-4 text-sm">
+              <div className="flex justify-between gap-4 text-white">
+                <dt className="font-semibold">Subtotal (before tax)</dt><dd className="font-bold tabular-nums text-white">KES {money(subtotal)}</dd>
               </div>
-              <div className="flex justify-between gap-4 text-slate-400">
-                <dt>VAT / tax</dt><dd className="font-medium text-slate-200">KES {money(taxTotal)}</dd>
+              <div className="flex justify-between gap-4 text-white">
+                <dt className="font-semibold">VAT / tax</dt><dd className="font-bold tabular-nums text-white">KES {money(taxTotal)}</dd>
               </div>
             </dl>
             <div className="flex items-end justify-between gap-4">
-              <span className="text-sm uppercase tracking-wide text-slate-500">Amount due</span>
-              <strong className="text-4xl font-black text-white">KES {money(total)}</strong>
+              <span className="text-sm font-bold uppercase tracking-wide text-slate-200">Amount due</span>
+              <strong className="text-4xl font-black text-amber-300">KES {money(total)}</strong>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <button className="payment-choice" onClick={enterCash}>
@@ -1181,7 +1177,8 @@ export default function POS() {
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault();
-                    submitSearch();
+                    if (searchTerm.trim()) submitSearch();
+                    else if (cart.length) openReview();
                   }
                 }}
                 aria-label="Scan barcode or search products"
@@ -1240,7 +1237,7 @@ export default function POS() {
               )}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-              <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">Enter</kbd> Add product</span>
+              <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">Enter</kbd> Add product; press Enter again to checkout</span>
               <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">F2</kbd> Search</span>
               <span><kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-slate-300">F8</kbd> Checkout</span>
             </div>
@@ -1264,123 +1261,74 @@ export default function POS() {
             </div>
           </div>
           <div className="flex flex-col gap-3 border-t border-slate-700 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <p className="text-sm text-slate-400">{cart.length ? 'Products are in the cart. Open the cart panel to adjust quantities or proceed to payment.' : 'Ready for the next scan. Search by name or SKU if a barcode is unavailable.'}</p>
+            <p className="text-sm text-slate-400">{cart.length ? 'Keep scanning to add items. Press Enter with the search box empty to review the sale and choose Cash or M-Pesa.' : 'Ready for the next scan. Search by name or SKU if a barcode is unavailable.'}</p>
             <div className="flex gap-2">
-              {cart.length > 0 && <button className="rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800" onClick={() => setCartOpen(true)}>View cart</button>}
               <button className="rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40" disabled={!cart.length} onClick={openReview}>Checkout <kbd className="ml-1 rounded border border-slate-950/20 px-1.5 py-0.5">F8</kbd></button>
             </div>
           </div>
         </section>
 
-        {cartOpen && cart.length > 0 && (
-          <div
-            className="fixed inset-0 z-[70] flex justify-end bg-black/65 backdrop-blur-[2px]"
-            role="presentation"
-            onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false); }}
-          >
-            <section className="panel flex h-full max-h-[100dvh] w-full max-w-md flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-2xl sm:rounded-l-2xl sm:rounded-r-none motion-safe:animate-in motion-safe:slide-in-from-right duration-200" role="dialog" aria-modal="true" aria-labelledby="pos-cart-title">
-          <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+        <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-xl shadow-black/20" aria-labelledby="pos-cart-title">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 bg-slate-950 px-4 py-4 sm:px-6">
             <div>
-              <h2 id="pos-cart-title" className="font-bold text-white">Added to cart</h2>
-              <p className="text-xs text-slate-500">{lineCount} item{lineCount === 1 ? '' : 's'}</p>
+              <h2 id="pos-cart-title" className="text-base font-bold text-white">Current cart</h2>
+              <p className="mt-1 text-sm text-slate-300">{lineCount} product line{lineCount === 1 ? '' : 's'} · quantities and totals update as you scan</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button className="text-xs font-semibold text-red-400 hover:text-red-300" onClick={() => { clearCart(); setCartOpen(false); }}>
-                Clear cart
-              </button>
-              <button className="btn-secondary !px-3 !py-2" onClick={() => setCartOpen(false)} aria-label="Close cart">
-                <X size={16} />
-              </button>
-            </div>
+            {cart.length > 0 && (
+              <button className="btn-secondary !py-2 !text-red-300 hover:!text-red-200" onClick={clearCart}>Clear cart</button>
+            )}
           </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {cart.length === 0 ? (
-              <div className="grid h-full min-h-72 place-items-center p-8 text-center">
-                <div>
-                  <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl border border-slate-800 bg-slate-950">
-                    <Package className="text-slate-600" size={24} />
-                  </div>
-                  <p className="font-semibold text-slate-300">No items yet</p>
-                  <p className="mt-1 text-sm text-slate-500">Scan a barcode or tap a product to begin.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-800/70">
+          {cart.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <Package className="mx-auto mb-3 text-slate-500" size={28} />
+              <p className="font-semibold text-slate-200">Your cart is empty</p>
+              <p className="mt-1 text-sm text-slate-400">Search for a product or scan its barcode. Added products will stay visible here.</p>
+            </div>
+          ) : (
+            <>
+              <div className="divide-y divide-slate-700">
                 {cart.map((item) => (
-                  <div key={item.id} className="p-4">
-                    <div className="flex gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-slate-200">{item.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">KES {money(item.price)} each</p>
-                      </div>
-                      <button
-                        className="shrink-0 text-slate-600 hover:text-red-400"
-                        onClick={() => removeFromCart(item.id)}
-                        aria-label={`Remove ${item.name}`}
-                      >
-                        <Trash2 size={16} />
+                  <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 bg-slate-800/70 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_120px_150px_40px] sm:px-6">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-white">{item.name}</p>
+                      <p className="mt-1 text-sm text-slate-300">KES {money(item.price)} each</p>
+                    </div>
+                    <div className="flex items-center rounded-lg border border-slate-600 bg-slate-950">
+                      <button className="p-2 text-slate-300 hover:text-white" onClick={() => changeQuantity(item, -1)} aria-label={`Decrease quantity of ${item.name}`}>
+                        <Minus size={14} />
+                      </button>
+                      <input type="number" min="1" className="w-12 border-0 bg-transparent text-center text-sm font-bold text-white outline-none" value={item.quantity} onChange={(event) => setQuantity(item.id, event.target.value)} aria-label={`Quantity for ${item.name}`} />
+                      <button className="p-2 text-slate-300 hover:text-white" onClick={() => changeQuantity(item, 1)} aria-label={`Increase quantity of ${item.name}`}>
+                        <Plus size={14} />
                       </button>
                     </div>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <div className="flex items-center rounded-lg border border-slate-800 bg-slate-950">
-                        <button className="p-2 text-slate-400 hover:text-white" onClick={() => changeQuantity(item, -1)} aria-label="Fewer">
-                          <Minus size={14} />
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          className="w-14 border-0 bg-transparent text-center text-sm font-semibold text-white outline-none"
-                          value={item.quantity}
-                          onChange={(event) => setQuantity(item.id, event.target.value)}
-                          aria-label={`Quantity for ${item.name}`}
-                        />
-                        <button className="p-2 text-slate-400 hover:text-white" onClick={() => changeQuantity(item, 1)} aria-label="More">
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                      <span className="font-semibold text-white">KES {money(getLineTotal(item))}</span>
+                    <div className="text-right">
+                      <p className="font-bold tabular-nums text-white">KES {money(getLineTotal(item))}</p>
+                      <p className="mt-1 text-xs text-slate-400">Line total</p>
                     </div>
+                    <button className="justify-self-end text-slate-300 hover:text-red-400" onClick={() => removeFromCart(item.id)} aria-label={`Remove ${item.name} from cart`}>
+                      <Trash2 size={17} />
+                    </button>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-
-          <div className="border-t border-slate-800 bg-slate-950/50 p-5">
-            <dl className="mb-4 space-y-2 text-sm">
-              <div className="flex justify-between gap-4 text-slate-400">
-                <dt>Subtotal (before tax)</dt><dd className="font-medium text-slate-200">KES {money(subtotal)}</dd>
+              <div className="border-t border-slate-700 bg-slate-950 p-4 sm:p-6">
+                <div className="ml-auto max-w-md space-y-3">
+                  <div className="flex justify-between gap-4 text-sm text-white"><span className="font-semibold">Subtotal</span><span className="font-bold tabular-nums">KES {money(subtotal)}</span></div>
+                  <div className="flex justify-between gap-4 text-sm text-white"><span className="font-semibold">VAT / tax</span><span className="font-bold tabular-nums">KES {money(taxTotal)}</span></div>
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
+                    <span className="text-sm font-bold uppercase tracking-wide text-amber-100">Total due</span>
+                    <span className="text-2xl font-black tabular-nums text-amber-300">KES {money(total)}</span>
+                  </div>
+                  <button className="w-full rounded-lg bg-amber-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40" disabled={!cart.length} onClick={openReview}>
+                    Checkout and payment <kbd className="ml-1 rounded border border-slate-950/20 px-1.5 py-0.5">F8</kbd>
+                  </button>
+                  <p className="text-right text-xs text-slate-400">Press Enter with the search field empty to continue to checkout.</p>
+                </div>
               </div>
-              <div className="flex justify-between gap-4 text-slate-400">
-                <dt>VAT / tax</dt><dd className="font-medium text-slate-200">KES {money(taxTotal)}</dd>
-              </div>
-            </dl>
-            <div className="mb-4 flex items-end justify-between">
-              <span className="text-sm text-slate-500">Total due</span>
-              <span className="text-3xl font-black text-white">KES {money(total)}</span>
-            </div>
-            <label className="mb-4 block">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-400">Customer</span>
-              <div className="relative">
-                <UserRound size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                <select className="input pl-10" value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
-                  <option value="">Walk-in customer</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name} — {customer.phone}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </label>
-            <button className="btn-primary w-full !py-4 !bg-blue-600 hover:!bg-blue-500" disabled={!cart.length} onClick={openReview}>
-              <CreditCard size={18} /> Take payment <kbd className="kbd kbd--dark">F8</kbd>
-            </button>
-          </div>
-            </section>
-          </div>
-        )}
+            </>
+          )}
+        </section>
       </div>
     </div>
   );
