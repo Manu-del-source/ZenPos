@@ -20,7 +20,7 @@ class IncomingTillTransactionAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "currency", "account__environment")
     search_fields = ("receipt_number", "bill_reference", "third_party_transaction_id")
-    list_select_related = ("account", "account__organization", "account__branch", "matched_sale", "matched_by")
+    list_select_related = ("account", "account__organization", "account__branch", "matched_sale", "matched_by")  # noqa: E501
     readonly_fields = (
         "account", "receipt_number", "amount", "currency", "transaction_time",
         "payer_phone", "payer_first_name", "payer_middle_name", "payer_last_name",
