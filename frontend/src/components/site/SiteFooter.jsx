@@ -12,15 +12,17 @@ function SiteFooter() {
         </div>
         <div className="footer-link-column">
           <b>Product</b>
-          <a href="#product">Product</a>
-          <a href="#features">Features</a>
-          <a href="#how-it-works">How it works</a>
+          <Link to="/#product">Product</Link>
+          <Link to="/#features">Features</Link>
+          <Link to="/#how-it-works">How it works</Link>
         </div>
         <div className="footer-link-column">
           <b>ZenPOS</b>
-          <a href="#contact">Contact</a>
+          <Link to="/#contact">Contact</Link>
           <Link to="/login">Sign in</Link>
           <Link to="/login">Open ZenPOS</Link>
+          <Link to="/privacy">Privacy policy</Link>
+          <Link to="/terms">Terms and conditions</Link>
         </div>
       </div>
       <div className="footer-bottom">
