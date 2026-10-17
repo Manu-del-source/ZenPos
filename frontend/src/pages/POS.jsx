@@ -900,7 +900,7 @@ export default function POS() {
         <section className="panel overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-950 text-left text-xs uppercase text-slate-500">
+              <thead className="bg-slate-800 text-left text-xs font-bold uppercase tracking-wide text-slate-200">
                 <tr>
                   <th className="p-4">Code</th>
                   <th className="p-4">Product</th>
@@ -909,14 +909,14 @@ export default function POS() {
                   <th className="p-4 text-right">Line total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-slate-700">
                 {cart.map((item) => (
                   <tr key={item.id}>
-                    <td className="p-4 font-mono text-xs text-slate-500">{item.sku || '—'}</td>
+                    <td className="p-4 font-mono text-xs text-slate-300">{item.sku || '—'}</td>
                     <td className="p-4 font-medium text-white">{item.name}</td>
-                    <td className="p-4 text-right">KES {money(item.price)}</td>
-                    <td className="p-4 text-right">{item.quantity}</td>
-                    <td className="p-4 text-right font-semibold text-white">
+                    <td className="p-4 text-right text-slate-200">KES {money(item.price)}</td>
+                    <td className="p-4 text-right font-semibold text-white">{item.quantity}</td>
+                    <td className="p-4 text-right font-bold text-amber-300">
                       KES {money(getLineTotal(item))}
                     </td>
                   </tr>
@@ -924,18 +924,18 @@ export default function POS() {
               </tbody>
             </table>
           </div>
-          <div className="border-t border-slate-800 p-6">
+          <div className="border-t border-slate-700 bg-slate-900 p-6">
             <dl className="mb-5 space-y-2 text-sm">
-              <div className="flex justify-between gap-4 text-slate-400">
-                <dt>Subtotal (before tax)</dt><dd className="font-medium text-slate-200">KES {money(subtotal)}</dd>
+              <div className="flex justify-between gap-4 text-slate-200">
+                <dt className="font-medium">Subtotal (before tax)</dt><dd className="font-bold text-white">KES {money(subtotal)}</dd>
               </div>
-              <div className="flex justify-between gap-4 text-slate-400">
-                <dt>VAT / tax</dt><dd className="font-medium text-slate-200">KES {money(taxTotal)}</dd>
+              <div className="flex justify-between gap-4 text-slate-200">
+                <dt className="font-medium">VAT / tax</dt><dd className="font-semibold text-white">KES {money(taxTotal)}</dd>
               </div>
             </dl>
             <div className="flex items-end justify-between gap-4">
-              <span className="text-sm uppercase tracking-wide text-slate-500">Amount due</span>
-              <strong className="text-4xl font-black text-white">KES {money(total)}</strong>
+              <span className="text-sm font-bold uppercase tracking-wide text-slate-200">Amount due</span>
+              <strong className="text-4xl font-black text-amber-300">KES {money(total)}</strong>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <button className="payment-choice" onClick={enterCash}>
@@ -1278,10 +1278,10 @@ export default function POS() {
             onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false); }}
           >
             <section className="panel flex h-full max-h-[100dvh] w-full max-w-md flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-2xl sm:rounded-l-2xl sm:rounded-r-none motion-safe:animate-in motion-safe:slide-in-from-right duration-200" role="dialog" aria-modal="true" aria-labelledby="pos-cart-title">
-          <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-5 py-4">
             <div>
               <h2 id="pos-cart-title" className="font-bold text-white">Added to cart</h2>
-              <p className="text-xs text-slate-500">{lineCount} item{lineCount === 1 ? '' : 's'}</p>
+              <p className="text-xs font-medium text-slate-300">{lineCount} item{lineCount === 1 ? '' : 's'}</p>
             </div>
             <div className="flex items-center gap-2">
               <button className="text-xs font-semibold text-red-400 hover:text-red-300" onClick={() => { clearCart(); setCartOpen(false); }}>
@@ -1305,13 +1305,13 @@ export default function POS() {
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-slate-800/70">
+              <div className="divide-y divide-slate-700">
                 {cart.map((item) => (
-                  <div key={item.id} className="p-4">
+                  <div key={item.id} className="bg-slate-900/70 p-4">
                     <div className="flex gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-slate-200">{item.name}</p>
-                        <p className="mt-1 text-xs text-slate-500">KES {money(item.price)} each</p>
+                        <p className="truncate font-semibold text-white">{item.name}</p>
+                        <p className="mt-1 text-xs font-medium text-slate-300">KES {money(item.price)} each</p>
                       </div>
                       <button
                         className="shrink-0 text-slate-600 hover:text-red-400"
@@ -1338,7 +1338,7 @@ export default function POS() {
                           <Plus size={14} />
                         </button>
                       </div>
-                      <span className="font-semibold text-white">KES {money(getLineTotal(item))}</span>
+                      <span className="font-bold text-amber-300">KES {money(getLineTotal(item))}</span>
                     </div>
                   </div>
                 ))}
@@ -1346,18 +1346,18 @@ export default function POS() {
             )}
           </div>
 
-          <div className="border-t border-slate-800 bg-slate-950/50 p-5">
+          <div className="border-t border-slate-700 bg-slate-900 p-5">
             <dl className="mb-4 space-y-2 text-sm">
-              <div className="flex justify-between gap-4 text-slate-400">
-                <dt>Subtotal (before tax)</dt><dd className="font-medium text-slate-200">KES {money(subtotal)}</dd>
+              <div className="flex justify-between gap-4 text-slate-200">
+                <dt className="font-medium">Subtotal (before tax)</dt><dd className="font-bold text-white">KES {money(subtotal)}</dd>
               </div>
-              <div className="flex justify-between gap-4 text-slate-400">
-                <dt>VAT / tax</dt><dd className="font-medium text-slate-200">KES {money(taxTotal)}</dd>
+              <div className="flex justify-between gap-4 text-slate-200">
+                <dt className="font-medium">VAT / tax</dt><dd className="font-semibold text-white">KES {money(taxTotal)}</dd>
               </div>
             </dl>
             <div className="mb-4 flex items-end justify-between">
-              <span className="text-sm text-slate-500">Total due</span>
-              <span className="text-3xl font-black text-white">KES {money(total)}</span>
+              <span className="text-sm font-semibold text-slate-200">Total due</span>
+              <span className="text-3xl font-black text-amber-300">KES {money(total)}</span>
             </div>
             <label className="mb-4 block">
               <span className="mb-1.5 block text-xs font-semibold text-slate-400">Customer</span>
