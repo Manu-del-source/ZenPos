@@ -910,11 +910,11 @@ export default function POS() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700">
-                {cart.map((item) => (
-                  <tr key={item.id}>
-                    <td className="p-4 font-mono text-xs text-slate-300">{item.sku || '—'}</td>
-                    <td className="p-4 font-medium text-white">{item.name}</td>
-                    <td className="p-4 text-right text-slate-200">KES {money(item.price)}</td>
+                {cart.map((item, index) => (
+                  <tr key={item.id} className={index % 2 === 0 ? "bg-slate-900" : "bg-slate-800/80"}>
+                    <td className="p-4 font-mono text-xs font-semibold text-slate-200">{item.sku || '—'}</td>
+                    <td className="p-4 font-semibold text-white">{item.name}</td>
+                    <td className="p-4 text-right font-medium text-white">KES {money(item.price)}</td>
                     <td className="p-4 text-right font-semibold text-white">{item.quantity}</td>
                     <td className="p-4 text-right font-bold text-amber-300">
                       KES {money(getLineTotal(item))}
@@ -924,13 +924,13 @@ export default function POS() {
               </tbody>
             </table>
           </div>
-          <div className="border-t border-slate-700 bg-slate-900 p-6">
-            <dl className="mb-5 space-y-2 text-sm">
-              <div className="flex justify-between gap-4 text-slate-200">
-                <dt className="font-medium">Subtotal (before tax)</dt><dd className="font-bold text-white">KES {money(subtotal)}</dd>
+          <div className="border-t border-slate-700 bg-slate-800 p-6">
+            <dl className="mb-5 space-y-2 rounded-xl border border-slate-600 bg-slate-900 p-4 text-sm">
+              <div className="flex justify-between gap-4 text-white">
+                <dt className="font-semibold">Subtotal (before tax)</dt><dd className="font-bold tabular-nums text-white">KES {money(subtotal)}</dd>
               </div>
-              <div className="flex justify-between gap-4 text-slate-200">
-                <dt className="font-medium">VAT / tax</dt><dd className="font-semibold text-white">KES {money(taxTotal)}</dd>
+              <div className="flex justify-between gap-4 text-white">
+                <dt className="font-semibold">VAT / tax</dt><dd className="font-bold tabular-nums text-white">KES {money(taxTotal)}</dd>
               </div>
             </dl>
             <div className="flex items-end justify-between gap-4">
@@ -1307,11 +1307,11 @@ export default function POS() {
             ) : (
               <div className="divide-y divide-slate-700">
                 {cart.map((item) => (
-                  <div key={item.id} className="bg-slate-900/70 p-4">
+                  <div key={item.id} className="border-l-2 border-amber-400/70 bg-slate-800 p-4">
                     <div className="flex gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold text-white">{item.name}</p>
-                        <p className="mt-1 text-xs font-medium text-slate-300">KES {money(item.price)} each</p>
+                        <p className="mt-1 text-sm font-medium text-slate-100">KES {money(item.price)} each</p>
                       </div>
                       <button
                         className="shrink-0 text-slate-600 hover:text-red-400"
@@ -1346,18 +1346,18 @@ export default function POS() {
             )}
           </div>
 
-          <div className="border-t border-slate-700 bg-slate-900 p-5">
-            <dl className="mb-4 space-y-2 text-sm">
-              <div className="flex justify-between gap-4 text-slate-200">
-                <dt className="font-medium">Subtotal (before tax)</dt><dd className="font-bold text-white">KES {money(subtotal)}</dd>
+          <div className="border-t border-slate-700 bg-slate-800 p-5">
+            <dl className="mb-4 space-y-2 rounded-xl border border-slate-600 bg-slate-900 p-4 text-sm">
+              <div className="flex justify-between gap-4 text-white">
+                <dt className="font-semibold">Subtotal (before tax)</dt><dd className="font-bold tabular-nums text-white">KES {money(subtotal)}</dd>
               </div>
-              <div className="flex justify-between gap-4 text-slate-200">
-                <dt className="font-medium">VAT / tax</dt><dd className="font-semibold text-white">KES {money(taxTotal)}</dd>
+              <div className="flex justify-between gap-4 text-white">
+                <dt className="font-semibold">VAT / tax</dt><dd className="font-bold tabular-nums text-white">KES {money(taxTotal)}</dd>
               </div>
             </dl>
-            <div className="mb-4 flex items-end justify-between">
-              <span className="text-sm font-semibold text-slate-200">Total due</span>
-              <span className="text-3xl font-black text-amber-300">KES {money(total)}</span>
+            <div className="mb-4 flex items-end justify-between rounded-xl border border-amber-400/40 bg-amber-400/10 p-4">
+              <span className="text-sm font-bold uppercase tracking-wide text-amber-100">Total due</span>
+              <span className="text-3xl font-black tabular-nums text-amber-300">KES {money(total)}</span>
             </div>
             <label className="mb-4 block">
               <span className="mb-1.5 block text-xs font-semibold text-slate-400">Customer</span>
