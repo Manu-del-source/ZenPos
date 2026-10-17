@@ -195,6 +195,7 @@ REST_FRAMEWORK = {
         # The unauthenticated M-Pesa callback: bounded so a flood of forged
         # bodies cannot pin the API, without slowing a real callback delivery.
         "mpesa_callback": "120/min",
+        "mpesa_c2b_callback": "120/min",
     },
 }
 
