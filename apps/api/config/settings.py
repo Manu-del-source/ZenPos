@@ -225,6 +225,8 @@ MPESA_CALLBACK_URL = os.environ.get("MPESA_CALLBACK_URL", "")
 # Safaricom. Required for the callback endpoint to accept anything; generate
 # it with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 MPESA_CALLBACK_SECRET = os.environ.get("MPESA_CALLBACK_SECRET", "")
+MPESA_C2B_CALLBACK_SECRET = os.environ.get("MPESA_C2B_CALLBACK_SECRET", "")
+MPESA_C2B_ENV = os.environ.get("MPESA_C2B_ENV", MPESA_ENV)
 
 # Explicit allowlists only — never `CORS_ALLOW_ALL_ORIGINS` in any environment.
 CORS_ALLOWED_ORIGINS = _env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
