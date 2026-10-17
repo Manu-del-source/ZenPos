@@ -12,14 +12,6 @@ class Organization(BaseModel):
 
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=80, unique=True)
-    # Set only when an existing ZenPOS business is explicitly linked to Clerk.
-    clerk_organization_id = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True,
-        unique=True,
-        editable=False,
-    )
     currency = models.CharField(
         max_length=3,
         default="KES",
